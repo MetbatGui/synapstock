@@ -1,9 +1,9 @@
-"""Stock, Node, Board 도메인 모델 단위 테스트."""
+"""Stock, Node 도메인 모델 단위 테스트."""
 
 import pytest
 from pydantic import ValidationError
 
-from synapstock.domain.models import Board, Node, Stock
+from synapstock.domain.models import Node, Stock
 
 
 class TestStock:
@@ -75,33 +75,3 @@ class TestNode:
         with pytest.raises(ValidationError):
             Node(name="root")  # type: ignore
 
-
-class TestBoard:
-    """Board 모델 테스트."""
-
-    def test_create_board_auto_creates_root(self):
-        """Board 생성 시 root 노드가 자동으로 만들어져야 한다."""
-        board = Board(name="테마보드")
-        assert board.root.name == "테마보드"
-        assert board.root.depth == 0
-
-    def test_root_starts_empty(self):
-        """Board의 root 노드는 초기에 자식 노드와 종목을 가지지 않아야 한다."""
-        board = Board(name="테마보드")
-        assert board.root.nodes == []
-        assert board.root.stocks == []
-
-    def test_board_name_is_required(self):
-        """name이 없으면 ValidationError가 발생해야 한다."""
-        with pytest.raises(ValidationError):
-            Board()  # type: ignore
-
-    def test_board_root_tree_manipulation(self):
-        """Board의 root를 시작점으로 트리를 만들 수 있어야 한다."""
-        board = Board(name="테마보드")
-        sector = board.root.add_child("섬터A")
-        sector.stocks.append(Stock(name="삼성전자", ticker="005930"))
-
-        assert len(board.root.nodes) == 1
-        assert board.root.nodes[0].depth == 1
-        assert board.root.nodes[0].stocks[0].ticker == "005930"
