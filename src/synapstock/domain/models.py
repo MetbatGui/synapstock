@@ -1,8 +1,10 @@
-"""Stock, Node 도메인 모델 정의."""
+"""Stock, Node, Board 도메인 모델 정의."""
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Any
+
+from pydantic import BaseModel, model_validator
 
 
 class Stock(BaseModel):
@@ -46,3 +48,29 @@ class Node(BaseModel):
         child = Node(name=name, depth=self.depth + 1)
         self.nodes.append(child)
         return child
+
+
+class Board(BaseModel):
+    """마인드맵 보드 모델.
+
+    Board 생성 시 루트 노드(depth=0)가 자동으로 생성된다.
+
+    Attributes:
+        name: 보드 이름.
+        root: 자동 생성된 루트 노드 (depth=0, name=보드명).
+    """
+
+    name: str
+    root: Node
+
+    @model_validator(mode="before")
+    @classmethod
+    def create_root_node(cls, data: Any) -> Any:
+        """root가 없을 경우 Board name으로 루트 노드를 자동 생성한다."""
+        if isinstance(data, dict) and "root" not in data and "name" in data:
+            data["root"] = Node(name=data["name"], depth=0)
+        return data
+
+
+# 재귀 참조 해소 (Node.nodes: list[Node])
+Node.model_rebuild()
