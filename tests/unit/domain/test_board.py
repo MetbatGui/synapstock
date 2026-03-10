@@ -166,3 +166,17 @@ class TestITBoardTree:
         tickers = [s.ticker for s in fin.stocks]
         assert "012510" in tickers  # 더존비즈온
         assert "053580" in tickers  # 웹캐시
+
+    def test_print_full_tree(self, it_board: Board):
+        """IT 보드 전체 트리를 출력한다 (pytest -s 시 확인 가능)."""
+
+        def print_tree(node: Node, indent: int = 0) -> None:
+            prefix = "  " * indent
+            print(f"{prefix}[D{node.depth}] {node.name}")
+            for stock in node.stocks:
+                print(f"{prefix}  - {stock.name} ({stock.ticker})")
+            for child in node.nodes:
+                print_tree(child, indent + 1)
+
+        print()  # 줄바꿈으로 테스트 헤더와 분리
+        print_tree(it_board.root)
