@@ -18,6 +18,9 @@ class Stock(BaseModel):
     name: str
     ticker: str
 
+    def __repr__(self) -> str:
+        return f"- {self.name} ({self.ticker})"
+
 
 class Node(BaseModel):
     """마인드맵 노드 모델.
@@ -49,6 +52,22 @@ class Node(BaseModel):
         self.nodes.append(child)
         return child
 
+    def _format(self, indent: int = 0) -> str:
+        """재귀적으로 트리 문자열을 구성한다."""
+        prefix = "  " * indent
+        lines = [f"{prefix}[D{self.depth}] {self.name}"]
+        for stock in self.stocks:
+            lines.append(f"{prefix}  {stock!r}")
+        for child in self.nodes:
+            lines.append(child._format(indent + 1))
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return self._format()
+
+    def __str__(self) -> str:
+        return self._format()
+
 
 class Board(BaseModel):
     """마인드맵 보드 모델.
@@ -70,6 +89,12 @@ class Board(BaseModel):
         if isinstance(data, dict) and "root" not in data and "name" in data:
             data["root"] = Node(name=data["name"], depth=0)
         return data
+
+    def __repr__(self) -> str:
+        return f"Board({self.name!r})\n{self.root!r}"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 # 재귀 참조 해소 (Node.nodes: list[Node])
