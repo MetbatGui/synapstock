@@ -1,0 +1,21 @@
+[project]
+name = "synapstock"
+version = "0.1.0"
+description = "Universal Mindmap Orchestrator connecting News and Stocks"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "pydantic>=2.12.5",
+    "requests>=2.32.5",
+]
+
+[project.scripts]
+synapstock = "synapstock.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/synapstock"]
