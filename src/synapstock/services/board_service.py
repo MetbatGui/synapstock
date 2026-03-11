@@ -45,4 +45,6 @@ class BoardService:
         Returns:
             Board 이름 리스트 (정렬됨).
         """
-        return self._mindmap.list_boards()
+        from typing import cast
+        return cast(list[str], self._mindmap.list_boards())
+
