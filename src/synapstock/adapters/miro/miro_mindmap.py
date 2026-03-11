@@ -2,7 +2,7 @@
 
 from typing import cast
 import requests
-from synapstock.domain.models import Board, Node
+from synapstock.domain.models import Board, Node, Stock
 from synapstock.domain.ports import MindmapPort
 
 class MiroMindmapAdapter(MindmapPort):
@@ -61,13 +61,13 @@ class MiroMindmapAdapter(MindmapPort):
         items = items_res.json().get("data", [])
 
         # ID -> 아이템 정보(이름, 타입 등) 매핑
-        id_to_data = {
-            item["id"]: {
+        id_to_data = {}
+        for item in items:
+            id_to_data[item["id"]] = {
                 "name": self._extract_text_from_item(item),
-                "type": item["type"]
+                "type": item["type"],
+                "ticker": item.get("data", {}).get("description", "") if item["type"] == "card" else ""
             }
-            for item in items
-        }
 
         # 2. 모든 커넥터 조회
         connectors_res = requests.get(f"{self.base_url}/boards/{board_id}/connectors", headers=self.headers)
@@ -102,13 +102,19 @@ class MiroMindmapAdapter(MindmapPort):
         # 5. 재귀적으로 트리 구성
         def build_node(item_id: str, depth: int) -> Node:
             data = id_to_data[item_id]
-            # TODO: Stock과 Node 구분 로직 (임시로 모두 Node 처리 혹은 특정 타입 구분)
             node = Node(name=data["name"], depth=depth)
             
             for child_id in parent_to_children.get(item_id, []):
-                # 자식 노드 재귀 생성
-                child_node = build_node(child_id, depth + 1)
-                node.nodes.append(child_node)
+                child_data = id_to_data.get(child_id)
+                if not child_data:
+                    continue
+                
+                if child_data["type"] == "card":
+                    # 카드는 종목으로 인식
+                    node.stocks.append(Stock(name=child_data["name"], ticker=child_data.get("ticker", "")))
+                else:
+                    # 그 외(shape 등)는 서브 노드로 인식
+                    node.nodes.append(build_node(child_id, depth + 1))
             return node
 
         board = Board(name=board_name)
@@ -117,67 +123,147 @@ class MiroMindmapAdapter(MindmapPort):
 
     def _extract_text_from_item(self, item: dict) -> str:
         """Item 객체에서 텍스트(이름) 정보를 추출한다."""
-        content = item.get("data", {}).get("content", "")
-        # HTML 태그 제거 (Miro는 텍스트에 HTML 태그가 포함될 수 있음)
+        # Shape/Sticky 등은 data.content, Card는 data.title 사용
+        content = item.get("data", {}).get("content") or item.get("data", {}).get("title") or ""
+        # HTML 태그 제거
         import re
         clean = re.compile('<.*?>')
         return re.sub(clean, '', content).strip() or item.get("id", "Unknown")
 
     def save(self, board: Board) -> None:
-        """Board 데이터를 Miro 보드에 반영한다.
+        """Board 데이터를 Miro 보드에 반영한다 (증분 업데이트).
 
-        기존 보드 내의 모든 아이템을 삭제하고, 도메인 트리를 기반으로 새로운 Shape와 Connector를 생성한다.
+        보드 전체 데이터를 Fetch하여 도메인 트리와 비교한 뒤, 필요한 항목만 생성/삭제한다.
         """
         board_id = self._get_board_id_by_name(board.name)
 
-        # 1. 기존 아이템 삭제
+        # 1. 현재 Miro 상태 Fetch (load와 유사)
         items_res = requests.get(f"{self.base_url}/boards/{board_id}/items", headers=self.headers)
         items_res.raise_for_status()
         items = items_res.json().get("data", [])
 
-        # 삭제 가능한 아이템들 (Miro 시스템 아이템 제외 필요할 수 있으나 일단 전체 삭제 시도)
+        id_to_data = {}
         for item in items:
-            requests.delete(f"{self.base_url}/boards/{board_id}/items/{item['id']}", headers=self.headers)
-
-        # 2. 노드 및 커넥터 생성 (재귀)
-        self._create_node_recursively(board_id, board.root, None)
-
-    def _create_node_recursively(self, board_id: str, node: Node, parent_miro_id: str | None) -> str:
-        """도메인 노드를 Miro Shape로 생성하고 상위 노드와 연결한다."""
-        # 1. Shape 생성
-        # TODO: Node와 Stock 타입에 따라 스타일 차별화 (현재는 모두 Shape)
-        payload = {
-            "data": {
-                "content": node.name
-            },
-            "style": {
-                "fillColor": "#ffffff",
-                "textAlign": "center"
-            },
-            "type": "shape"
-        }
-        
-        # 위치 계산 logic이 복잡하므로 일단 기본 위치에 생성 (Miro가 자동으로 겹치지 않게 두지 않음)
-        # TODO: 위치(x, y) 알고리즘 도입 검토
-        res = requests.post(f"{self.base_url}/boards/{board_id}/shapes", headers=self.headers, json=payload)
-        res.raise_for_status()
-        miro_id = res.json()["id"]
-
-        # 2. 부모가 있다면 Connector 생성
-        if parent_miro_id:
-            conn_payload = {
-                "startItem": {"id": parent_miro_id},
-                "endItem": {"id": miro_id},
-                "style": {
-                    "strokeColor": "#000000",
-                    "strokeWidth": "2.0"
-                }
+            id_to_data[item["id"]] = {
+                "name": self._extract_text_from_item(item),
+                "type": item["type"],
+                "ticker": item.get("data", {}).get("description", "") if item["type"] == "card" else ""
             }
-            requests.post(f"{self.base_url}/boards/{board_id}/connectors", headers=self.headers, json=conn_payload)
 
-        # 3. 자식 노드 처리
-        for child in node.nodes:
-            self._create_node_recursively(board_id, child, miro_id)
+        connectors_res = requests.get(f"{self.base_url}/boards/{board_id}/connectors", headers=self.headers)
+        connectors_res.raise_for_status()
+        connectors = connectors_res.json().get("data", [])
+
+        parent_to_children: dict[str, list[str]] = {}
+        child_to_parent: dict[str, str] = {}
+        for conn in connectors:
+            sid = conn.get("startItem", {}).get("id")
+            eid = conn.get("endItem", {}).get("id")
+            if sid and eid:
+                parent_to_children.setdefault(sid, []).append(eid)
+                child_to_parent[eid] = sid
+
+        # 2. 루트 노드 찾기
+        root_candidates = [iid for iid in id_to_data if iid not in child_to_parent]
+        root_id = None
+        for cid in root_candidates:
+            if id_to_data[cid]["name"] == board.name:
+                root_id = cid
+                break
         
-        return cast(str, miro_id)
+        # 루트가 없으면 생성
+        if not root_id:
+            payload = {
+                "data": {"content": board.name},
+                "style": {"fillColor": "#ffffff", "textAlign": "center"},
+                "type": "shape"
+            }
+            res = requests.post(f"{self.base_url}/boards/{board_id}/shapes", headers=self.headers, json=payload)
+            res.raise_for_status()
+            root_id = res.json()["id"]
+
+        # 3. 재귀적으로 동기화
+        if board.root:
+            self._sync_node(board_id, board.root, root_id, id_to_data, parent_to_children)
+
+    def _sync_node(
+        self, 
+        board_id: str, 
+        domain_node: Node, 
+        miro_id: str, 
+        id_to_data: dict, 
+        parent_to_children: dict
+    ) -> None:
+        """도메인 노드와 Miro 아이템을 대조하여 동기화한다."""
+        
+        # 현재 Miro 아이템의 자식들
+        miro_child_ids = parent_to_children.get(miro_id, [])
+        miro_children = {cid: id_to_data[cid] for cid in miro_child_ids if cid in id_to_data}
+
+        # 도메인 자식들 (Node + Stock)
+        domain_items = []
+        for n in domain_node.nodes:
+            domain_items.append({"name": n.name, "type": "shape", "obj": n})
+        for s in domain_node.stocks:
+            domain_items.append({"name": s.name, "type": "card", "obj": s})
+
+        matched_miro_ids = set()
+
+        for d_item in domain_items:
+            # 매칭되는 Miro 아이템 찾기 (이름과 타입이 같은 것)
+            found_id = None
+            for mid, m_data in miro_children.items():
+                if mid not in matched_miro_ids and m_data["name"] == d_item["name"] and m_data["type"] == d_item["type"]:
+                    found_id = mid
+                    break
+            
+            if found_id:
+                # 보존(Keep) 및 하위 재귀 (Node인 경우만)
+                matched_miro_ids.add(found_id)
+                if d_item["type"] == "shape":
+                    self._sync_node(board_id, d_item["obj"], found_id, id_to_data, parent_to_children)
+            else:
+                # 생성(Create) 및 연결
+                new_id = self._create_miro_item_by_type(board_id, d_item)
+                self._connect_items(board_id, miro_id, new_id)
+                if d_item["type"] == "shape":
+                    # 신규 생성 후 하위도 재귀적으로 생성
+                    self._sync_node(board_id, d_item["obj"], new_id, {}, {})
+
+        # 도메인에 없는데 Miro에만 있는 것 삭제(Delete)
+        for mid in miro_children:
+            if mid not in matched_miro_ids:
+                requests.delete(f"{self.base_url}/boards/{board_id}/items/{mid}", headers=self.headers)
+
+    def _create_miro_item_by_type(self, board_id: str, d_item: dict) -> str:
+        """도메인 아이템 타입에 맞춰 Miro 아이템을 생성한다."""
+        if d_item["type"] == "shape":
+            payload = {
+                "data": {"content": d_item["name"]},
+                "style": {"fillColor": "#ffffff", "textAlign": "center"},
+                "type": "shape"
+            }
+            res = requests.post(f"{self.base_url}/boards/{board_id}/shapes", headers=self.headers, json=payload)
+        else: # card (Stock)
+            stock = d_item["obj"]
+            payload = {
+                "data": {"title": stock.name, "description": stock.ticker},
+                "type": "card"
+            }
+            res = requests.post(f"{self.base_url}/boards/{board_id}/cards", headers=self.headers, json=payload)
+        
+        res.raise_for_status()
+        return cast(str, res.json()["id"])
+
+    def _connect_items(self, board_id: str, start_id: str, end_id: str) -> None:
+        """두 아이템을 Connector로 연결한다."""
+        conn_payload = {
+            "startItem": {"id": start_id},
+            "endItem": {"id": end_id},
+            "style": {
+                "strokeColor": "#000000",
+                "strokeWidth": "2.0"
+            }
+        }
+        requests.post(f"{self.base_url}/boards/{board_id}/connectors", headers=self.headers, json=conn_payload)
 
