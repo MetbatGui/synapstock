@@ -1,6 +1,5 @@
 """BoardService 단위 테스트."""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest

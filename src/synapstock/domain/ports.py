@@ -1,7 +1,6 @@
 """도메인 포트(인터페이스) 정의."""
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 
 from synapstock.domain.models import Board
 
