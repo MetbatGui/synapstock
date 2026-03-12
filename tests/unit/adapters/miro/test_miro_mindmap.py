@@ -30,7 +30,9 @@ def test_load_board(adapter):
     # Given
     board_name = "Test Board"
     board_id = "b123"
-    shape_id = "s456"
+    root_id = "root_1"
+    sub_id = "sub_1"
+    card_id = "card_1"
     
     # 1. 보드 ID 조회 모킹
     responses.add(
@@ -39,22 +41,16 @@ def test_load_board(adapter):
         json={"data": [{"id": board_id, "name": board_name}]},
         status=200
     )
-    # 2. 아이템 조회 (Shape 1개, Card 1개)
+    
+    # 2. 아이템 조회 (mindmap_nodes)
+    # Root, SubNode, Card
     responses.add(
         responses.GET,
-        f"https://api.miro.com/v2/boards/{board_id}/items",
+        f"https://api.miro.com/v2-experimental/boards/{board_id}/mindmap_nodes",
         json={"data": [
-            {"id": shape_id, "type": "shape", "data": {"content": board_name}},
-            {"id": "c789", "type": "card", "data": {"title": "Samsung", "description": "005930"}}
-        ]},
-        status=200
-    )
-    # 3. 커넥터 조회 (Shape -> Card 연결 1개)
-    responses.add(
-        responses.GET,
-        f"https://api.miro.com/v2/boards/{board_id}/connectors",
-        json={"data": [
-            {"id": "conn1", "startItem": {"id": shape_id}, "endItem": {"id": "c789"}}
+            {"id": root_id, "data": {"nodeView": {"data": {"content": board_name}}}},
+            {"id": sub_id, "data": {"nodeView": {"data": {"content": "Sub Node"}}}, "parent": {"id": root_id}},
+            {"id": card_id, "data": {"nodeView": {"data": {"content": "Samsung<!--ticker:005930-->"}}}, "parent": {"id": sub_id}}
         ]},
         status=200
     )
@@ -65,9 +61,11 @@ def test_load_board(adapter):
     # Then
     assert board.name == board_name
     assert board.root.name == board_name
-    assert len(board.root.stocks) == 1
-    assert board.root.stocks[0].name == "Samsung"
-    assert board.root.stocks[0].ticker == "005930"
+    assert len(board.root.nodes) == 1
+    assert board.root.nodes[0].name == "Sub Node"
+    assert len(board.root.nodes[0].stocks) == 1
+    assert board.root.nodes[0].stocks[0].name == "Samsung"
+    assert board.root.nodes[0].stocks[0].ticker == "005930"
 
 @responses.activate
 def test_save_board_reconciliation(adapter):
@@ -89,31 +87,23 @@ def test_save_board_reconciliation(adapter):
                   json={"data": [{"id": board_id, "name": board_name}]}, status=200)
     
     # 2. 현재 상태 Fetch (Miro에는 Root만 있고 자식은 없는 상태)
-    responses.add(responses.GET, f"https://api.miro.com/v2/boards/{board_id}/items",
-                  json={"data": [{"id": "root_id", "type": "shape", "data": {"content": board_name}}]}, status=200)
-    responses.add(responses.GET, f"https://api.miro.com/v2/boards/{board_id}/connectors",
-                  json={"data": []}, status=200)
+    responses.add(responses.GET, f"https://api.miro.com/v2-experimental/boards/{board_id}/mindmap_nodes",
+                  json={"data": [{"id": "root_id", "data": {"nodeView": {"data": {"content": board_name}}}}]}, status=200)
     
-    # 3. 새로운 NodeA 생성 (Shape)
-    responses.add(responses.POST, f"https://api.miro.com/v2/boards/{board_id}/shapes",
-                  json={"id": "node_a_id"}, status=201)
-    # 4. 새로운 Stock1 생성 (Card)
-    responses.add(responses.POST, f"https://api.miro.com/v2/boards/{board_id}/cards",
-                  json={"id": "stock_1_id"}, status=201)
-    # 5. Connectors 생성 (Root->NodeA, Root->Stock1)
-    responses.add(responses.POST, f"https://api.miro.com/v2/boards/{board_id}/connectors",
-                  json={"id": "conn1"}, status=201)
-    responses.add(responses.POST, f"https://api.miro.com/v2/boards/{board_id}/connectors",
-                  json={"id": "conn2"}, status=201)
+    # 3. 새로운 NodeA, Stock1 생성 시도 (mindmap_nodes POST)
+    responses.add(responses.POST, f"https://api.miro.com/v2-experimental/boards/{board_id}/mindmap_nodes",
+                  json={"id": "new_created_id"}, status=201)
 
     # When
     adapter.save(board)
 
     # Then
     # API 호출 횟수 및 순서 확인
-    # GET (boards, items, connectors) + POST (shape, card, conn, conn)
-    assert len(responses.calls) == 7
+    # GET (boards, mindmap_nodes) + POST (NodeA, Stock1) = 4회
+    assert len(responses.calls) == 4
     
-    post_cards = [c for c in responses.calls if c.request.method == 'POST' and '/cards' in c.request.url]
-    assert len(post_cards) == 1
-    assert "Stock1" in post_cards[0].request.body.decode()
+    post_nodes = [c for c in responses.calls if c.request.method == 'POST' and 'mindmap_nodes' in c.request.url]
+    assert len(post_nodes) == 2
+    # Stock 생성 바디 확인
+    post_bodies = [c.request.body.decode() for c in post_nodes]
+    assert any("Stock1" in body and "S1" in body for body in post_bodies)
