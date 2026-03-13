@@ -52,6 +52,33 @@ class Node(BaseModel):
         self.nodes.append(child)
         return child
 
+    def remove_child(self, name: str, absorb: bool = True) -> None:
+        """자식 노드를 삭제한다.
+
+        Args:
+            name: 삭제할 자식 노드의 이름.
+            absorb: True일 경우 삭제되는 노드의 자식들을 현재 노드(부모)로 흡수한다.
+        """
+        target = next((n for n in self.nodes if n.name == name), None)
+        if not target:
+            return
+
+        if absorb:
+            # 1. 자식 노드들을 현재 노드로 이동 및 depth 갱신
+            for child_node in target.nodes:
+                child_node._update_depth_recursive(self.depth + 1)
+                self.nodes.append(child_node)
+            # 2. 종목들을 현재 노드(부모)로 이동
+            self.stocks.extend(target.stocks)
+
+        self.nodes.remove(target)
+
+    def _update_depth_recursive(self, new_depth: int) -> None:
+        """노드와 그 하위 트리 전체의 depth를 재귀적으로 갱신한다."""
+        self.depth = new_depth
+        for child in self.nodes:
+            child._update_depth_recursive(new_depth + 1)
+
     def _format(self, indent: int = 0) -> str:
         """재귀적으로 트리 문자열을 구성한다."""
         prefix = "  " * indent

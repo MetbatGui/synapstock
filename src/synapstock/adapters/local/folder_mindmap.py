@@ -85,6 +85,10 @@ class LocalFolderMindmapAdapter(MindmapPort):
         """
         return sorted(d.name for d in self.root_dir.iterdir() if d.is_dir())
 
+    def sync(self, board: Board) -> None:
+        """로컬 폴더 구조는 Diff 로직 없이 save(덮어쓰기)를 수행한다."""
+        self.save(board)
+
     # -------------------------------------------------------------------------
     # 내부 헬퍼
     # -------------------------------------------------------------------------

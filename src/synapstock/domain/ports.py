@@ -79,3 +79,13 @@ class MindmapPort(ABC):
         Returns:
             Board 이름 리스트 (정렬됨).
         """
+
+    @abstractmethod
+    def sync(self, board: Board) -> None:
+        """Board의 변경사항을 마인드맵 서비스에 동기화한다.
+
+        전체 삭제 후 재생성 대신, 변경된 부분만 업데이트(이동, 수정 등)한다.
+
+        Args:
+            board: 동기화할 Board 인스턴스.
+        """

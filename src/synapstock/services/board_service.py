@@ -48,3 +48,11 @@ class BoardService:
         from typing import cast
         return cast(list[str], self._mindmap.list_boards())
 
+    def sync(self, board: Board) -> None:
+        """Board의 변경사항을 마인드맵에 동기화한다.
+
+        Args:
+            board: 동기화할 Board 인스턴스.
+        """
+        self._mindmap.sync(board)
+

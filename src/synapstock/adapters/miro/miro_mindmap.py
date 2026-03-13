@@ -1,14 +1,18 @@
 """Miro 마인드맵 어댑터 구현."""
 
-from typing import cast
+import re
+from typing import Any, cast
 import requests
+
 from synapstock.domain.models import Board, Node, Stock
 from synapstock.domain.ports import MindmapPort
 
 class MiroMindmapAdapter(MindmapPort):
     """Miro V2 API를 사용하는 마인드맵 어댑터.
 
-    Miro의 Board, Shape, Connector를 사용하여 도메인 트리 구조를 매핑한다.
+    기존 Experimental Sync 방식을 버리고, 
+    Bulk Upload (create-items) 기능을 활용하여 보드 데이터를 
+    좌우 밸런싱된 구조의 커스텀 Shape(Round Rectangle) 형태로 전면 덮어쓴다.
     """
 
     def __init__(self, api_token: str):
@@ -47,194 +51,302 @@ class MiroMindmapAdapter(MindmapPort):
                 return cast(str, board["id"])
         raise FileNotFoundError(f"Miro board not found: {board_name}")
 
-
-    def load(self, board_name: str) -> Board:
-        """Miro 보드에서 트리 구조를 읽어온다.
-
-        Miro의 Experimental Mindmap API를 통해 mindmap_node들을 읽어와 도메인 노드 트리로 복원한다.
-        """
-        board_id = self._get_board_id_by_name(board_name)
-
-        # 1. 모든 mindmap 노드 조회
-        res = requests.get(f"{self.base_url}-experimental/boards/{board_id}/mindmap_nodes", headers=self.headers)
-        res.raise_for_status()
-        items = res.json().get("data", [])
-
-        # ID -> 아이템 정보 맵핑
-        id_to_data = {}
-        for item in items:
-            raw_content = item.get("data", {}).get("nodeView", {}).get("data", {}).get("content", "")
-            id_to_data[item["id"]] = {
-                "name": self._extract_text_from_html(raw_content) or item["id"],
-                "raw_content": raw_content,
-                "parent_id": item.get("parent", {}).get("id") if item.get("parent") else None
-            }
-
-        # 2. 부모 -> 자식 관계 매핑
-        parent_to_children: dict[str, list[str]] = {}
-        for iid, data in id_to_data.items():
-            pid = data["parent_id"]
-            if pid:
-                parent_to_children.setdefault(pid, []).append(iid)
-
-        # 3. 루트 노드 식별 (부모가 없는 노드)
-        root_candidates = [iid for iid, data in id_to_data.items() if not data["parent_id"]]
-        root_id = None
-        for r_id in root_candidates:
-            if id_to_data[r_id]["name"] == board_name:
-                root_id = r_id
-                break
-        
-        if not root_id and root_candidates:
-            root_id = root_candidates[0]
-            
-        if not root_id:
-            return Board(name=board_name)
-
-        # 4. 재귀적으로 트리 구성
-        def build_node(item_id: str, depth: int) -> Node:
-            data = id_to_data[item_id]
-            # 카드는 '<br/>ticker: ' 등의 문자열을 포함함
-            name = data["name"]
-            raw_content = data["raw_content"]
-            
-            node = Node(name=name, depth=depth)
-            
-            for child_id in parent_to_children.get(item_id, []):
-                child_data = id_to_data.get(child_id)
-                if not child_data:
-                    continue
-                
-                c_raw = child_data["raw_content"]
-                c_name = child_data["name"]
-                
-                # 원시 텍스트에 숨겨진 종목 시그니처가 있으면 카드로 파싱
-                if "<!--ticker:" in c_raw:
-                    import re
-                    match = re.search(r"<!--ticker:(.*?)-->", c_raw)
-                    ticker = match.group(1).strip() if match else ""
-                    node.stocks.append(Stock(name=c_name, ticker=ticker))
-                else:
-                    node.nodes.append(build_node(child_id, depth + 1))
-            return node
-
-        board = Board(name=board_name)
-        board.root = build_node(root_id, 0)
-        return board
-
     def _extract_text_from_html(self, content: str) -> str:
         """HTML 형태의 텍스트에서 순수 텍스트만 추출한다."""
-        import re
         clean = re.compile('<.*?>')
         return re.sub(clean, '', content).strip()
 
-    def save(self, board: Board) -> None:
-        """Board 데이터를 Miro 보드의 Mindmap API를 통해 반영한다 (증분 업데이트)."""
-        board_id = self._get_board_id_by_name(board.name)
-
-        # 1. 현재 Miro 상태 Fetch
-        res = requests.get(f"{self.base_url}-experimental/boards/{board_id}/mindmap_nodes", headers=self.headers)
-        res.raise_for_status()
-        items = res.json().get("data", [])
-
-        id_to_data = {}
-        child_to_parent = {}
-        parent_to_children = {}
-        for item in items:
-            iid = item["id"]
-            raw_content = item.get("data", {}).get("nodeView", {}).get("data", {}).get("content", "")
-            pid = item.get("parent", {}).get("id") if item.get("parent") else None
-            
-            id_to_data[iid] = {
-                "raw_content": raw_content,
-                "name": self._extract_text_from_html(raw_content) or iid
-            }
-            if pid:
-                child_to_parent[iid] = pid
-                parent_to_children.setdefault(pid, []).append(iid)
-
-        # 2. 루트 찾기
-        root_candidates = [iid for iid in id_to_data if iid not in child_to_parent]
-        root_id = None
-        for r_id in root_candidates:
-            if id_to_data[r_id]["name"] == board.name:
-                root_id = r_id
+    def load(self, board_name: str) -> Board:
+        """Miro 보드에서 Shape 기반 커스텀 트리 형태를 읽어서 복원한다."""
+        board_id = self._get_board_id_by_name(board_name)
+        
+        # 1. 모든 아이템 & 커넥터 조회
+        items = []
+        cursor = ""
+        while True:
+            url = f"{self.base_url}/boards/{board_id}/items?limit=50"
+            if cursor:
+                url += f"&cursor={cursor}"
+            res = requests.get(url, headers=self.headers)
+            if not res.ok:
                 break
+            data = res.json()
+            items.extend(data.get("data", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+                
+        connectors = []
+        cursor = ""
+        while True:
+            url = f"{self.base_url}/boards/{board_id}/connectors?limit=50"
+            if cursor:
+                url += f"&cursor={cursor}"
+            res = requests.get(url, headers=self.headers)
+            if not res.ok:
+                break
+            data = res.json()
+            connectors.extend(data.get("data", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+                
+        # 2. 분석 및 트리 구성
+        item_dict = {item["id"]: item for item in items}
+        adjacency: dict[str, list[str]] = {}
+        incoming_counts = {item["id"]: 0 for item in items if item["type"] in ["shape", "card"]}
         
-        # 루트가 없으면 생성
-        if not root_id:
-            payload = {"data": {"nodeView": {"data": {"content": board.name}}}}
-            res = requests.post(f"{self.base_url}-experimental/boards/{board_id}/mindmap_nodes", headers=self.headers, json=payload)
-            res.raise_for_status()
-            root_id = res.json()["id"]
-            id_to_data[root_id] = {"raw_content": board.name, "name": board.name}
-
-        # 3. 재귀적으로 동기화
-        if board.root:
-            self._sync_node(board_id, board.root, root_id, id_to_data, parent_to_children)
-
-    def _sync_node(
-        self, 
-        board_id: str, 
-        domain_node: Node, 
-        miro_id: str, 
-        id_to_data: dict, 
-        parent_to_children: dict
-    ) -> None:
-        """도메인 노드와 Miro 마인드맵 아이템을 대조하여 동기화한다."""
-        
-        miro_child_ids = parent_to_children.get(miro_id, [])
-        miro_children = {cid: id_to_data[cid] for cid in miro_child_ids if cid in id_to_data}
-
-        # 도메인 자식들 데이터화 (Node + Stock)
-        domain_items = []
-        for n in domain_node.nodes:
-            domain_items.append({"name": n.name, "raw_content": n.name, "type": "node", "obj": n})
-        for s in domain_node.stocks:
-            link_url = f"https://finance.naver.com/item/main.nhn?code={s.ticker}"
-            card_content = f"<a href=\"{link_url}\">{s.name}</a><!--ticker:{s.ticker}-->"
-            domain_items.append({"name": s.name, "raw_content": card_content, "type": "card", "obj": s})
-
-        matched_miro_ids = set()
-
-        for d_item in domain_items:
-            found_id = None
-            # 이름으로 매칭 시도 (Stock의 경우 파싱된 이름값과 비교)
-            for mid, m_data in miro_children.items():
-                if mid not in matched_miro_ids:
-                    is_match = False
-                    if d_item["type"] == "node" and m_data["name"] == d_item["name"]:
-                        is_match = True
-                    # 카드의 경우 ticker 정보 포함 여부로 확실히 카드임을 식별하거나 텍스트 이름으로 매칭
-                    elif d_item["type"] == "card" and (str(d_item["obj"].ticker) in m_data["raw_content"] or d_item["name"] in m_data["name"]):
-                        is_match = True
-                        
-                    if is_match:
-                        found_id = mid
-                        break
+        for conn in connectors:
+            start_id = conn.get("startItem", {}).get("id")
+            end_id = conn.get("endItem", {}).get("id")
+            if start_id in item_dict and end_id in item_dict:
+                adjacency.setdefault(start_id, []).append(end_id)
+                if end_id in incoming_counts:
+                    incoming_counts[end_id] += 1
+                    
+        root_candidates = [iid for iid, count in incoming_counts.items() if count == 0 and iid in adjacency]
+        if not root_candidates:
+            return Board(name=board_name)
             
-            if found_id:
-                # 보존 및 하위 순회
-                matched_miro_ids.add(found_id)
-                if d_item["type"] == "node":
-                    self._sync_node(board_id, d_item["obj"], found_id, id_to_data, parent_to_children)
+        root_id = root_candidates[0]
+        
+        # 3. 도메인 객체로 파싱
+        def build_domain_node(item_id, depth) -> Node:
+            item = item_dict[item_id]
+            html_content = item.get("data", {}).get("content", "")
+            node_name = self._extract_text_from_html(html_content)
+            
+            node = Node(name=node_name, depth=depth)
+            
+            for child_id in adjacency.get(item_id, []):
+                child_item = item_dict[child_id]
+                c_html = child_item.get("data", {}).get("content", "")
+                c_name = self._extract_text_from_html(c_html)
+                
+                # HTML 주석 내부의 티커(ticker) 여부로 Stock 판단
+                match = re.search(r"<!--ticker:(.*?)-->", c_html)
+                if match:
+                    ticker = match.group(1).strip()
+                    node.stocks.append(Stock(name=c_name, ticker=ticker))
+                else:
+                    node.nodes.append(build_domain_node(child_id, depth + 1))
+            return node
+            
+        board = Board(name=board_name)
+        board.root = build_domain_node(root_id, 0)
+        return board
+
+
+    def save(self, board: Board) -> None:
+        """기존 보드를 완전히 지우고 새로 그린다. (Overwrite)"""
+        board_id = self._get_board_id_by_name(board.name)
+        
+        # 1. 초기화 (모든 아이템 삭제)
+        while True:
+            res = requests.get(f"{self.base_url}/boards/{board_id}/items?limit=50", headers=self.headers)
+            if not res.ok:
+                break
+            items = res.json().get("data", [])
+            if not items:
+                break
+            for item in items:
+                requests.delete(f"{self.base_url}/boards/{board_id}/items/{item['id']}", headers=self.headers)
+
+        if not board.root:
+            return
+
+        # 2. 레이아웃 계산 및 생성 (sync와 로직 공유를 위해 sync 호출도 가능하지만, 단순성을 위해 유지)
+        self.sync(board)
+
+    def sync(self, board: Board) -> None:
+        """기존 아이템과 비교하여 변경된 부분만 PATCH/POST/DELETE 수행."""
+        board_id = self._get_board_id_by_name(board.name)
+        
+        # 1. 가상 레이아웃 계산
+        target_layout = self._calculate_balanced_layout(board.root)
+        
+        # 2. 현재 Miro 아이템 조회
+        items = []
+        cursor = ""
+        while True:
+            url = f"{self.base_url}/boards/{board_id}/items?limit=50"
+            if cursor:
+                url += f"&cursor={cursor}"
+            res = requests.get(url, headers=self.headers)
+            if not res.ok:
+                break
+            data = res.json()
+            items.extend(data.get("data", []))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+
+        # 3. 매칭 맵 구성
+        existing_map: dict[tuple[str, str, bool], list[dict]] = {}
+        for item in items:
+            if item["type"] != "shape":
+                continue
+            c_html = item.get("data", {}).get("content", "")
+            name = self._extract_text_from_html(c_html)
+            ticker_match = re.search(r"<!--ticker:(.*?)-->", c_html)
+            ticker = ticker_match.group(1) if ticker_match else ""
+            is_stk = bool(ticker)
+            key = (name, ticker, is_stk)
+            existing_map.setdefault(key, []).append(item)
+
+        # 4. 동기화 루프
+        item_ids = {}
+        for (obj, depth, x, y, is_stock) in target_layout:
+            name = obj.name
+            ticker = obj.ticker if is_stock else ""
+            key = (name, ticker, is_stock)
+            
+            if is_stock:
+                link_url = f"https://finance.naver.com/item/main.nhn?code={ticker}"
+                c_html = f"<p style=\"text-align: center;\"><a href=\"{link_url}\"><strong>{name}</strong></a></p><!--ticker:{ticker}-->"
             else:
-                # 생성
-                new_id = self._create_mindmap_node(board_id, miro_id, d_item["raw_content"])
-                if d_item["type"] == "node":
-                    self._sync_node(board_id, d_item["obj"], new_id, {}, {})
+                c_html = f"<p style=\"text-align: center;\"><strong>{name}</strong></p>"
 
-        # 도메인에 없는데 Miro에만 있는 것 삭제
-        for mid in miro_children:
-            if mid not in matched_miro_ids:
-                requests.delete(f"{self.base_url}-experimental/boards/{board_id}/mindmap_nodes/{mid}", headers=self.headers)
+            if depth == 0:
+                fill_color = "#e3f2fd"
+            elif depth == 1:
+                fill_color = "#ede7f6"
+            elif is_stock:
+                fill_color = "#e8f5e9"
+            else:
+                fill_color = "#fff3e0"
 
-    def _create_mindmap_node(self, board_id: str, parent_id: str, content: str) -> str:
-        """새로운 자식 마인드맵 노드를 생성한다."""
-        payload = {
-            "data": {"nodeView": {"data": {"content": content}}},
-            "parent": {"id": parent_id}
-        }
-        res = requests.post(f"{self.base_url}-experimental/boards/{board_id}/mindmap_nodes", headers=self.headers, json=payload)
-        res.raise_for_status()
-        return cast(str, res.json()["id"])
+            match = existing_map.get(key, []).pop(0) if existing_map.get(key) else None
+
+            if match:
+                m_id = match["id"]
+                item_ids[id(obj)] = m_id
+                m_pos = match.get("position", {})
+                m_data = match.get("data", {})
+                m_style = match.get("style", {})
+                
+                if (abs(m_pos.get("x", 0) - x) > 0.5 or abs(m_pos.get("y", 0) - y) > 0.5 or 
+                    m_data.get("content") != c_html or m_style.get("fillColor", "").lower() != fill_color.lower()):
+                    patch_payload = {
+                        "data": {"content": c_html},
+                        "position": {"x": x, "y": y},
+                        "style": {"fillColor": fill_color}
+                    }
+                    requests.patch(f"{self.base_url}/boards/{board_id}/items/{m_id}", headers=self.headers, json=patch_payload)
+            else:
+                calc_width = max(100, len(name) * 16 + 40)
+                post_payload = {
+                    "type": "shape",
+                    "data": {"content": c_html, "shape": "round_rectangle"},
+                    "style": {"fillOpacity": "1.0", "fillColor": fill_color, "textAlign": "center", "textAlignVertical": "middle"},
+                    "position": {"x": x, "y": y},
+                    "geometry": {"width": calc_width, "height": 44}
+                }
+                res = requests.post(f"{self.base_url}/boards/{board_id}/shapes", headers=self.headers, json=post_payload)
+                if res.ok:
+                    item_ids[id(obj)] = res.json()["id"]
+
+        # 5. 삭제 및 커넥터 재생성
+        for items_to_del in existing_map.values():
+            for it in items_to_del:
+                requests.delete(f"{self.base_url}/boards/{board_id}/items/{it['id']}", headers=self.headers)
+
+        self._refresh_connectors(board_id, item_ids, board.root)
+
+    def _refresh_connectors(self, board_id: str, item_ids: dict, root_node: Node) -> None:
+        """커넥터 전체 삭제 후 현재 구조에 맞게 재생성."""
+        while True:
+            res = requests.get(f"{self.base_url}/boards/{board_id}/connectors?limit=50", headers=self.headers)
+            if not res.ok:
+                break
+            conns = res.json().get("data", [])
+            if not conns:
+                break
+            for c in conns:
+                requests.delete(f"{self.base_url}/boards/{board_id}/connectors/{c['id']}", headers=self.headers)
+
+        def draw(p):
+            p_id = item_ids.get(id(p))
+            if not p_id:
+                return
+            for child in (p.nodes + p.stocks):
+                c_id = item_ids.get(id(child))
+                if c_id:
+                    requests.post(f"{self.base_url}/boards/{board_id}/connectors", headers=self.headers, json={
+                        "startItem": {"id": p_id}, "endItem": {"id": c_id},
+                        "style": {"strokeColor": "#000000", "strokeWidth": "1.5"}
+                    })
+                if isinstance(child, Node):
+                    draw(child)
+        draw(root_node)
+
+    def _calculate_balanced_layout(self, root_node: Node) -> list:
+        """루트 노드의 자식들을 좌우로 균등 배치하고 x, y 좌표가 계산된 정보를 반환.
+        Returns:
+            list[tuple]: [(obj, depth, x, y, is_stock), ...]
+        """
+        def get_leaf_count(n):
+            if isinstance(n, Stock):
+                return 1
+            if not n.nodes and not n.stocks:
+                return 1
+            count = sum(get_leaf_count(c) for c in n.nodes)
+            count += len(n.stocks)
+            return count
+
+        top_children = root_node.nodes + root_node.stocks
+        top_children.sort(key=get_leaf_count, reverse=True)
+        left_kids, right_kids = [], []
+        left_leaves, right_leaves = 0, 0
+        
+        for c in top_children:
+            if left_leaves <= right_leaves:
+                left_kids.append(c)
+                left_leaves += get_leaf_count(c)
+            else:
+                right_kids.append(c)
+                right_leaves += get_leaf_count(c)
+
+        def layout_subtree(nodes, direction_x):
+            layout = []
+            global_y = 0
+            
+            def traverse(node_obj, depth):
+                nonlocal global_y
+                is_stk = isinstance(node_obj, Stock)
+                children = [] if is_stk else (node_obj.nodes + node_obj.stocks)
+                
+                if not children:
+                    my_y = global_y
+                    global_y += 80  # 말단 노드 Y 간격
+                else:
+                    child_ys = []
+                    for child in children:
+                        cy = traverse(child, depth + 1)
+                        child_ys.append(cy)
+                    my_y = sum(child_ys) / len(child_ys)
+                
+                my_x = depth * 350 * direction_x
+                layout.append((node_obj, depth, my_x, my_y, is_stk))
+                return my_y
+
+            for n in nodes:
+                traverse(n, 1)
+                global_y += 60 # 섹터 그룹 간 Y 간격 추가
+                
+            if layout:
+                min_y = min(ly[3] for ly in layout)
+                max_y = max(ly[3] for ly in layout)
+                center_y = (min_y + max_y) / 2
+                layout = [(obj, d, x, y - center_y, is_stk) for obj, d, x, y, is_stk in layout]
+            return layout
+
+        left_layout = layout_subtree(left_kids, -1)
+        right_layout = layout_subtree(right_kids, 1)
+        
+        all_layout: list[Any] = []
+        all_layout.extend(left_layout)
+        all_layout.extend(right_layout)
+        all_layout.append((root_node, 0, 0, 0, False)) # Root 노드
+        
+        return all_layout
