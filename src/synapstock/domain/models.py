@@ -17,6 +17,7 @@ class Stock(BaseModel):
 
     name: str
     ticker: str
+    reports: list[str] = []
 
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"

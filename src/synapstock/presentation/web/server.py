@@ -27,6 +27,11 @@ if not os.path.exists(static_dir):
 templates = Jinja2Templates(directory=static_dir)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+# PDF 리포트 파일 서빙을 위한 정적 경로 추가
+pdf_dir = Path("data/pdf")
+pdf_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/pdf", StaticFiles(directory=str(pdf_dir)), name="pdf")
+
 # 전역 서비스 레이어 초기화 (싱글톤 패턴 형태)
 repo = LocalBoardRepository(Path("data") / "board")
 miro_adapter = MiroMindmapAdapter(os.getenv("MIRO_ACCESS_TOKEN", ""))
@@ -120,7 +125,7 @@ async def get_board_data(name: str):
             return {
                 "name": node.name,
                 "nodes": [to_dict(n) for n in node.nodes],
-                "stocks": [{"name": s.name, "ticker": s.ticker} for s in node.stocks]
+                "stocks": [{"name": s.name, "ticker": s.ticker, "reports": s.reports} for s in node.stocks]
             }
         return to_dict(board.root)
     except Exception as e:
@@ -265,6 +270,23 @@ async def add_stock(board: str, parent: str, name: str, ticker: str):
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
+
+@app.delete("/api/stock/delete")
+async def delete_stock(board: str, ticker: str):
+    """보드에서 종목을 삭제합니다.
+    
+    Args:
+        board: 대상 보드 이름.
+        ticker: 삭제할 종목의 티커 심볼.
+        
+    Returns:
+        dict: 성공 상태.
+        JSONResponse: 삭제 실패 시 404 (종목을 찾을 수 없는 경우).
+    """
+    success = service.delete_stock(board, ticker)
+    if success:
+        return {"status": "success"}
+    return JSONResponse(status_code=404, content={"message": "Stock not found in board"})
 
 @app.delete("/api/node/delete")
 async def delete_node(board: str, name: str):

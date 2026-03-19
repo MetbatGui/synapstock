@@ -196,28 +196,29 @@ function renderNode(node, container, depth) {
                     if (overviewPanel) {
                         overviewPanel.style.display = 'block';
                         overviewPanel.innerHTML = `
-                                    <div class="overview-header">
+                                    <div class="overview-header" style="position: relative;">
                                         <h3>${name} (${ticker})</h3>
                                     </div>
                                     <div class="overview-stats">
                                         <div class="stat-item">📰 <span>뉴스</span> <span class="count">0</span></div>
-                                        <div class="stat-item">📊 <span>리포트</span> <span class="count">0</span></div>
+                                        <div class="stat-item">📊 <span>리포트</span> <span class="count">${(stock.reports || []).length}</span></div>
                                     </div>
                                     <div class="overview-footer">
                                         <button class="btn btn-primary btn-sm btn-go-detail" style="width: auto;">상세 이동</button>
+                                        <button class="btn btn-danger btn-sm" onclick="deleteStock('${ticker}')" style="background: #ef4444; color: white; display: inline-flex; align-items: center; gap: 5px;">제거</button>
                                     </div>
-                                `;
+                        `;
 
                         // 상세 보기 버튼 연동
                         overviewPanel.querySelector('.btn-go-detail').onclick = () => {
-                            addLogEntry(`[UI] 종목 상세로 이동: ${name}(${ticker})`, 'info');
+                            addLogEntry(`[UI] 종목 상세로 이동: ${name} (${ticker})`, 'info');
                             history.pushState({ tab: 'dashboard', ticker: ticker, name: name }, '', `/stock/${ticker}`);
                             switchTab('dashboard-tab', false);
                             loadStockDashboard(ticker, name);
                         };
                     }
 
-                    addLogEntry(`[UI] 종목 선택됨: ${name}(${ticker}) - 오버뷰 로드됨`, 'info');
+                    addLogEntry(`[UI] 종목 선택됨: ${name} (${ticker}) - 오버뷰 로드됨`, 'info');
                 };
 
                 stockHeader.addEventListener('click', handleStockClick);
@@ -271,7 +272,7 @@ function updateNodeOverview(node) {
         </div>
     `;
 
-    addLogEntry(`[UI] 노드 선택됨: ${node.name} (하위:${subNodesCount}, 종목:${totalStocksCount})`, 'info');
+    addLogEntry(`[UI] 노드 선택됨: ${node.name} (하위: ${subNodesCount}, 종목: ${totalStocksCount})`, 'info');
 }
 
 /**
@@ -326,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // 백엔드 프록시를 통해 네이버 자동완성 호출 (CORS 회피)
-                const response = await fetch(`/api/stock/search?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`/ api / stock / search ? q = ${encodeURIComponent(query)} `);
                 const items = await response.json();
 
                 if (items && items.length > 0) {
@@ -360,9 +361,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!name) return;
 
         const currentBoard = document.getElementById('board-select').value;
-        const res = await fetch(`/api/node/add?board=${encodeURIComponent(currentBoard)}&parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}&name=${encodeURIComponent(name)}`, { method: 'POST' });
+        const res = await fetch(`/ api / node / add ? board = ${encodeURIComponent(currentBoard)}& parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}& name=${encodeURIComponent(name)} `, { method: 'POST' });
         if (res.ok) {
-            addLogEntry(`[SYSTEM] 노드 추가 성공: ${name}`, 'success');
+            addLogEntry(`[SYSTEM] 노드 추가 성공: ${name} `, 'success');
             closeModal('add-node-modal');
             loadBoardData(currentBoardName); // 트리 갱신
         }
@@ -372,9 +373,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!SELECTED_STOCK) return;
 
         const currentBoard = document.getElementById('board-select').value;
-        const res = await fetch(`/api/stock/add?board=${encodeURIComponent(currentBoard)}&parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}&name=${encodeURIComponent(SELECTED_STOCK.name)}&ticker=${encodeURIComponent(SELECTED_STOCK.ticker)}`, { method: 'POST' });
+        const res = await fetch(`/ api / stock / add ? board = ${encodeURIComponent(currentBoard)}& parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}& name=${encodeURIComponent(SELECTED_STOCK.name)}& ticker=${encodeURIComponent(SELECTED_STOCK.ticker)} `, { method: 'POST' });
         if (res.ok) {
-            addLogEntry(`[SYSTEM] 종목 추가 성공: ${SELECTED_STOCK.name}`, 'success');
+            addLogEntry(`[SYSTEM] 종목 추가 성공: ${SELECTED_STOCK.name} `, 'success');
             closeModal('add-stock-modal');
             loadBoardData(currentBoardName); // 트리 갱신
         }
@@ -382,14 +383,28 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function deleteNode(nodeName) {
-    if (!confirm(`'${nodeName}' 노드를 삭제하시겠습니까?\n하위 노드와 종목은 상위 노드로 흡수됩니다.`)) return;
+    if (!confirm(`'${nodeName}' 노드를 삭제하시겠습니까 ?\n하위 노드와 종목은 상위 노드로 흡수됩니다.`)) return;
 
     const currentBoard = document.getElementById('board-select').value;
-    const res = await fetch(`/api/node/delete?board=${encodeURIComponent(currentBoard)}&name=${encodeURIComponent(nodeName)}`, { method: 'DELETE' });
+    const res = await fetch(`/ api / node / delete? board = ${encodeURIComponent(currentBoard)}& name=${encodeURIComponent(nodeName)} `, { method: 'DELETE' });
     if (res.ok) {
-        addLogEntry(`[SYSTEM] 노드 삭제 및 흡수 완료: ${nodeName}`, 'success');
+        addLogEntry(`[SYSTEM] 노드 삭제 및 흡수 완료: ${nodeName} `, 'success');
         document.getElementById('stock-overview-panel').style.display = 'none';
         loadBoardData(currentBoardName);
+    }
+}
+
+async function deleteStock(ticker) {
+    if (!confirm(`'${ticker}' 종목을 보드에서 제거하시겠습니까 ? `)) return;
+
+    const currentBoard = document.getElementById('board-select').value;
+    const res = await fetch(`/ api / stock / delete? board = ${encodeURIComponent(currentBoard)}& ticker=${encodeURIComponent(ticker)} `, { method: 'DELETE' });
+    if (res.ok) {
+        addLogEntry(`[SYSTEM] 종목 제거 완료: ${ticker} `, 'success');
+        document.getElementById('stock-overview-panel').style.display = 'none';
+        loadBoardData(currentBoardName); // 트리 갱신
+    } else {
+        addLogEntry(`[ERROR] 종목 제거 실패: ${ticker} `, 'error');
     }
 }
 
@@ -425,13 +440,13 @@ function loadStockDashboard(ticker, name = null) {
         fetchStockInfo(ticker).then(info => {
             if (info && info.name) {
                 const titleEl = document.querySelector('.dashboard-header h1');
-                if (titleEl) titleEl.innerText = `${info.name}(${ticker})`;
-                addLogEntry(`[UI] 종목명 확인: ${info.name}`, 'success');
+                if (titleEl) titleEl.innerText = `${info.name} (${ticker})`;
+                addLogEntry(`[UI] 종목명 확인: ${info.name} `, 'success');
             }
         });
     }
 
-    const displayTitle = name ? `${name}(${ticker})` : ticker;
+    const displayTitle = name ? `${name} (${ticker})` : ticker;
 
     placeholder.style.display = 'none';
     container.style.display = 'block';
@@ -439,7 +454,7 @@ function loadStockDashboard(ticker, name = null) {
     addLogEntry(`[UI] 종목 상세 조회: ${displayTitle}`, 'info');
 
     container.innerHTML = `
-        <div class="card dashboard-card" style="padding: 40px; max-width: 1400px; margin: 0 auto;">
+        <div class="card dashboard-card" style="padding: 25px; max-width: 1200px; margin: 0 auto;">
             <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 25px;">
                 <div>
                     <h1 style="font-size: 2.8rem; font-weight: 700; background: linear-gradient(90deg, #00d2ff, #9d50bb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
@@ -454,7 +469,7 @@ function loadStockDashboard(ticker, name = null) {
                 </div>
             </div>
             
-            <div class="dashboard-body" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 40px; margin-top: 35px;">
+            <div class="dashboard-body" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 25px; margin-top: 25px;">
                 <div class="left-column">
                     <div class="chart-section" style="background: rgba(0,0,0,0.2); border-radius: 24px; padding: 25px; text-align: center;">
                         <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; color: #e5e7eb; font-weight: 600;">실시간 차트</h3>
@@ -463,8 +478,17 @@ function loadStockDashboard(ticker, name = null) {
                              onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                         <div class="button-group" style="display: flex; justify-content: center; gap: 15px;">
                             <a href="https://finance.naver.com/item/main.naver?code=${ticker}" target="_blank" class="btn btn-naver" style="background: #03c75a; color: white; border: none; padding: 12px 30px; border-radius: 10px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; font-size: 1rem;">
-                                <span style="font-size: 1.3rem;">N</span> 네이버 증권 홈
+                                <i class="fas fa-external-link-alt"></i> 네이버 증권 홈
                             </a>
+                        </div>
+                    </div>
+
+                    <div class="report-section card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; margin-top: 25px;">
+                        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3rem; color: #ef4444 !important; display: flex; align-items: center; gap: 10px; font-weight: 700;">
+                            <span>📊</span> 리포트 (PDF)
+                        </h3>
+                        <div id="report-list" class="report-list">
+                            <div class="loading-mini" style="text-align: center; color: #9ca3af; padding: 10px;">리포트 정보를 가져오는 중...</div>
                         </div>
                     </div>
                 </div>
@@ -480,11 +504,65 @@ function loadStockDashboard(ticker, name = null) {
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        </div >
+                `;
 
-    // 공시 정보 로드
+    // 공시 및 리포트 정보 로드
     fetchDisclosures(ticker);
+    fetchReports(ticker);
+}
+
+/**
+ * 특정 종목의 리포트 목록을 렌더링합니다.
+ */
+function fetchReports(ticker) {
+    const listEl = document.getElementById('report-list');
+    if (!listEl) return;
+
+    // 현재 보드 데이터에서 해당 종목의 reports 필드를 찾아 목록을 구성합니다.
+    if (!currentBoardData) {
+        listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">보드 정보가 없습니다.</div>';
+        return;
+    }
+
+    let reports = [];
+
+    function findStockInTree(node) {
+        if (node.stocks) {
+            const stock = node.stocks.find(s => s.ticker === ticker);
+            if (stock && stock.reports) {
+                reports = stock.reports;
+                return true;
+            }
+        }
+        if (node.nodes) {
+            for (const child of node.nodes) {
+                if (findStockInTree(child)) return true;
+            }
+        }
+        return false;
+    }
+
+    findStockInTree(currentBoardData);
+
+    if (reports.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">등록된 리포트가 없습니다.</div>';
+        return;
+    }
+
+    listEl.innerHTML = '';
+    const displayReports = reports.slice(0, 10);
+    displayReports.forEach(path => {
+        const filename = path.split('/').pop().split('\\').pop();
+        const url = path.includes('data/pdf/') ? path.replace('data/pdf/', '/pdf/') : `/pdf/${filename}`;
+
+        const entry = document.createElement('a');
+        entry.href = url;
+        entry.target = '_blank';
+        entry.className = 'report-link';
+        entry.innerHTML = `<i class="fas fa-file-pdf"></i> ${filename}`;
+        listEl.appendChild(entry);
+    });
 }
 
 async function fetchDisclosures(ticker) {
@@ -495,7 +573,7 @@ async function fetchDisclosures(ticker) {
         const response = await fetch(`/api/disclosure/${ticker}`);
         const data = await response.json();
 
-        if (!data || data.length === 0) {
+        if (!data || !Array.isArray(data) || data.length === 0) {
             listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">최근 1년 이내 공시가 없습니다.</div>';
             return;
         }
@@ -506,7 +584,7 @@ async function fetchDisclosures(ticker) {
             entry.className = 'disclosure-item';
             entry.innerHTML = `
                 <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcpNo}" 
-                   target="_blank" class="disclosure-title" title="${item.title}" 
+                   target="_blank" class="disclosure-title" title="${item.title}"
                    style="color: #e5e7eb !important; text-decoration: none !important; font-size: 0.95rem !important; display: block !important;">${item.title}</a>
                 <span class="disclosure-date" style="color: #9ca3af !important; font-size: 0.85rem !important;">${item.date}</span>
             `;
@@ -520,7 +598,7 @@ async function fetchDisclosures(ticker) {
 
 async function fetchStockInfo(ticker) {
     try {
-        const response = await fetch(`/api/stock/info/${ticker}`);
+        const response = await fetch(`/ api / stock / info / ${ticker} `);
         if (response.ok) return await response.json();
     } catch (err) {
         console.error("Failed to fetch stock info:", err);
