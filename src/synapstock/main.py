@@ -1,3 +1,4 @@
+import webbrowser
 from synapstock.presentation.web.server import run_server
 
 def main():
@@ -6,6 +7,7 @@ def main():
     포트 8090에서 FastAPI 웹 서버를 시작합니다.
     """
     # 웹 서버 포트를 8090으로 실행합니다.
+    webbrowser.open("http://localhost:8090")
     run_server(port=8090)
 
 if __name__ == "__main__":

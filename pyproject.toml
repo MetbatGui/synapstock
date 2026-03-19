@@ -13,8 +13,10 @@ dependencies = [
     "ruff>=0.15.5",
     "types-requests>=2.32.4.20260107",
     "fastapi>=0.135.1",
-    "uvicorn>=0.42.0",
+    "uvicorn[standard]>=0.42.0",
     "jinja2>=3.1.6",
+    "beautifulsoup4>=4.14.3",
+    "websockets>=16.0",
 ]
 
 [project.scripts]
@@ -28,7 +30,10 @@ build-backend = "hatchling.build"
 packages = ["src/synapstock"]
 
 [dependency-groups]
-dev = ["pytest>=9.0.2"]
+dev = [
+    "pytest>=9.0.2",
+    "types-beautifulsoup4>=4.12.0.20250516",
+]
 
 [tool.mypy]
 python_version = "3.12"
