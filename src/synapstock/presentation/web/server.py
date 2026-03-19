@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -175,7 +175,7 @@ async def get_stock_info(ticker: str):
                 if hasattr(node, 'stocks') and node.stocks:
                     for s in node.stocks:
                         if s.ticker == ticker:
-                            return s.name
+                            return s # Stock 객체 반환
                 
                 # 2. 자식 노드들 탐색
                 if hasattr(node, 'nodes') and node.nodes:
@@ -186,12 +186,12 @@ async def get_stock_info(ticker: str):
             
             # Pydantic 모델인 경우 .root 접근, 아니면 직접 탐색
             root_node = getattr(board, 'root', board)
-            name = find_stock_recursive(root_node)
+            stock_obj = find_stock_recursive(root_node)
             
-            if name:
-                return {"ticker": ticker, "name": name}
+            if stock_obj:
+                return {"ticker": ticker, "name": stock_obj.name, "reports": stock_obj.reports}
         
-        return {"ticker": ticker, "name": None}
+        return {"ticker": ticker, "name": None, "reports": []}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -270,6 +270,44 @@ async def add_stock(board: str, parent: str, name: str, ticker: str):
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
+
+@app.post("/api/stock/report/upload")
+async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(...)):
+    """종목에 대한 PDF 리포트를 업로드합니다.
+    
+    Args:
+        board: 보드 이름.
+        ticker: 종목 티커.
+        file: 업로드할 PDF 파일.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        return JSONResponse(status_code=400, content={"message": "PDF 파일만 업로드 가능합니다."})
+    
+    try:
+        content = await file.read()
+        success = service.add_stock_report(board, ticker, content, file.filename)
+        if success:
+            return {"status": "success", "filename": file.filename}
+        return JSONResponse(status_code=404, content={"message": "Stock not found"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@app.delete("/api/stock/report/delete")
+async def delete_stock_report(board: str, ticker: str, report_path: str):
+    """종목에서 리포트 링크를 삭제합니다.
+    
+    Args:
+        board: 보드 이름.
+        ticker: 종목 티커.
+        report_path: 삭제할 리포트의 경로.
+    """
+    try:
+        success = service.remove_stock_report(board, ticker, report_path)
+        if success:
+            return {"status": "success"}
+        return JSONResponse(status_code=404, content={"message": "Stock or report not found"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
 
 @app.delete("/api/stock/delete")
 async def delete_stock(board: str, ticker: str):

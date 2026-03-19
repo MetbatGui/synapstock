@@ -276,3 +276,77 @@ class BoardService:
             self._repository.save(board)
         return success
 
+    def add_stock_report(self, board_name: str, ticker: str, file_content: bytes, filename: str) -> bool:
+        """종목에 PDF 리포트를 추가하고 파일을 저장합니다.
+        
+        Args:
+            board_name: 대상 보드 이름.
+            ticker: 종목 티커 심볼.
+            file_content: 파일 바이너리 내용.
+            filename: 저장할 파일명 (PDF 검증은 외부에서 수행).
+            
+        Returns:
+            bool: 성공적으로 추가된 경우 True.
+        """
+        from pathlib import Path
+        
+        # 1. 파일 저장 경로 설정 및 디렉토리 생성
+        pdf_dir = Path("data/pdf")
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        target_path = pdf_dir / filename
+        
+        # 2. 파일 저장
+        with open(target_path, "wb") as f:
+            f.write(file_content)
+            
+        # 3. 보드 데이터 업데이트
+        board = self.load(board_name)
+        # 웹 환경에서의 접근을 위해 'data/'를 포함한 상대 경로 저장
+        report_path = f"data/pdf/{filename}"
+        
+        def find_and_add_report(node):
+            for s in node.stocks:
+                if s.ticker == ticker:
+                    if report_path not in s.reports:
+                        s.reports.append(report_path)
+                    return True
+            for child in node.nodes:
+                if find_and_add_report(child):
+                    return True
+            return False
+            
+        success = find_and_add_report(board.root)
+        if success:
+            self._repository.save(board)
+        return success
+
+    def remove_stock_report(self, board_name: str, ticker: str, report_path: str) -> bool:
+        """종목에서 리포트 링크를 제거합니다.
+        
+        Args:
+            board_name: 대상 보드 이름.
+            ticker: 종목 티커 심볼.
+            report_path: 제거할 리포트의 상대 경로.
+            
+        Returns:
+            bool: 성공적으로 제거된 경우 True.
+        """
+        board = self.load(board_name)
+        
+        def find_and_remove_report(node):
+            for s in node.stocks:
+                if s.ticker == ticker:
+                    if report_path in s.reports:
+                        s.reports.remove(report_path)
+                        return True
+                    return False
+            for child in node.nodes:
+                if find_and_remove_report(child):
+                    return True
+            return False
+            
+        success = find_and_remove_report(board.root)
+        if success:
+            self._repository.save(board)
+        return success
+
