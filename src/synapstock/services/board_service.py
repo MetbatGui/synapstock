@@ -248,3 +248,31 @@ class BoardService:
             self._repository.save(board)
         return success
 
+    def delete_stock(self, board_name: str, ticker: str) -> bool:
+        """보드에서 특정 티커를 가진 종목을 삭제합니다.
+        
+        Args:
+            board_name: 대상 보드 이름.
+            ticker: 삭제할 종목의 티커 코드.
+            
+        Returns:
+            bool: 성공적으로 삭제된 경우 True.
+        """
+        board = self.load(board_name)
+        
+        def find_and_remove(node):
+            orig_len = len(node.stocks)
+            node.stocks = [s for s in node.stocks if s.ticker != ticker]
+            if len(node.stocks) < orig_len:
+                return True
+            
+            for child in node.nodes:
+                if find_and_remove(child):
+                    return True
+            return False
+            
+        success = find_and_remove(board.root)
+        if success:
+            self._repository.save(board)
+        return success
+
