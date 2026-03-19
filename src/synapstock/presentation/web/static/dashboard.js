@@ -24,7 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * 로그 콘솔에 메시지를 추가하는 공통 함수
+ * 로그 콘솔에 메시지를 추가하고 스크롤을 하단으로 이동시킵니다.
+ * @param {string} message - 표시할 메시지 내용
+ * @param {string} [type='info'] - 로그 타입 (info, success, error, system)
  */
 function addLogEntry(message, type = 'info') {
     const consoleEl = document.getElementById('log-console');
@@ -40,7 +42,9 @@ function addLogEntry(message, type = 'info') {
     consoleEl.scrollTop = consoleEl.scrollHeight;
 }
 
-// 1. 탭 전환 로직
+/**
+ * 네비게이션 탭 버튼들에 클릭 이벤트를 바인딩합니다.
+ */
 function initTabs() {
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
@@ -81,9 +85,10 @@ function switchTab(tabId, updateHistory = true) {
     }
 }
 
-// 2. 트리 렌더링 로직
-let currentBoardName = null;
-
+/**
+ * 초기 보드 목록을 서버에서 가져와 셀렉트 박스에 채웁니다.
+ * @async
+ */
 async function initTree() {
     const boardSelect = document.getElementById('board-select');
     const loadBtn = document.getElementById('load-board-btn');
@@ -122,6 +127,11 @@ async function initTree() {
     }
 }
 
+/**
+ * 특정 보드의 데이터를 서버에서 가져와 트리를 렌더링합니다.
+ * @async
+ * @param {string} name - 로드할 보드 이름
+ */
 async function loadBoardData(name) {
     const treeContainer = document.getElementById('tree-container');
     treeContainer.innerHTML = '<div class="loading-shimmer">데이터를 불러오는 중...</div>';
@@ -149,6 +159,12 @@ async function loadBoardData(name) {
     }
 }
 
+/**
+ * 재귀적으로 트리 노드(폴더 또는 종목)를 렌더링합니다.
+ * @param {Object} node - 렌더링할 노드 객체
+ * @param {HTMLElement} container - 노드가 삽입될 부모 컨테이너
+ * @param {number} depth - 현재 트리의 깊이 (0부터 시작)
+ */
 function renderNode(node, container, depth) {
     const nodeEl = document.createElement('div');
     nodeEl.className = 'tree-node';
@@ -237,6 +253,10 @@ function renderNode(node, container, depth) {
     }
 }
 
+/**
+ * 루트 노드부터 하위 모든 종목의 총 개수를 계산하여 UI에 표시합니다.
+ * @param {Object} root - 최상위 루트 노드 객체
+ */
 function updateStockCount(root) {
     let count = countRecursiveStocks(root);
     const countEl = document.getElementById('total-stocks-count');
@@ -298,12 +318,20 @@ function closeModal(id) {
 let LAST_CLICKED_NODE_NAME = '';
 let SELECTED_STOCK = null;
 
+/**
+ * 노드 추가 모달을 표시합니다.
+ * @param {string} parentName - 부모 노드 이름
+ */
 function showAddNodeModal(parentName) {
     LAST_CLICKED_NODE_NAME = parentName;
     document.getElementById('parent-node-name').innerText = parentName;
     openModal('add-node-modal');
 }
 
+/**
+ * 종목 추가 모달을 표시합니다.
+ * @param {string} targetName - 종목이 추가될 노드 이름
+ */
 function showAddStockModal(targetName) {
     LAST_CLICKED_NODE_NAME = targetName;
     document.getElementById('target-node-name').innerText = targetName;
@@ -327,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // 백엔드 프록시를 통해 네이버 자동완성 호출 (CORS 회피)
-                const response = await fetch(`/ api / stock / search ? q = ${encodeURIComponent(query)} `);
+                const response = await fetch(`/api/stock/search?q=${encodeURIComponent(query)}`);
                 const items = await response.json();
 
                 if (items && items.length > 0) {
@@ -361,9 +389,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!name) return;
 
         const currentBoard = document.getElementById('board-select').value;
-        const res = await fetch(`/ api / node / add ? board = ${encodeURIComponent(currentBoard)}& parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}& name=${encodeURIComponent(name)} `, { method: 'POST' });
+        const res = await fetch(`/api/node/add?board=${encodeURIComponent(currentBoard)}&parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}&name=${encodeURIComponent(name)}`, { method: 'POST' });
         if (res.ok) {
-            addLogEntry(`[SYSTEM] 노드 추가 성공: ${name} `, 'success');
+            addLogEntry(`[SYSTEM] 노드 추가 성공: ${name}`, 'success');
             closeModal('add-node-modal');
             loadBoardData(currentBoardName); // 트리 갱신
         }
@@ -373,38 +401,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!SELECTED_STOCK) return;
 
         const currentBoard = document.getElementById('board-select').value;
-        const res = await fetch(`/ api / stock / add ? board = ${encodeURIComponent(currentBoard)}& parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}& name=${encodeURIComponent(SELECTED_STOCK.name)}& ticker=${encodeURIComponent(SELECTED_STOCK.ticker)} `, { method: 'POST' });
+        const res = await fetch(`/api/stock/add?board=${encodeURIComponent(currentBoard)}&parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}&name=${encodeURIComponent(SELECTED_STOCK.name)}&ticker=${encodeURIComponent(SELECTED_STOCK.ticker)}`, { method: 'POST' });
         if (res.ok) {
-            addLogEntry(`[SYSTEM] 종목 추가 성공: ${SELECTED_STOCK.name} `, 'success');
+            addLogEntry(`[SYSTEM] 종목 추가 성공: ${SELECTED_STOCK.name}`, 'success');
             closeModal('add-stock-modal');
             loadBoardData(currentBoardName); // 트리 갱신
         }
     };
 });
 
+/**
+ * 특정 노드를 삭제하고 하위 항목들을 부모 노드로 흡수합니다.
+ * @async
+ * @param {string} nodeName - 삭제할 노드 이름
+ */
 async function deleteNode(nodeName) {
-    if (!confirm(`'${nodeName}' 노드를 삭제하시겠습니까 ?\n하위 노드와 종목은 상위 노드로 흡수됩니다.`)) return;
+    if (!confirm(`'${nodeName}' 노드를 삭제하시겠습니까?\n하위 노드와 종목은 상위 노드로 흡수됩니다.`)) return;
 
     const currentBoard = document.getElementById('board-select').value;
-    const res = await fetch(`/ api / node / delete? board = ${encodeURIComponent(currentBoard)}& name=${encodeURIComponent(nodeName)} `, { method: 'DELETE' });
+    const res = await fetch(`/api/node/delete?board=${encodeURIComponent(currentBoard)}&name=${encodeURIComponent(nodeName)}`, { method: 'DELETE' });
     if (res.ok) {
-        addLogEntry(`[SYSTEM] 노드 삭제 및 흡수 완료: ${nodeName} `, 'success');
+        addLogEntry(`[SYSTEM] 노드 삭제 및 흡수 완료: ${nodeName}`, 'success');
         document.getElementById('stock-overview-panel').style.display = 'none';
         loadBoardData(currentBoardName);
     }
 }
 
+/**
+ * 보드에서 특정 종목을 제거합니다.
+ * @async
+ * @param {string} ticker - 제거할 종목 티커
+ */
 async function deleteStock(ticker) {
-    if (!confirm(`'${ticker}' 종목을 보드에서 제거하시겠습니까 ? `)) return;
+    if (!confirm(`'${ticker}' 종목을 보드에서 제거하시겠습니까?`)) return;
 
     const currentBoard = document.getElementById('board-select').value;
-    const res = await fetch(`/ api / stock / delete? board = ${encodeURIComponent(currentBoard)}& ticker=${encodeURIComponent(ticker)} `, { method: 'DELETE' });
+    const res = await fetch(`/api/stock/delete?board=${encodeURIComponent(currentBoard)}&ticker=${encodeURIComponent(ticker)}`, { method: 'DELETE' });
     if (res.ok) {
-        addLogEntry(`[SYSTEM] 종목 제거 완료: ${ticker} `, 'success');
+        addLogEntry(`[SYSTEM] 종목 제거 완료: ${ticker}`, 'success');
         document.getElementById('stock-overview-panel').style.display = 'none';
         loadBoardData(currentBoardName); // 트리 갱신
     } else {
-        addLogEntry(`[ERROR] 종목 제거 실패: ${ticker} `, 'error');
+        addLogEntry(`[ERROR] 종목 제거 실패: ${ticker}`, 'error');
     }
 }
 
@@ -424,6 +462,11 @@ function countRecursiveStocks(node) {
 // 3. 종목 대시보드 로드
 let currentBoardData = null; // 전역 변수로 관리하여 이름 조회 등에 활용
 
+/**
+ * 특정 종목의 상세 대시보드(차트, 리포트, 공시 등)를 로드하고 렌더링합니다.
+ * @param {string} ticker - 종목 티커
+ * @param {string} [name=null] - 종목 이름 (전달되지 않으면 서버에서 조회)
+ */
 function loadStockDashboard(ticker, name = null) {
     const container = document.getElementById('dashboard-container');
     const placeholder = document.getElementById('dashboard-placeholder');
@@ -484,8 +527,11 @@ function loadStockDashboard(ticker, name = null) {
                     </div>
 
                     <div class="report-section card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; margin-top: 25px;">
-                        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3rem; color: #ef4444 !important; display: flex; align-items: center; gap: 10px; font-weight: 700;">
-                            <span>📊</span> 리포트 (PDF)
+                        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3rem; color: #ef4444 !important; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span>📊</span> 리포트 (PDF)
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="triggerReportUpload('${ticker}')" style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 4px 12px; font-size: 0.85rem;">추가</button>
                         </h3>
                         <div id="report-list" class="report-list">
                             <div class="loading-mini" style="text-align: center; color: #9ca3af; padding: 10px;">리포트 정보를 가져오는 중...</div>
@@ -515,56 +561,108 @@ function loadStockDashboard(ticker, name = null) {
 /**
  * 특정 종목의 리포트 목록을 렌더링합니다.
  */
-function fetchReports(ticker) {
+async function fetchReports(ticker) {
     const listEl = document.getElementById('report-list');
     if (!listEl) return;
 
-    // 현재 보드 데이터에서 해당 종목의 reports 필드를 찾아 목록을 구성합니다.
-    if (!currentBoardData) {
-        listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">보드 정보가 없습니다.</div>';
-        return;
-    }
+    // 로딩 상태 표시
+    listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">로딩 중...</div>';
 
-    let reports = [];
-
-    function findStockInTree(node) {
-        if (node.stocks) {
-            const stock = node.stocks.find(s => s.ticker === ticker);
-            if (stock && stock.reports) {
-                reports = stock.reports;
-                return true;
-            }
+    try {
+        const stockData = await fetchStockInfo(ticker);
+        if (!stockData || !stockData.reports) {
+            listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">등록된 리포트가 없습니다.</div>';
+            return;
         }
-        if (node.nodes) {
-            for (const child of node.nodes) {
-                if (findStockInTree(child)) return true;
-            }
+
+        const reports = stockData.reports;
+        if (reports.length === 0) {
+            listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">등록된 리포트가 없습니다.</div>';
+            return;
         }
-        return false;
+
+        listEl.innerHTML = '';
+        const displayReports = reports.slice(0, 10);
+        displayReports.forEach(path => {
+            const filename = path.split('/').pop().split('\\').pop();
+            const url = path.includes('data/pdf/') ? path.replace('data/pdf/', '/pdf/') : `/pdf/${filename}`;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'report-item';
+            wrapper.style.display = 'flex';
+            wrapper.style.justifyContent = 'space-between';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.padding = '12px 0';
+            wrapper.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+            wrapper.style.transition = 'background 0.2s';
+
+            const entry = document.createElement('a');
+            entry.href = url;
+            entry.target = '_blank';
+            entry.className = 'report-link-alt';
+            entry.style.flex = '1';
+            entry.style.minWidth = '0'; // flex container 내에서 말줄임표 작동을 위해 필수
+            entry.style.display = 'flex';
+            entry.style.alignItems = 'center';
+            entry.style.gap = '10px';
+            entry.style.color = '#e5e7eb';
+            entry.style.textDecoration = 'none';
+            entry.style.fontSize = '0.95rem';
+            entry.style.transition = 'color 0.2s';
+            entry.innerHTML = `<i class="fas fa-file-pdf" style="color: #ef4444; flex-shrink: 0;"></i> <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${filename}</span>`;
+
+            // Hover effects
+            wrapper.onmouseover = () => {
+                wrapper.style.background = 'rgba(239, 68, 68, 0.03)';
+                entry.style.color = '#ef4444';
+            };
+            wrapper.onmouseout = () => {
+                wrapper.style.background = 'transparent';
+                entry.style.color = '#e5e7eb';
+            };
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.className = 'btn-delete-report';
+            deleteBtn.title = '리포트 제거';
+            deleteBtn.style.background = 'none';
+            deleteBtn.style.border = 'none';
+            deleteBtn.style.color = '#6b7280';
+            deleteBtn.style.fontSize = '1.2rem';
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.style.padding = '0 5px';
+            deleteBtn.style.transition = 'color 0.2s';
+
+            deleteBtn.onmouseover = (e) => {
+                e.stopPropagation();
+                deleteBtn.style.color = '#ef4444';
+            };
+            deleteBtn.onmouseout = (e) => {
+                e.stopPropagation();
+                deleteBtn.style.color = '#6b7280';
+            };
+            deleteBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm(`'${filename}' 리포트 링크를 제거하시겠습니까?`)) {
+                    deleteReport(ticker, path);
+                }
+            };
+
+            wrapper.appendChild(entry);
+            wrapper.appendChild(deleteBtn);
+            listEl.appendChild(wrapper);
+        });
+    } catch (err) {
+        listEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 10px;">로드 실패: ${err.message}</div>`;
     }
-
-    findStockInTree(currentBoardData);
-
-    if (reports.length === 0) {
-        listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">등록된 리포트가 없습니다.</div>';
-        return;
-    }
-
-    listEl.innerHTML = '';
-    const displayReports = reports.slice(0, 10);
-    displayReports.forEach(path => {
-        const filename = path.split('/').pop().split('\\').pop();
-        const url = path.includes('data/pdf/') ? path.replace('data/pdf/', '/pdf/') : `/pdf/${filename}`;
-
-        const entry = document.createElement('a');
-        entry.href = url;
-        entry.target = '_blank';
-        entry.className = 'report-link';
-        entry.innerHTML = `<i class="fas fa-file-pdf"></i> ${filename}`;
-        listEl.appendChild(entry);
-    });
 }
 
+/**
+ * 특정 종목의 DART 공시 목록을 서버에서 가져와 렌더링합니다.
+ * @async
+ * @param {string} ticker - 종목 티커
+ */
 async function fetchDisclosures(ticker) {
     const listEl = document.getElementById('disclosure-list');
     if (!listEl) return;
@@ -596,9 +694,15 @@ async function fetchDisclosures(ticker) {
     }
 }
 
+/**
+ * 특정 종목의 가본 정보(이름, 리포트 목록 등)를 서버에서 조회합니다.
+ * @async
+ * @param {string} ticker - 종목 티커
+ * @returns {Promise<Object|null>} 종목 정보 객체 또는 null
+ */
 async function fetchStockInfo(ticker) {
     try {
-        const response = await fetch(`/ api / stock / info / ${ticker} `);
+        const response = await fetch(`/api/stock/info/${ticker}`);
         if (response.ok) return await response.json();
     } catch (err) {
         console.error("Failed to fetch stock info:", err);
@@ -607,6 +711,9 @@ async function fetchStockInfo(ticker) {
 }
 
 // 4. History API & WebSocket & Sync 연동
+/**
+ * History API(popstate)를 감지하여 브라우저 뒤로가기/앞으로가기 시 적절한 탭과 데이터를 로드합니다.
+ */
 function initHistoryState() {
     window.addEventListener('popstate', (event) => {
         const path = window.location.pathname;
@@ -621,6 +728,9 @@ function initHistoryState() {
     });
 }
 
+/**
+ * 서버와의 WebSocket 연결을 초기화하고 실시간 로그 및 동기화 진행률을 수신합니다.
+ */
 function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(`${protocol}//${window.location.host}/ws/logs`);
@@ -648,6 +758,9 @@ function initWebSocket() {
     socket.onopen = () => addLogEntry('[SYSTEM] 실시간 로그 서버에 연결되었습니다.', 'success');
 }
 
+/**
+ * 동기화 버튼 클릭 이벤트를 초기화합니다.
+ */
 function initSyncButton() {
     const syncBtn = document.getElementById('sync-btn');
     syncBtn.addEventListener('click', async () => {
@@ -668,4 +781,134 @@ function initSyncButton() {
             addLogEntry(`[ERROR] 동기화 요청 실패: ${err.message}`, 'error');
         }
     });
+}
+
+// 5. PDF 리포트 업로드 관련
+let CURRENT_UPLOAD_TICKER = '';
+
+/**
+ * 숨겨진 파일 입력창을 클릭하여 리포트 업로드를 시작합니다.
+ * @param {string} ticker - 업로드 대상 종목 티커
+ */
+function triggerReportUpload(ticker) {
+    CURRENT_UPLOAD_TICKER = ticker;
+    const input = document.getElementById('report-upload-input');
+    if (input) {
+        input.value = ''; // 동일 파일 재업로드 가능하도록 초기화
+        input.click();
+    }
+}
+
+/**
+ * 서버로 PDF 리포트 파일을 업로드합니다.
+ * @async
+ * @param {string} ticker - 종목 티커
+ * @param {File} file - 업로드할 PDF 파일 객체
+ */
+async function uploadReport(ticker, file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert('PDF 파일만 업로드 가능합니다.');
+        return;
+    }
+
+    const boardName = document.getElementById('board-select').value;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const listEl = document.getElementById('report-list');
+    const originalContent = listEl.innerHTML;
+    listEl.innerHTML = '<div class="loading-mini" style="text-align: center; color: #9ca3af; padding: 10px;">업로드 중...</div>';
+
+    try {
+        const response = await fetch(`/api/stock/report/upload?board=${boardName}&ticker=${ticker}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            addLogEntry(`[API] 리포트 업로드 성공: ${file.name}`, 'success');
+            // 보드 데이터 갱신 후 리포트 목록 업데이트
+            await loadBoardData(boardName);
+            const stock = findStockByTicker(currentBoardData, ticker);
+            if (stock) {
+                await fetchReports(ticker);
+                // 오버뷰 패널의 개수도 업데이트
+                const countEl = document.querySelector('.overview-stats .stat-item:nth-child(2) .count');
+                if (countEl) countEl.innerText = stock.reports.length;
+            }
+        } else {
+            alert(`업로드 실패: ${result.message}`);
+            listEl.innerHTML = originalContent;
+        }
+    } catch (err) {
+        alert(`업로드 중 오류 발생: ${err.message}`);
+        listEl.innerHTML = originalContent;
+    }
+}
+
+/**
+ * 현재 로드된 보드 데이터 트리 내에서 티커로 종목 객체를 검색합니다.
+ * @param {Object} node - 검색을 시작할 노드
+ * @param {string} ticker - 찾을 종목 티커
+ * @returns {Object|null} 찾은 종목 객체 또는 null
+ */
+function findStockByTicker(node, ticker) {
+    if (!node) return null;
+    if (node.stocks) {
+        const stock = node.stocks.find(s => s.ticker === ticker);
+        if (stock) return stock;
+    }
+    if (node.nodes) {
+        for (const child of node.nodes) {
+            const found = findStockByTicker(child, ticker);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+// 스크립트 로드 시 파일 입력 이벤트 리스너 등록
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('report-upload-input');
+    if (input) {
+        input.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && CURRENT_UPLOAD_TICKER) {
+                uploadReport(CURRENT_UPLOAD_TICKER, file);
+            }
+        });
+    }
+});
+
+/**
+ * 서버에 요청하여 특정 종목의 리포트 등록을 취소(삭제)합니다.
+ * @async
+ * @param {string} ticker - 종목 티커
+ * @param {string} reportPath - 삭제할 리포트 파일 경로
+ */
+async function deleteReport(ticker, reportPath) {
+    const boardName = document.getElementById('board-select').value;
+    try {
+        const response = await fetch(`/api/stock/report/delete?board=${boardName}&ticker=${ticker}&report_path=${encodeURIComponent(reportPath)}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            addLogEntry(`[API] 리포트 제거 성공: ${reportPath.split('/').pop()}`, 'success');
+            await loadBoardData(boardName);
+            const stock = findStockByTicker(currentBoardData, ticker);
+            if (stock) {
+                await fetchReports(ticker);
+                // 오버뷰 패널의 개수도 업데이트
+                const countEl = document.querySelector('.overview-stats .stat-item:nth-child(2) .count');
+                if (countEl) countEl.innerText = stock.reports.length;
+            }
+        } else {
+            const result = await response.json();
+            alert(`제거 실패: ${result.message}`);
+        }
+    } catch (err) {
+        alert(`제거 중 오류 발생: ${err.message}`);
+    }
 }
