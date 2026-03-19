@@ -1,7 +1,5 @@
-"""도메인 포트(인터페이스) 정의."""
-
 from abc import ABC, abstractmethod
-
+from typing import Callable
 from synapstock.domain.models import Board
 
 
@@ -51,11 +49,12 @@ class MindmapPort(ABC):
     """
 
     @abstractmethod
-    def load(self, board_name: str) -> Board:
-        """마인드맵에서 board_name에 해당하는 Board를 읽어온다.
+    def load(self, board_name: str, progress_callback: Callable[[str, float], None] | None = None) -> Board:
+        """마인드맵에서 Board를 불러온다.
 
         Args:
-            board_name: Board 이름.
+            board_name: 불러올 Board 이름.
+            progress_callback: 진행률 업데이트를 위한 콜백 함수 (메시지, 0~1 사이의 값).
 
         Returns:
             복원된 Board 인스턴스.
@@ -65,11 +64,12 @@ class MindmapPort(ABC):
         """
 
     @abstractmethod
-    def save(self, board: Board) -> None:
+    def save(self, board: Board, progress_callback: Callable[[str, float], None] | None = None) -> None:
         """Board를 마인드맵 서비스에 반영(저장)한다.
 
         Args:
             board: 저장할 Board 인스턴스.
+            progress_callback: 진행률 업데이트를 위한 콜백 함수 (메시지, 0~1 사이의 값).
         """
 
     @abstractmethod
@@ -81,11 +81,27 @@ class MindmapPort(ABC):
         """
 
     @abstractmethod
-    def sync(self, board: Board) -> None:
+    def sync(self, board: Board, progress_callback: Callable[[str, float], None] | None = None) -> None:
         """Board의 변경사항을 마인드맵 서비스에 동기화한다.
 
         전체 삭제 후 재생성 대신, 변경된 부분만 업데이트(이동, 수정 등)한다.
 
         Args:
             board: 동기화할 Board 인스턴스.
+            progress_callback: 진행률 업데이트를 위한 콜백 함수 (메시지, 0~1 사이의 값).
+        """
+
+
+class DisclosurePort(ABC):
+    """공시 정보 조회를 위한 추상 포트."""
+
+    @abstractmethod
+    def get_recent_disclosures(self, ticker: str) -> list[dict]:
+        """특정 종목의 최근 공시 목록을 가져온다.
+
+        Args:
+            ticker: 종목 코드.
+
+        Returns:
+            공시 정보 리스트 (제목, 날짜, 링크 등).
         """

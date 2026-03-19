@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SynapStock - Intelligent Mindmap Orchestrator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css?v=1.1">
+</head>
+
+<body class="dark-theme">
+    <nav class="navbar">
+        <div class="nav-logo">Mind<span>Map</span></div>
+        <div class="nav-links">
+            <a href="#" class="nav-item active" data-tab="mindmap-tab">마인드맵 관리</a>
+            <a href="#" class="nav-item" data-tab="dashboard-tab">종목정보</a>
+        </div>
+        <div class="nav-status">
+            <span id="sync-status-indicator">● System Ready</span>
+        </div>
+    </nav>
+
+    <main class="content-area">
+        <!-- 마인드맵 관리 탭 -->
+        <section id="mindmap-tab" class="tab-content active">
+            <div class="view-layout">
+                <aside class="sidebar">
+                    <div class="card tree-card">
+                        <h2>마인드맵 구조</h2>
+                        <div class="board-selector">
+                            <label for="board-select">보드 선택:</label>
+                            <div class="selector-controls">
+                                <select id="board-select">
+                                    <!-- Options will be populated by JS -->
+                                </select>
+                                <button id="load-board-btn" class="btn btn-secondary">불러오기</button>
+                            </div>
+                        </div>
+                        <div id="tree-container" class="tree-root">
+                            <!-- JS로 계층형 트리 렌더링 -->
+                            <div class="loading-shimmer">로딩 중...</div>
+                        </div>
+                    </div>
+                </aside>
+
+                <article class="main-panel">
+                    <div class="control-header">
+                        <div class="card stats-summary">
+                            <div class="stat-box">
+                                <span class="label">활성 종목</span>
+                                <span class="value" id="total-stocks-count">--</span>
+                            </div>
+                            <div class="stat-box">
+                                <span class="label">연결 보드</span>
+                                <span class="value">Miro (Cloud)</span>
+                            </div>
+                        </div>
+                        <button id="sync-btn" class="btn btn-primary">Sync with Miro</button>
+                    </div>
+
+                    <div class="card log-card">
+                        <div id="stock-overview-panel" class="stock-overview-panel" style="display: none;">
+                            <!-- 종목 클릭 시 오버뷰 내용이 여기에 렌더링됨 -->
+                        </div>
+                        <h2>Activity Logs</h2>
+                        <div id="log-console" class="log-console">
+                            <div class="log-entry system">[SYSTEM] 웹 인터페이스에 연결되었습니다.</div>
+                        </div>
+                        <div class="progress-container">
+                            <div id="sync-progress-bar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- 종목 상세 정보 탭 -->
+        <section id="dashboard-tab" class="tab-content">
+            <div id="dashboard-placeholder" class="card empty-state">
+                <div class="icon">🔍</div>
+                <h3>종목을 선택해 주세요</h3>
+                <p>마인드맵 트리에서 특정 종목을 클릭하거나 Miro 보드에서 링크를 클릭하면 상세 정보가 표시됩니다.</p>
+            </div>
+            <div id="dashboard-container" style="display: none;">
+                <!-- 기존 index.html의 대시보드 내용이 여기로 동적 로드됨 -->
+            </div>
+        </section>
+    </main>
+
+    <!-- 노드 추가 모달 -->
+    <div id="add-node-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="add-node-modal-title">새 노드 추가</h3>
+            <p>상위 노드: <span id="parent-node-name" style="color: #00d2ff; font-weight: 600;">--</span></p>
+            <input type="text" id="new-node-name" placeholder="새 노드 이름을 입력하세요" class="modal-input">
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal('add-node-modal')">취소</button>
+                <button class="btn btn-primary" id="confirm-add-node">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 종목 추가 모달 -->
+    <div id="add-stock-modal" class="modal">
+        <div class="modal-content">
+            <h3>종목 추가</h3>
+            <p>위치: <span id="target-node-name" style="color: #00d2ff; font-weight: 600;">--</span></p>
+            <div class="autocomplete-container">
+                <input type="text" id="stock-search-input" placeholder="종목명 또는 티커 검색" class="modal-input"
+                    autocomplete="off">
+                <div id="autocomplete-results" class="autocomplete-results"></div>
+            </div>
+            <div id="selected-stock-info" class="selected-stock-box" style="display: none;">
+                선택됨: <span id="selected-stock-display">--</span>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal('add-stock-modal')">취소</button>
+                <button class="btn btn-primary" id="confirm-add-stock" disabled>확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 스크립트 연동 -->
+    <script src="/static/dashboard.js?v=1.1"></script>
+</body>
+
+</html>

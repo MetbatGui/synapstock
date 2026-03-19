@@ -106,7 +106,8 @@ class Board(BaseModel):
         root: 자동 생성된 루트 노드 (depth=0, name=보드명).
     """
 
-    name: str
+    id: str | None = None # 파일명 및 고유 식별자
+    name: str # 표시 이름
     root: Node
 
     @model_validator(mode="before")
