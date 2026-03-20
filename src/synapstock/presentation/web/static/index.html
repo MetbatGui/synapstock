@@ -21,6 +21,19 @@
         </div>
     </nav>
 
+    <!-- 재무 데이터 개폐식 사이드바 -->
+    <aside id="financial-sidebar" class="financial-sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                <h3>💰 분기 매출 현황</h3>
+            </div>
+            <div id="financial-list-sidebar" class="financial-list">
+                <div class="empty-state">종목을 선택해 주세요</div>
+            </div>
+        </div>
+    </aside>
+    <button id="toggle-financial-sidebar" class="toggle-sidebar-btn" title="재무 데이터 보기"></button>
+
     <main class="content-area">
         <!-- 마인드맵 관리 탭 -->
         <section id="mindmap-tab" class="tab-content active">
@@ -117,6 +130,24 @@
             <div class="modal-buttons">
                 <button class="btn btn-secondary" onclick="closeModal('add-stock-modal')">취소</button>
                 <button class="btn btn-primary" id="confirm-add-stock" disabled>확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 뉴스 추가 모달 -->
+    <div id="add-news-modal" class="modal">
+        <div class="modal-content">
+            <h3>뉴스 추가</h3>
+            <p>종목: <span id="news-target-stock" style="color: #facc15; font-weight: 600;">--</span></p>
+            <input type="text" id="news-url-input" placeholder="뉴스 URL을 입력하세요" class="modal-input">
+            <div id="news-scrape-preview"
+                style="display: none; background: rgba(250, 204, 21, 0.1); border: 1px solid #facc15; border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                <div id="news-preview-title" style="font-weight: 600; margin-bottom: 5px; color: #facc15;"></div>
+                <div id="news-preview-date" style="font-size: 0.85rem; color: #9ca3af;"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal('add-news-modal')">취소</button>
+                <button class="btn btn-primary" id="confirm-add-news">확인</button>
             </div>
         </div>
     </div>

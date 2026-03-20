@@ -667,3 +667,166 @@ h2 {
 .node-header.stock:hover .tree-stock-link {
     color: #86efac;
 }
+
+/* Dashboard Layout Expansion */
+.dashboard-card {
+    max-width: 1600px !important;
+    width: 95vw !important;
+}
+
+.news-list,
+.disclosure-list,
+.report-list {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.news-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+}
+
+.news-item:hover {
+    background: rgba(250, 204, 21, 0.03);
+}
+
+.news-link {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #e5e7eb;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.2s;
+}
+
+.news-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.news-date {
+    color: #9ca3af;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    margin: 0 10px;
+}
+
+/* Financial Sidebar - Retractable (Right Side) */
+.financial-sidebar {
+    position: fixed;
+    top: 70px;
+    right: -600px;
+    width: 600px;
+    height: calc(100vh - 70px);
+    background: rgba(17, 24, 39, 0.98);
+    backdrop-filter: blur(35px);
+    border-left: 4px solid var(--accent-blue);
+    z-index: 95;
+    /* Perfect sync with handle */
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -15px 0 40px rgba(0, 0, 0, 0.6);
+    padding: 40px 40px 40px 80px;
+    /* Space for the inward sigmoid bulge */
+    display: none;
+}
+
+.financial-sidebar.active-tab {
+    display: block;
+}
+
+.financial-sidebar.open {
+    transform: translateX(-600px);
+}
+
+/* Sigmoid (Smooth Trapezoid) Bulging Handle */
+.toggle-sidebar-btn {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    /* Slightly wider for the sigmoid ramp */
+    height: 160px;
+    /* Taller for a smoother sigmoid curve */
+    background: var(--accent-blue);
+    border: none;
+    cursor: pointer;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    /* Perfect sync with sidebar transition */
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), right 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+    /* Sigmoid curve using clip-path (Left-facing bulge) */
+    clip-path: path('M 40 0 C 40 20, 0 40, 0 80 C 0 120, 40 140, 40 160 L 40 0 Z');
+    box-shadow: -5px 0 15px rgba(0, 210, 255, 0.4);
+}
+
+.toggle-sidebar-btn.active-tab {
+    display: flex;
+}
+
+.toggle-sidebar-btn::before {
+    content: '«';
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+    margin-right: -10px;
+    /* Adjust for the sigmoid depth */
+    transition: transform 0.4s;
+}
+
+.toggle-sidebar-btn:hover:not(.sidebar-open) {
+    background: #00d2ff;
+    filter: brightness(1.1);
+}
+
+.toggle-sidebar-btn.sidebar-open {
+    right: 600px;
+    /* Sigmoid curve (Right-facing bulge - mirrored path for inward bulge) */
+    clip-path: path('M 0 0 C 0 20, 40 40, 40 80 C 40 120, 0 140, 0 160 L 0 0 Z');
+    transform: translateY(-50%) translateX(100%);
+    box-shadow: 5px 0 15px rgba(0, 210, 255, 0.3);
+}
+
+.toggle-sidebar-btn.sidebar-open::before {
+    content: '»';
+    margin-right: 0;
+    margin-left: -10px;
+}
+
+.financial-list {
+    overflow-y: auto;
+    height: calc(100% - 60px);
+    padding-right: 10px;
+}
+
+.financial-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.financial-list::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.3);
+    border-radius: 10px;
+}
+
+/* Revert Dashboard 3 columns */
+.dashboard-body {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr) !important;
+    gap: 25px !important;
+}
+
+.dashboard-card {
+    max-width: 1400px !important;
+}

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initWebSocket();
     initSyncButton();
     initHistoryState();
+    initFinancialSidebar();
 
     // URL을 파싱하여 초기 상태 설정 (SPA 경로 지원)
     // /stock/{ticker} 형식의 URL에서 티커를 추출하여 대시보드를 로드합니다.
@@ -81,6 +82,23 @@ function switchTab(tabId, updateHistory = true) {
         } else if (tabId === 'dashboard-tab' && !window.location.pathname.startsWith('/stock/')) {
             // 종목 정보 탭을 직접 눌렀을 때 (특정 종목 선택 전)
             history.pushState({ tab: 'dashboard' }, '', '/stock/none');
+        }
+    }
+
+    // 재무 사이드바 핸들 표시 여부 제어
+    const financialToggle = document.getElementById('toggle-financial-sidebar');
+    const financialSidebar = document.getElementById('financial-sidebar');
+    if (financialToggle && financialSidebar) {
+        if (tabId === 'dashboard-tab') {
+            financialToggle.classList.add('active-tab');
+            financialSidebar.classList.add('active-tab');
+        } else {
+            financialToggle.classList.remove('active-tab');
+            financialSidebar.classList.remove('active-tab');
+            financialSidebar.classList.remove('open');
+            financialToggle.classList.remove('sidebar-open');
+            // 위치 리셋 (너비 변경 대응)
+            financialToggle.style.right = '0';
         }
     }
 }
@@ -497,7 +515,7 @@ function loadStockDashboard(ticker, name = null) {
     addLogEntry(`[UI] 종목 상세 조회: ${displayTitle}`, 'info');
 
     container.innerHTML = `
-        <div class="card dashboard-card" style="padding: 25px; max-width: 1200px; margin: 0 auto;">
+        <div class="card dashboard-card" style="padding: 25px; max-width: 1400px; margin: 0 auto;">
             <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 25px;">
                 <div>
                     <h1 style="font-size: 2.8rem; font-weight: 700; background: linear-gradient(90deg, #00d2ff, #9d50bb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
@@ -512,7 +530,7 @@ function loadStockDashboard(ticker, name = null) {
                 </div>
             </div>
             
-            <div class="dashboard-body" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 25px; margin-top: 25px;">
+            <div class="dashboard-body" style="display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 25px; margin-top: 25px;">
                 <div class="left-column">
                     <div class="chart-section" style="background: rgba(0,0,0,0.2); border-radius: 24px; padding: 25px; text-align: center;">
                         <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; color: #e5e7eb; font-weight: 600;">실시간 차트</h3>
@@ -538,6 +556,20 @@ function loadStockDashboard(ticker, name = null) {
                         </div>
                     </div>
                 </div>
+
+                <div class="middle-column">
+                    <div class="news-section card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; height: 100%; display: flex; flex-direction: column;">
+                        <h3 style="margin-top: 0; margin-bottom: 20px; font-size: 1.3rem; color: #facc15 !important; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span>📰</span> 주요 뉴스
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="triggerNewsAdd('${ticker}', '${name || ticker}')" style="background: rgba(250, 204, 21, 0.1); border: 1px solid #facc15; color: #facc15; padding: 4px 12px; font-size: 0.85rem;">추가</button>
+                        </h3>
+                        <div id="news-list" class="news-list" style="flex: 1;">
+                            <div class="loading-mini" style="text-align: center; color: #9ca3af; padding: 10px;">뉴스 정보를 가져오는 중...</div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="right-column" style="display: flex; flex-direction: column; gap: 20px; height: 100%;">
                     <div class="disclosure-section card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; display: flex; flex-direction: column; flex: 1;">
@@ -550,12 +582,22 @@ function loadStockDashboard(ticker, name = null) {
                     </div>
                 </div>
             </div>
-        </div >
+        </div>
                 `;
 
-    // 공시 및 리포트 정보 로드
+    // 공시, 리포트, 뉴스, 재무 정보 로드
     fetchDisclosures(ticker);
     fetchReports(ticker);
+    fetchNews(ticker);
+
+    if (name) {
+        fetchFinancials(name);
+    } else {
+        // 이름이 없을 경우 info에서 가져온 뒤 호출
+        fetchStockInfo(ticker).then(info => {
+            if (info && info.name) fetchFinancials(info.name);
+        });
+    }
 }
 
 /**
@@ -691,6 +733,66 @@ async function fetchDisclosures(ticker) {
 
     } catch (err) {
         listEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">로드 실패: ${err.message}</div>`;
+    }
+}
+
+/**
+ * 특정 종목의 분기별 재무(매출) 데이터를 서버에서 가져와 렌더링합니다.
+ * @async
+ * @param {string} name - 기업명
+ */
+async function fetchFinancials(name) {
+    const listEl = document.getElementById('financial-list-sidebar');
+    if (!listEl) return;
+
+    try {
+        const response = await fetch(`/api/stock/financials?name=${encodeURIComponent(name)}`);
+        const data = await response.json();
+
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 40px;">데이터가 없습니다.</div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        data.forEach(item => {
+            const entry = document.createElement('div');
+            entry.style.display = 'flex';
+            entry.style.justifyContent = 'space-between';
+            entry.style.padding = '12px 0';
+            entry.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+            entry.innerHTML = `
+                <span style="color: #9ca3af; font-weight: 500;">${item.quarter}</span>
+                <span style="color: #e5e7eb; font-weight: 600;">${item.value.toLocaleString()}</span>
+            `;
+            listEl.appendChild(entry);
+        });
+
+    } catch (err) {
+        listEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 20px;">로드 실패: ${err.message}</div>`;
+    }
+}
+
+/**
+ * 재무 사이드바 개폐 로직을 초기화합니다.
+ */
+function initFinancialSidebar() {
+    const sidebar = document.getElementById('financial-sidebar');
+    const toggleBtn = document.getElementById('toggle-financial-sidebar');
+    const closeBtn = document.getElementById('close-financial-sidebar');
+
+    if (toggleBtn) {
+        toggleBtn.onclick = () => {
+            sidebar.classList.toggle('open');
+            toggleBtn.classList.toggle('sidebar-open');
+        };
+    }
+
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            sidebar.classList.remove('open');
+            toggleBtn.classList.remove('sidebar-open');
+        };
     }
 }
 
@@ -912,3 +1014,162 @@ async function deleteReport(ticker, reportPath) {
         alert(`제거 중 오류 발생: ${err.message}`);
     }
 }
+
+/**
+ * 특정 종목의 뉴스 목록을 렌더링합니다.
+ * @async
+ * @param {string} ticker - 종목 티커
+ */
+async function fetchNews(ticker) {
+    const listEl = document.getElementById('news-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">로딩 중...</div>';
+
+    try {
+        const stockData = await fetchStockInfo(ticker);
+        if (!stockData || !stockData.news || stockData.news.length === 0) {
+            listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">등록된 뉴스가 없습니다.</div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        stockData.news.forEach(item => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'news-item';
+
+            const entry = document.createElement('a');
+            entry.href = item.url;
+            entry.target = '_blank';
+            entry.className = 'news-link';
+            entry.innerHTML = `<i class="fas fa-newspaper" style="color: #facc15; flex-shrink: 0;"></i> <span class="news-summary" title="${item.title}">${item.title}</span>`;
+
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'news-date';
+            dateSpan.innerText = item.date;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.className = 'btn-delete-news';
+            deleteBtn.style.background = 'none';
+            deleteBtn.style.border = 'none';
+            deleteBtn.style.color = '#6b7280';
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.style.fontSize = '1.2rem';
+            deleteBtn.style.padding = '0 5px';
+            deleteBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm('이 뉴스를 삭제하시겠습니까?')) {
+                    deleteNews(ticker, item.url);
+                }
+            };
+
+            wrapper.appendChild(entry);
+            wrapper.appendChild(dateSpan);
+            wrapper.appendChild(deleteBtn);
+            listEl.appendChild(wrapper);
+        });
+    } catch (err) {
+        listEl.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 10px;">로드 실패: ${err.message}</div>`;
+    }
+}
+
+/**
+ * 특정 뉴스를 보드 데이터에서 제거합니다.
+ * @async
+ * @param {string} ticker - 종목 티커
+ * @param {string} url - 삭제할 뉴스 URL
+ */
+async function deleteNews(ticker, url) {
+    const boardName = document.getElementById('board-select').value;
+    try {
+        const response = await fetch(`/api/stock/news/delete?board=${boardName}&ticker=${ticker}&url=${encodeURIComponent(url)}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            addLogEntry(`[API] 뉴스 제거 성공`, 'success');
+            await loadBoardData(boardName);
+            await fetchNews(ticker);
+        }
+    } catch (err) {
+        alert(`삭제 중 오류 발생: ${err.message}`);
+    }
+}
+
+let CURRENT_NEWS_TICKER = '';
+let SCRAPED_NEWS_DATA = null;
+
+/**
+ * 뉴스 추가 모달을 표시합니다.
+ * @param {string} ticker - 종목 티커
+ * @param {string} name - 종목 이름
+ */
+function triggerNewsAdd(ticker, name) {
+    CURRENT_NEWS_TICKER = ticker;
+    SCRAPED_NEWS_DATA = null;
+    document.getElementById('news-target-stock').innerText = name;
+    document.getElementById('news-url-input').value = '';
+    document.getElementById('news-scrape-preview').style.display = 'none';
+    document.getElementById('confirm-add-news').disabled = true;
+    openModal('add-news-modal');
+}
+
+// 뉴스 모달 이벤트 초기화
+document.addEventListener('DOMContentLoaded', () => {
+    const urlInput = document.getElementById('news-url-input');
+    const previewBox = document.getElementById('news-scrape-preview');
+    const previewTitle = document.getElementById('news-preview-title');
+    const previewDate = document.getElementById('news-preview-date');
+    const confirmBtn = document.getElementById('confirm-add-news');
+
+    if (urlInput) {
+        urlInput.addEventListener('input', async (e) => {
+            const url = e.target.value.trim();
+            if (!url.startsWith('http')) return;
+
+            previewBox.style.display = 'block';
+            previewTitle.innerText = '정보 추출 중...';
+            previewDate.innerText = '';
+
+            try {
+                const response = await fetch(`/api/news/scrape?url=${encodeURIComponent(url)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    SCRAPED_NEWS_DATA = data;
+                    previewTitle.innerText = data.title;
+                    previewDate.innerText = data.date;
+                    confirmBtn.disabled = false;
+                } else {
+                    previewTitle.innerText = 'URL 정보를 가져오지 못했습니다.';
+                }
+            } catch (err) {
+                previewTitle.innerText = '오류 발생: ' + err.message;
+            }
+        });
+    }
+
+    if (confirmBtn) {
+        confirmBtn.onclick = async () => {
+            if (!SCRAPED_NEWS_DATA || !CURRENT_NEWS_TICKER) return;
+
+            const boardName = document.getElementById('board-select').value;
+            try {
+                const response = await fetch(`/api/stock/news/add?board=${boardName}&ticker=${CURRENT_NEWS_TICKER}&title=${encodeURIComponent(SCRAPED_NEWS_DATA.title)}&date=${encodeURIComponent(SCRAPED_NEWS_DATA.date)}&url=${encodeURIComponent(SCRAPED_NEWS_DATA.url)}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    addLogEntry(`[API] 뉴스 추가 성공: ${SCRAPED_NEWS_DATA.title}`, 'success');
+                    closeModal('add-news-modal');
+                    await loadBoardData(boardName);
+                    await fetchNews(CURRENT_NEWS_TICKER);
+                } else {
+                    alert('뉴스 추가에 실패했습니다.');
+                }
+            } catch (err) {
+                alert(`추가 중 오류 발생: ${err.message}`);
+            }
+        };
+    }
+});
