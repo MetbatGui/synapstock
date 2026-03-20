@@ -15,6 +15,7 @@ from synapstock.services.board_service import BoardService
 from synapstock.adapters.local.board_repo import LocalBoardRepository
 from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
+from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
 
 app = FastAPI()
 
@@ -36,7 +37,8 @@ app.mount("/pdf", StaticFiles(directory=str(pdf_dir)), name="pdf")
 repo = LocalBoardRepository(Path("data") / "board")
 miro_adapter = MiroMindmapAdapter(os.getenv("MIRO_ACCESS_TOKEN", ""))
 disclosure_adapter = DartDisclosureAdapter()
-service = BoardService(repo, miro_adapter, disclosure_adapter)
+financial_adapter = ExcelFinancialDataAdapter(Path("data") / "financial_statements" / "financial_data.xlsx")
+service = BoardService(repo, miro_adapter, disclosure_adapter, financial_adapter)
 
 # WebSocket 연결 관리자
 class ConnectionManager:
@@ -151,6 +153,25 @@ async def get_disclosures(ticker: str):
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
+@app.get("/api/stock/financials")
+async def get_financials(name: str):
+    """특정 기업의 분기별 재무 데이터를 반환합니다.
+    
+    Args:
+        name: 기업명.
+        
+    Returns:
+        List[dict]: 분기별 매출 데이터.
+    """
+    try:
+        if not name:
+            return []
+            
+        financials = service.get_financial_data(name)
+        return financials
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
 @app.get("/api/stock/info/{ticker}")
 async def get_stock_info(ticker: str):
     """티커를 기반으로 종목명 등의 기본 정보를 반환합니다.
@@ -189,9 +210,14 @@ async def get_stock_info(ticker: str):
             stock_obj = find_stock_recursive(root_node)
             
             if stock_obj:
-                return {"ticker": ticker, "name": stock_obj.name, "reports": stock_obj.reports}
+                return {
+                    "ticker": ticker, 
+                    "name": stock_obj.name, 
+                    "reports": stock_obj.reports,
+                    "news": stock_obj.news
+                }
         
-        return {"ticker": ticker, "name": None, "reports": []}
+        return {"ticker": ticker, "name": None, "reports": [], "news": []}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -342,6 +368,89 @@ async def delete_node(board: str, name: str):
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=400, content={"message": "Delete failed (Root cannot be deleted or node not found)"})
+
+@app.get("/api/news/scrape")
+async def scrape_news(url: str):
+    """뉴스 URL에서 제목과 날짜를 추출합니다."""
+    import requests
+    from bs4 import BeautifulSoup
+    from datetime import datetime
+    import re
+
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = response.apparent_encoding # 인코딩 자동 감지
+        
+        if response.status_code != 200:
+            return JSONResponse(status_code=400, content={"message": f"URL 접속 실패: {response.status_code}"})
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 1. 제목 추출 (OG title -> Title tag)
+        title = ""
+        og_title = soup.find("meta", property="og:title")
+        if og_title:
+            title = og_title.get("content", "")
+        if not title:
+            title_tag = soup.find("title")
+            if title_tag:
+                title = title_tag.get_text().strip()
+                
+        # 2. 날짜 추출 (OG pubdate -> Meta date -> Text search)
+        date_str = ""
+        # Common meta tags for dates
+        date_tags = [
+            ("meta", {"property": "article:published_time"}),
+            ("meta", {"property": "og:pubdate"}),
+            ("meta", {"name": "pubdate"}),
+            ("meta", {"name": "date"}),
+        ]
+        for tag_name, attrs in date_tags:
+            tag = soup.find(tag_name, attrs)
+            if tag:
+                content = tag.get("content", "")
+                if content:
+                    date_match = re.search(r'(\d{4}[.\-/]\d{2}[.\-/]\d{2})', content)
+                    if date_match:
+                        date_str = date_match.group(1).replace('.', '-').replace('/', '-')
+                        break
+                    
+        if not date_str:
+            # 보조 수단: 본문에서 날짜 형식 검색 (YYYY.MM.DD 또는 YYYY-MM-DD)
+            match = re.search(r'(\d{4}[.\-/]\d{2}[.\-/]\d{2})', response.text)
+            if match:
+                date_str = match.group(1).replace('.', '-').replace('/', '-')
+            else:
+                date_str = datetime.now().strftime("%Y-%m-%d")
+
+        return {"title": title, "date": date_str, "url": url}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@app.post("/api/stock/news/add")
+async def add_stock_news(board: str, ticker: str, title: str, date: str, url: str):
+    """종목에 뉴스를 추가합니다."""
+    try:
+        success = service.add_stock_news(board, ticker, title, date, url)
+        if success:
+            return {"status": "success"}
+        return JSONResponse(status_code=404, content={"message": "Stock not found"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@app.delete("/api/stock/news/delete")
+async def delete_stock_news(board: str, ticker: str, url: str):
+    """종목에서 뉴스를 삭제합니다."""
+    try:
+        success = service.remove_stock_news(board, ticker, url)
+        if success:
+            return {"status": "success"}
+        return JSONResponse(status_code=404, content={"message": "Stock or news not found"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
 
 @app.get("/api/stock/search")
 async def search_stock(q: str):
