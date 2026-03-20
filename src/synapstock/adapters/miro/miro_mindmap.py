@@ -523,20 +523,22 @@ class MiroMindmapAdapter(MindmapPort):
                 
                 if not children:
                     my_y = global_y
-                    global_y += 50 # 타이트한 수직 간격
+                    global_y += 55 # 리프 간 최소 간격
                 else:
                     child_ys = []
                     for child in children:
                         cy = calculate_y(child, depth + 1, my_idx)
                         child_ys.append(cy)
                     my_y = sum(child_ys) / len(child_ys)
+                    # 하위 뭉치가 끝날 때 그룹 간 구분을 위해 추가 여백 부여
+                    global_y += 40 
                 
                 node_data_list[my_idx]["y"] = my_y
                 return my_y
 
             for n in nodes:
                 calculate_y(n, 1, -1)
-                global_y += 40
+                global_y += 100 # 루트 직계 자식 간의 간격 확대
                 
             if not node_data_list:
                 return []
@@ -571,9 +573,10 @@ class MiroMindmapAdapter(MindmapPort):
                     protrusion_dx = 0
                     if y_range > 0:
                         norm_dist = abs(cur_y - y_center) / (y_range / 2 if y_range > 0 else 1)
-                        # 중앙(norm_dist=0)에 가까울수록 더 많이 돌출되도록 (1 - norm_dist^2) 적용
-                        # 곡률이 너무 과하지 않게 가중치를 150px로 하향 조정
-                        protrusion_dx = (1 - (norm_dist ** 2)) * 150 * direction_x
+                        # 아이템이 많아질수록(y_range가 커질수록) 곡률 가중치를 동적으로 높여 평평해지는 현상 방지
+                        # 기본 200px에서 시작하여 y_range의 15%를 가산 (최대 600px까지 확장)
+                        curve_weight = 200 + min(400, y_range * 0.15)
+                        protrusion_dx = (1 - (norm_dist ** 2)) * curve_weight * direction_x
                     
                     my_x = px + base_dx + protrusion_dx
                     nd["x"] = my_x

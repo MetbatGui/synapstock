@@ -18,6 +18,7 @@ class Stock(BaseModel):
     name: str
     ticker: str
     reports: list[str] = []
+    news: list[dict[str, str]] = [] # [{"title": "...", "date": "...", "url": "..."}]
 
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"

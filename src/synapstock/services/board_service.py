@@ -2,23 +2,25 @@
 
 from typing import Callable
 from synapstock.domain.models import Board, Node, Stock
-from synapstock.domain.ports import MindmapPort, BoardRepositoryPort, DisclosurePort
+from synapstock.domain.ports import MindmapPort, BoardRepositoryPort, DisclosurePort, FinancialDataPort
 
 
 class BoardService:
     """보드 도메인 유즈케이스를 조정하는 서비스 레이어입니다."""
 
-    def __init__(self, repository: BoardRepositoryPort, mindmap: MindmapPort, disclosure: DisclosurePort = None) -> None:
+    def __init__(self, repository: BoardRepositoryPort, mindmap: MindmapPort, disclosure: DisclosurePort = None, financial: FinancialDataPort = None) -> None:
         """필요한 어댑터들과 함께 BoardService를 초기화합니다.
         
         Args:
             repository: 보드 데이터 퍼시스턴스를 위한 포트.
             mindmap: 외부 마인드맵(예: Miro) 동기화를 위한 포트.
             disclosure: 선택사항으로, 종목 공시 정보 조회를 위한 포트.
+            financial: 선택사항으로, 재무 데이터 조회를 위한 포트.
         """
         self._repository = repository
         self._mindmap = mindmap
         self._disclosure = disclosure
+        self._financial = financial
 
     def get_disclosures(self, ticker: str) -> list[dict]:
         """지정된 티커에 대한 최근 공시 항목을 가져옵니다.
@@ -33,6 +35,19 @@ class BoardService:
         if not self._disclosure:
             return []
         return self._disclosure.get_recent_disclosures(ticker)
+
+    def get_financial_data(self, company_name: str) -> list[dict]:
+        """지정된 기업명에 대한 분기별 재무 데이터를 가져옵니다.
+        
+        Args:
+            company_name: 기업명.
+            
+        Returns:
+            list[dict]: 분기별 재무 정보 리스트.
+        """
+        if not self._financial:
+            return []
+        return self._financial.get_financial_data(company_name)
 
     def load_board(self, name: str) -> Board:
         """로컬 저장소에서 보드를 불러옵니다.
@@ -346,6 +361,69 @@ class BoardService:
             return False
             
         success = find_and_remove_report(board.root)
+        if success:
+            self._repository.save(board)
+        return success
+
+    def add_stock_news(self, board_name: str, ticker: str, title: str, date: str, url: str) -> bool:
+        """종목에 뉴스 링크를 추가합니다.
+        
+        Args:
+            board_name: 대상 보드 이름.
+            ticker: 종목 티커 심볼.
+            title: 뉴스 제목.
+            date: 뉴스 발행일.
+            url: 뉴스 원본 링크.
+            
+        Returns:
+            bool: 성공적으로 추가된 경우 True.
+        """
+        board = self.load(board_name)
+        news_entry = {"title": title, "date": date, "url": url}
+        
+        def find_and_add_news(node):
+            for s in node.stocks:
+                if s.ticker == ticker:
+                    if not any(n["url"] == url for n in s.news):
+                        s.news.append(news_entry)
+                    return True
+            for child in node.nodes:
+                if find_and_add_news(child):
+                    return True
+            return False
+            
+        success = find_and_add_news(board.root)
+        if success:
+            self._repository.save(board)
+        return success
+
+    def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
+        """종목에서 특정 뉴스 링크를 제거합니다.
+        
+        Args:
+            board_name: 대상 보드 이름.
+            ticker: 종목 티커 심볼.
+            url: 제거할 뉴스의 링크 (ID 역할).
+            
+        Returns:
+            bool: 성공적으로 제거된 경우 True.
+        """
+        board = self.load(board_name)
+        
+        def find_and_remove_news(node):
+            for s in node.stocks:
+                if s.ticker == ticker:
+                    new_news = [n for n in s.news if n["url"] != url]
+                    if len(new_news) < len(s.news):
+                        s.news = new_news
+                        return True
+                    return False
+            for child in node.nodes:
+                if find_and_remove_news(child):
+                    return True
+            return False
+            
+        success = find_and_remove_news(board.root)
         if success:
             self._repository.save(board)
         return success

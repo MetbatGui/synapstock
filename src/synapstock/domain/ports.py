@@ -105,3 +105,17 @@ class DisclosurePort(ABC):
         Returns:
             공시 정보 리스트 (제목, 날짜, 링크 등).
         """
+
+class FinancialDataPort(ABC):
+    """재무 데이터 조회를 위한 추상 포트."""
+
+    @abstractmethod
+    def get_financial_data(self, company_name: str) -> list[dict]:
+        """특정 기업의 분기별 재무 데이터를 가져온다.
+
+        Args:
+            company_name: 기업명.
+
+        Returns:
+            분기별 재무 정보 리스트 (분기, 수치 등).
+        """
