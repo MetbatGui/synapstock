@@ -26,6 +26,8 @@ dependencies = [
     "google-api-python-client>=2.155.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.2.1",
+    "python-telegram-bot>=21.10",
+    "httpx>=0.28.1",
 ]
 
 [project.scripts]

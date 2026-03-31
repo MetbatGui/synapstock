@@ -1,8 +1,6 @@
-"""Stock, Node, Board 도메인 모델 정의."""
-
-from __future__ import annotations
-
-from typing import Any
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, model_validator
 
@@ -40,6 +38,7 @@ class Node(BaseModel):
     depth: int
     nodes: list[Node] = []
     stocks: list[Stock] = []
+    news: list[dict[str, str]] = [] # [{"title": "...", "date": "...", "url": "..."}]
 
     def add_child(self, name: str) -> Node:
         """자식 노드를 생성하여 추가하고 반환한다.
@@ -129,3 +128,30 @@ class Board(BaseModel):
 
 # 재귀 참조 해소 (Node.nodes: list[Node])
 Node.model_rebuild()
+
+
+@dataclass
+class ScrapedNews:
+    """스크래핑된 뉴스 정보를 담는 값 객체."""
+    title: str
+    date: str  # YYYY-MM-DD
+    url: str
+
+
+class SearchResultType(Enum):
+    """검색 결과의 타입 (종목 또는 섹터/노드)."""
+    STOCK = "STOCK"
+    SECTOR = "SECTOR"
+
+
+@dataclass
+class SearchResult:
+    """검색 결과를 담는 값 객체.
+    
+    종목(STOCK) 또는 섹터(SECTOR) 정보를 모두 포함할 수 있음.
+    """
+    type: SearchResultType
+    name: str
+    board_name: str
+    node_path: List[str]  # ["조선", "재료", ...]
+    ticker: Optional[str] = None  # SECTOR일 경우 None
