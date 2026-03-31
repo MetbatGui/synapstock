@@ -205,9 +205,9 @@ body {
     gap: 30px;
     height: 100%;
     max-width: 1200px;
-    /* 대화면에서의 과도한 확장을 방지 */
+    /* ??붾㈃?먯꽌??怨쇰룄???뺤옣??諛⑹? */
     margin: 0 auto;
-    /* 중앙 정렬 */
+    /* 以묒븰 ?뺣젹 */
 }
 
 /* Sidebar Tree */
@@ -331,7 +331,7 @@ h2 {
     transition: width 0.3s;
 }
 
-/* 보드 선택기 */
+/* 蹂대뱶 ?좏깮湲?*/
 .board-selector {
     margin: 15px 0;
     display: flex;
@@ -413,7 +413,7 @@ h2 {
 }
 
 .node-header.folder::before {
-    content: '▶';
+    content: '??;
     font-size: 0.65rem;
     margin-right: 10px;
     color: var(--accent-blue);
@@ -446,7 +446,7 @@ h2 {
 
 .children-container.show {
     max-height: 5000px;
-    /* 큰 값 */
+    /* ??媛?*/
     opacity: 1;
     transition: max-height 0.4s cubic-bezier(1, 0, 1, 0), opacity 0.5s ease;
 }
@@ -477,7 +477,7 @@ h2 {
     flex: 1 !important;
     display: block !important;
     max-width: 500px !important;
-    /* 고정 너비를 넘어가면 말줄임표가 작동하도록 복구 */
+    /* 怨좎젙 ?덈퉬瑜??섏뼱媛硫?留먯쨪?꾪몴媛 ?묐룞?섎룄濡?蹂듦뎄 */
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -502,7 +502,7 @@ h2 {
 
 .disclosure-section {
     min-width: 0;
-    /* 그리드 내에서 콘텐츠에 의해 늘어나는 것을 방지 */
+    /* 洹몃━???댁뿉??肄섑뀗痢좎뿉 ?섑빐 ?섏뼱?섎뒗 寃껋쓣 諛⑹? */
 }
 
 /* Fixed Stock Overview Panel */
@@ -738,10 +738,13 @@ h2 {
     padding: 40px 40px 40px 80px;
     /* Space for the inward sigmoid bulge */
     display: none;
+    flex-direction: column;
+    /* Ensure vertical stack */
 }
 
 .financial-sidebar.active-tab {
-    display: block;
+    display: flex;
+    /* Flex instead of block */
 }
 
 .financial-sidebar.open {
@@ -777,7 +780,7 @@ h2 {
 }
 
 .toggle-sidebar-btn::before {
-    content: '«';
+    content: '짬';
     font-size: 1.5rem;
     font-weight: bold;
     color: white;
@@ -800,15 +803,28 @@ h2 {
 }
 
 .toggle-sidebar-btn.sidebar-open::before {
-    content: '»';
+    content: '쨩';
     margin-right: 0;
     margin-left: -10px;
 }
 
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.sidebar-header {
+    margin-bottom: 30px;
+    /* Add gap below title */
+    flex-shrink: 0;
+}
+
 .financial-list {
     overflow-y: auto;
-    height: calc(100% - 60px);
-    padding-right: 10px;
+    flex: 1;
+    /* Take up remaining space for scroll */
+    padding-right: 15px;
 }
 
 .financial-list::-webkit-scrollbar {
@@ -827,6 +843,119 @@ h2 {
     gap: 25px !important;
 }
 
+
 .dashboard-card {
     max-width: 1400px !important;
+}
+
+/* Global Stock Search Styles (English comments for compatibility) */
+.global-search-container {
+    position: relative;
+    flex: 2;
+    max-width: 700px;
+    margin: 0 30px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0 15px;
+    height: 52px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-input-wrapper:focus-within {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #00d2ff;
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
+}
+
+.search-input-wrapper i {
+    color: #9ca3af;
+    margin-right: 12px;
+    font-size: 1.1rem;
+}
+
+#global-stock-search {
+    background: none; 
+    border: none;
+    color: #e5e7eb;
+    padding: 12px 0;
+    width: 100%;
+    font-size: 1rem;
+    outline: none;
+}
+
+#global-stock-search::placeholder {
+    color: #6b7280;
+}
+
+.search-results-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    background: #1f2937;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 2005;
+    max-height: 450px;
+    overflow-y: auto;
+    backdrop-filter: blur(15px);
+    display: none; /* Controlled by JS but set as default */
+}
+
+.search-result-item {
+    padding: 14px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: rgba(0, 210, 255, 0.1);
+    padding-left: 25px;
+}
+
+.search-result-name {
+    display: block;
+    color: #e5e7eb;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.search-result-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-top: 6px;
+}
+
+.search-result-board {
+    color: #00d2ff;
+    font-weight: 500;
+}
+
+.search-result-path {
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.search-results-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.search-results-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
 }

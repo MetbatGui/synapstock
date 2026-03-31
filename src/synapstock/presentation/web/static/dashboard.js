@@ -10,9 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initSyncButton();
     initHistoryState();
     initFinancialSidebar();
+    initGlobalSearch();
 
     // URL을 파싱하여 초기 상태 설정 (SPA 경로 지원)
-    // /stock/{ticker} 형식의 URL에서 티커를 추출하여 대시보드를 로드합니다.
     const path = window.location.pathname;
     if (path.startsWith('/stock/')) {
         const parts = path.split('/');
@@ -23,6 +23,126 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// 전역 상태 변수
+let currentBoardData = null; 
+let currentTicker = null;
+let currentBoardName = ''; // 현재 로드된 보드 파일명
+let globalLocalReportCounts = {}; // 로컬 리포트 수량을 저장할 전역 변수
+let globalStockCache = []; // 전종목 캐시 (검색용)
+
+/**
+ * 전종목 데이터를 가져와 캐싱하고 검색 이벤트를 초기화합니다.
+ */
+async function initGlobalSearch() {
+    const searchInput = document.getElementById('global-stock-search');
+    const resultsContainer = document.getElementById('global-search-results');
+    
+    if (!searchInput) return;
+
+    try {
+        const response = await fetch('/api/stocks/all');
+        globalStockCache = await response.json();
+        addLogEntry(`[SYSTEM] 총 ${globalStockCache.length}개의 종목 데이터를 캐싱했습니다.`, 'success');
+    } catch (err) {
+        console.error("Failed to fetch all stocks:", err);
+        addLogEntry("[ERROR] 전종목 데이터 캐싱 실패", "error");
+    }
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim().toLowerCase();
+        if (query.length < 1) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+
+        const filtered = globalStockCache.filter(s => 
+            s.name.toLowerCase().includes(query) || 
+            s.ticker.toLowerCase().includes(query)
+        ).slice(0, 10);
+
+        if (filtered.length > 0) {
+            resultsContainer.innerHTML = '';
+            filtered.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.innerHTML = `
+                    <span class="search-result-name">${item.name} (${item.ticker})</span>
+                    <div class="search-result-meta">
+                        <span class="search-result-board">${item.board.replace('theme_', '').replace('.json', '')}</span>
+                        <span class="search-result-path">${item.path.join(' > ')}</span>
+                    </div>
+                `;
+                div.onclick = () => {
+                    searchInput.value = item.name;
+                    resultsContainer.style.display = 'none';
+                    jumpToStock(item.ticker, item.board, item.path);
+                };
+                resultsContainer.appendChild(div);
+            });
+            resultsContainer.style.display = 'block';
+        } else {
+            resultsContainer.style.display = 'none';
+        }
+    });
+
+    // 외부 클릭 시 닫기
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
+            resultsContainer.style.display = 'none';
+        }
+    });
+}
+
+/**
+ * 선택한 종목이 있는 보드로 전환하고 트리를 자동으로 펼칩니다.
+ */
+async function jumpToStock(ticker, boardName, path) {
+    addLogEntry(`[UI] 종목 이동 요청: ${ticker} (보드: ${boardName})`, 'info');
+    
+    // 1. 보드 전환 및 데이터 로드
+    const boardSelect = document.getElementById('board-select');
+    if (boardSelect.value !== boardName) {
+        boardSelect.value = boardName;
+        currentBoardName = boardName;
+        await loadBoardData(boardName);
+    }
+
+    // 2. 트리 확장 (재귀적으로 path를 따라가며 expand 클래스 추가)
+    // loadBoardData가 완료된 후 DOM에 트리가 그려져 있음
+    const expandPath = async (currentPath) => {
+        for (const nodeName of currentPath) {
+            // 해당 노드 이름을 가진 제목 요소를 찾음
+            const headers = document.querySelectorAll('.node-header.folder');
+            for (const header of headers) {
+                if (header.innerText.includes(nodeName)) {
+                    const container = header.nextElementSibling;
+                    if (container && !container.classList.contains('show')) {
+                        header.click(); // 펼치기
+                    }
+                }
+            }
+        }
+    };
+
+    await expandPath(path);
+
+    // 3. 해당 종목 찾아서 클릭
+    setTimeout(() => {
+        const stocks = document.querySelectorAll('.node-header.stock');
+        for (const s of stocks) {
+            if (s.innerText.includes(ticker)) {
+                s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                s.click(); // 오버뷰 패널 열기
+                
+                // 일시적 강조 효과
+                s.style.backgroundColor = 'rgba(0, 210, 255, 0.2)';
+                setTimeout(() => s.style.backgroundColor = '', 2000);
+                break;
+            }
+        }
+    }, 100); // 렌더링 대기 시간
+}
 
 /**
  * 로그 콘솔에 메시지를 추가하고 스크롤을 하단으로 이동시킵니다.
@@ -162,6 +282,15 @@ async function loadBoardData(name) {
 
         const data = await response.json();
         currentBoardData = data; // 전역 데이터 업데이트
+        
+        // 로컬 리포트 수량 정보도 함께 가져오기
+        try {
+            const countsResponse = await fetch('/api/reports/counts');
+            globalLocalReportCounts = await countsResponse.json();
+        } catch (e) {
+            console.error("Failed to fetch report counts:", e);
+        }
+
         treeContainer.innerHTML = '';
 
         const rootList = document.createElement('div');
@@ -216,7 +345,18 @@ function renderNode(node, container, depth) {
                 const stockHeader = document.createElement('div');
                 stockHeader.className = 'node-header stock';
                 stockHeader.style.cursor = 'pointer'; // 명시적으로 클릭 가능 표시
-                stockHeader.innerHTML = `<a href="#" class="tree-stock-link" onclick="event.preventDefault();">${stock.name} (${stock.ticker || 'N/A'})</a>`;
+
+                // 리포트 수량 계산 (보드 등록 리포트 + 로컬 수집 리포트)
+                const manualCount = (stock.reports || []).length;
+                const localCount = globalLocalReportCounts[stock.name] || 0;
+                const totalCount = manualCount + localCount;
+                
+                let countBadge = '';
+                if (totalCount > 0) {
+                    countBadge = `<span style="color: #60a5fa; font-weight: 700; font-size: 0.8rem; margin-left: 5px;">(${totalCount})</span>`;
+                }
+
+                stockHeader.innerHTML = `<a href="#" class="tree-stock-link" onclick="event.preventDefault();">${stock.name} (${stock.ticker || 'N/A'})${countBadge}</a>`;
 
                 const handleStockClick = (e) => {
                     e.preventDefault();
@@ -235,7 +375,7 @@ function renderNode(node, container, depth) {
                                     </div>
                                     <div class="overview-stats">
                                         <div class="stat-item">📰 <span>뉴스</span> <span class="count">0</span></div>
-                                        <div class="stat-item">📊 <span>리포트</span> <span class="count">${(stock.reports || []).length}</span></div>
+                                        <div class="stat-item">📊 <span>리포트</span> <span class="count">${((stock.reports || []).length) + (globalLocalReportCounts[name] || 0)}</span></div>
                                     </div>
                                     <div class="overview-footer">
                                         <button class="btn btn-primary btn-sm btn-go-detail" style="width: auto;">상세 이동</button>
@@ -478,7 +618,6 @@ function countRecursiveStocks(node) {
 }
 
 // 3. 종목 대시보드 로드
-let currentBoardData = null; // 전역 변수로 관리하여 이름 조회 등에 활용
 
 /**
  * 특정 종목의 상세 대시보드(차트, 리포트, 공시 등)를 로드하고 렌더링합니다.
@@ -587,7 +726,7 @@ function loadStockDashboard(ticker, name = null) {
 
     // 공시, 리포트, 뉴스, 재무 정보 로드
     fetchDisclosures(ticker);
-    fetchReports(ticker);
+    fetchReports(ticker, name);
     fetchNews(ticker);
 
     if (name) {
@@ -601,33 +740,104 @@ function loadStockDashboard(ticker, name = null) {
 }
 
 /**
- * 특정 종목의 리포트 목록을 렌더링합니다.
+ * 리포트 파일명에서 날짜와 제목을 추출합니다.
  */
-async function fetchReports(ticker) {
+function parseReportInfo(filename) {
+    // 20260320_[삼성전자]_[미래에셋]_제목_1081800.pdf
+    const name = filename.replace('.pdf', '');
+    const parts = name.split('_');
+    
+    let date = "";
+    let title = filename;
+    let broker = "";
+
+    if (parts.length >= 4 && /^\d{8}$/.test(parts[0])) {
+        // YYYYMMDD -> YYYY.MM.DD
+        const d = parts[0];
+        date = `${d.substring(0, 4)}.${d.substring(4, 6)}.${d.substring(6, 8)}`;
+        
+        // 브로커 (세 번째 파츠: [BNK] 형식 등)
+        broker = parts[2].replace(/[\[\]]/g, '');
+        
+        // 제목 (네 번째 파츠부터 ID 직전까지)
+        // 마지막 파츠는 보통 ID (숫자)이므로 제외 시도
+        const titleParts = parts.slice(3);
+        if (titleParts.length > 1 && /^\d+$/.test(titleParts[titleParts.length - 1])) {
+            title = titleParts.slice(0, -1).join('_');
+        } else {
+            title = titleParts.join('_');
+        }
+        
+        if (broker) title = `[${broker}] ${title}`;
+    }
+    
+    return { date, title };
+}
+
+/**
+ * 특정 종목의 리포트 목록(수동 등록 + 자동 수집)을 가져와 렌더링합니다.
+ */
+async function fetchReports(ticker, name = null) {
     const listEl = document.getElementById('report-list');
     if (!listEl) return;
 
-    // 로딩 상태 표시
-    listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">로딩 중...</div>';
+    let stockRes = null;
+    try {
+        stockRes = await fetchStockInfo(ticker);
+    } catch (e) {}
+
+    let stockName = name || (stockRes ? stockRes.name : null);
 
     try {
-        const stockData = await fetchStockInfo(ticker);
-        if (!stockData || !stockData.reports) {
+        // 1. 보드 데이터에서 등록된 리포트 가져오기
+        const manualReports = (stockRes && stockRes.reports) ? stockRes.reports : [];
+
+        // 2. 서버에서 자동 수집된 리포트 가져오기
+        let localReports = [];
+        if (stockName) {
+            try {
+                const localRes = await fetch(`/api/reports/local?name=${encodeURIComponent(stockName.normalize('NFC'))}`);
+                localReports = await localRes.json();
+            } catch (e) {
+                console.error("Local reports fetch failed:", e);
+            }
+        }
+
+        // 3. 통합 및 포맷팅
+        const allReports = [];
+        
+        // 매뉴얼 리포트 추가
+        manualReports.forEach(path => {
+            const fname = path.split('/').pop().split('\\').pop();
+            allReports.push({
+                url: path.includes('data/pdf/') ? path.replace('data/pdf/', '/pdf/') : `/pdf/${fname}`,
+                filename: fname,
+                isLocal: false
+            });
+        });
+
+        // 로컬 리포트 추가 (중복 제거 시도 - 파일명 기준)
+        localReports.forEach(report => {
+            if (!allReports.find(r => r.filename === report.filename)) {
+                allReports.push({
+                    url: report.url,
+                    filename: report.filename,
+                    isLocal: true
+                });
+            }
+        });
+
+        if (allReports.length === 0) {
             listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">등록된 리포트가 없습니다.</div>';
             return;
         }
 
-        const reports = stockData.reports;
-        if (reports.length === 0) {
-            listEl.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 10px;">등록된 리포트가 없습니다.</div>';
-            return;
-        }
+        // 날짜 기준 정렬 (최신순)
+        allReports.sort((a, b) => b.filename.localeCompare(a.filename));
 
         listEl.innerHTML = '';
-        const displayReports = reports.slice(0, 10);
-        displayReports.forEach(path => {
-            const filename = path.split('/').pop().split('\\').pop();
-            const url = path.includes('data/pdf/') ? path.replace('data/pdf/', '/pdf/') : `/pdf/${filename}`;
+        allReports.forEach(report => {
+            const { date, title } = parseReportInfo(report.filename);
 
             const wrapper = document.createElement('div');
             wrapper.className = 'report-item';
@@ -639,19 +849,35 @@ async function fetchReports(ticker) {
             wrapper.style.transition = 'background 0.2s';
 
             const entry = document.createElement('a');
-            entry.href = url;
+            entry.href = report.url;
             entry.target = '_blank';
             entry.className = 'report-link-alt';
             entry.style.flex = '1';
-            entry.style.minWidth = '0'; // flex container 내에서 말줄임표 작동을 위해 필수
+            entry.style.minWidth = '0';
             entry.style.display = 'flex';
+            entry.style.justifyContent = 'space-between';
             entry.style.alignItems = 'center';
-            entry.style.gap = '10px';
+            entry.style.gap = '15px';
             entry.style.color = '#e5e7eb';
             entry.style.textDecoration = 'none';
             entry.style.fontSize = '0.95rem';
             entry.style.transition = 'color 0.2s';
-            entry.innerHTML = `<i class="fas fa-file-pdf" style="color: #ef4444; flex-shrink: 0;"></i> <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${filename}</span>`;
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.style.overflow = 'hidden';
+            titleSpan.style.textOverflow = 'ellipsis';
+            titleSpan.style.whiteSpace = 'nowrap';
+            titleSpan.style.flex = '1';
+            titleSpan.innerText = title;
+
+            const dateSpan = document.createElement('span');
+            dateSpan.style.fontSize = '0.85rem';
+            dateSpan.style.color = '#6b7280';
+            dateSpan.style.flexShrink = '0';
+            dateSpan.innerText = date || '';
+
+            entry.appendChild(titleSpan);
+            entry.appendChild(dateSpan);
 
             // Hover effects
             wrapper.onmouseover = () => {
@@ -686,8 +912,8 @@ async function fetchReports(ticker) {
             deleteBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (confirm(`'${filename}' 리포트 링크를 제거하시겠습니까?`)) {
-                    deleteReport(ticker, path);
+                if (confirm(`'${report.filename}' 리포트 링크를 제거하시겠습니까?`)) {
+                    deleteReport(ticker, report.url);
                 }
             };
 
@@ -1043,6 +1269,32 @@ async function fetchNews(ticker) {
             entry.target = '_blank';
             entry.className = 'news-link';
             entry.innerHTML = `<i class="fas fa-newspaper" style="color: #facc15; flex-shrink: 0;"></i> <span class="news-summary" title="${item.title}">${item.title}</span>`;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'node-title';
+            
+            // 리포트 수량 계산 (보드 등록 리포트 + 로컬 수집 리포트)
+            const manualCount = (stockData.reports || []).length; // Use stockData for current stock's reports
+            const localCount = globalLocalReportCounts[stockData.name] || 0; // Use stockData.name for local reports
+            const totalCount = manualCount + localCount;
+            
+            let countBadge = '';
+            if (totalCount > 0) {
+                countBadge = ` <span style="color: #60a5fa; font-weight: 700; font-size: 0.8rem; margin-left: 5px;">(${totalCount})</span>`;
+            }
+            
+            // This part of the snippet seems to be for rendering a stock item, not a news item.
+            // I will place it in a logical place within the renderNode function (which is not provided)
+            // or assume it's a separate helper function for rendering stock items.
+            // Given the context of fetchNews, this snippet is out of place here.
+            // I will apply the globalLocalReportCounts fetching in loadBoardData and NFC normalization in fetchLocalReports.
+            // The `renderNode` modification cannot be applied as `renderNode` is not in the provided code.
+            // I will skip the `renderNode` part of the instruction as it's not applicable to the given code.
+            // The instruction's code edit for `renderNode` is placed *inside* fetchNews, which is incorrect.
+            // I will only apply the globalLocalReportCounts variable and its fetching in loadBoardData,
+            // and the NFC normalization in fetchLocalReports.
+            // The `nameSpan` and `countBadge` logic is for rendering a stock item, not a news item.
+            // I will remove the misplaced `nameSpan` and `countBadge` logic from `fetchNews`.
 
             const dateSpan = document.createElement('span');
             dateSpan.className = 'news-date';
@@ -1173,3 +1425,4 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 });
+

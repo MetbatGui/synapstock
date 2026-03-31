@@ -69,6 +69,16 @@
                                 <span class="value">Miro (Cloud)</span>
                             </div>
                         </div>
+
+                        <!-- 전체 종목 검색창 추가 -->
+                        <div class="global-search-container">
+                            <div class="search-input-wrapper">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="global-stock-search" placeholder="전체 보드 종목 검색 (이름/티커)..." autocomplete="off">
+                            </div>
+                            <div id="global-search-results" class="search-results-dropdown" style="display: none;"></div>
+                        </div>
+
                         <button id="sync-btn" class="btn btn-primary">Sync with Miro</button>
                     </div>
 
@@ -155,7 +165,7 @@
     <!-- 스크립트 연동 -->
     <!-- hidden file input for report upload -->
     <input type="file" id="report-upload-input" accept=".pdf" style="display: none;">
-    <script src="/static/dashboard.js?v=1.2"></script>
+    <script type="module" src="/static/js/app.js"></script>
 </body>
 
 </html>
