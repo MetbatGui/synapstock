@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Optional, Any
+import pandas as pd
+import openpyxl
 from synapstock.domain.models import Board
 
 
@@ -92,6 +94,7 @@ class MindmapPort(ABC):
         """
 
 
+
 class DisclosurePort(ABC):
     """공시 정보 조회를 위한 추상 포트."""
 
@@ -119,3 +122,46 @@ class FinancialDataPort(ABC):
         Returns:
             분기별 재무 정보 리스트 (분기, 수치 등).
         """
+
+
+class StoragePort(ABC):
+    """저장소 추상 포트.
+    
+    파일 및 데이터프레임의 저장/로드를 담당한다.
+    """
+
+    @abstractmethod
+    def save_dataframe_excel(self, df: pd.DataFrame, path: str, **kwargs) -> bool:
+        """DataFrame을 Excel 파일로 저장한다."""
+
+    @abstractmethod
+    def save_dataframe_csv(self, df: pd.DataFrame, path: str, **kwargs) -> bool:
+        """DataFrame을 CSV 파일로 저장한다."""
+
+    @abstractmethod
+    def save_workbook(self, book: openpyxl.Workbook, path: str) -> bool:
+        """openpyxl Workbook을 저장한다."""
+
+    @abstractmethod
+    def load_workbook(self, path: str) -> Optional[openpyxl.Workbook]:
+        """Excel Workbook을 로드한다."""
+
+    @abstractmethod
+    def path_exists(self, path: str) -> bool:
+        """경로 존재 여부를 확인한다."""
+
+    @abstractmethod
+    def ensure_directory(self, path: str) -> bool:
+        """디렉토리 존재를 보장(없으면 생성)한다."""
+
+    @abstractmethod
+    def load_dataframe(self, path: str, sheet_name: str = None, **kwargs) -> pd.DataFrame:
+        """파일에서 DataFrame을 로드한다."""
+
+    @abstractmethod
+    def get_file(self, path: str) -> Optional[bytes]:
+        """파일 내용을 바이트로 가져온다."""
+
+    @abstractmethod
+    def put_file(self, path: str, data: bytes) -> bool:
+        """바이트 데이터를 파일로 저장한다."""

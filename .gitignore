@@ -11,3 +11,6 @@ wheels/
 .env
 
 data/
+downloaded_reports/
+secrets/
+stock_cache.json

@@ -20,6 +20,12 @@ dependencies = [
     "python-multipart>=0.0.22",
     "pandas>=3.0.1",
     "openpyxl>=3.1.5",
+    "playwright>=1.58.0",
+    "pytest-playwright>=0.7.2",
+    "pycryptodome>=3.23.0",
+    "google-api-python-client>=2.155.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib>=1.2.1",
 ]
 
 [project.scripts]
