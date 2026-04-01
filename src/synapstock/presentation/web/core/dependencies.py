@@ -16,6 +16,7 @@ from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
 from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
 from synapstock.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
 
 load_dotenv()
 
@@ -27,6 +28,9 @@ financial_adapter = ExcelFinancialDataAdapter(
     Path("data") / "financial_statements" / "financial_data.xlsx"
 )
 service = BoardService(repo, miro_adapter, disclosure_adapter, financial_adapter)
+
+# ── 뉴스 스크래퍼 어댑터 (신규) ──────────────────────────────────────────
+news_scraper_adapter = HttpxNewsScraperAdapter()
 
 # ── Google Drive 어댑터 (온디맨드 다운로드용) ──────────────────────────────
 drive_adapter = None
