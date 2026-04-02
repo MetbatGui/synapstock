@@ -14,9 +14,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .core.dependencies import sync_indices_if_needed
-from .core.websocket_manager import manager
-from .routes import board_routes, report_routes, stock_routes
+from synapstock.presentation.web.core.dependencies import sync_indices_if_needed
+from synapstock.presentation.web.core.websocket_manager import manager
+from synapstock.presentation.web.routes import board_routes, report_routes, stock_routes
 
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
 app = FastAPI()

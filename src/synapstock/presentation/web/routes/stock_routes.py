@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from ..core.dependencies import service
+from synapstock.presentation.web.core.dependencies import service
 
 router = APIRouter()
 

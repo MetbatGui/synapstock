@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from fastapi import APIRouter
 
-from ..core.dependencies import drive_adapter, sync_indices_if_needed
+from synapstock.presentation.web.core.dependencies import drive_adapter, sync_indices_if_needed
 
 router = APIRouter()
 

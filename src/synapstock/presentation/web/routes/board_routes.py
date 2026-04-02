@@ -9,8 +9,8 @@ import threading
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from ..core.dependencies import service
-from ..core.websocket_manager import manager
+from synapstock.presentation.web.core.dependencies import service
+from synapstock.presentation.web.core.websocket_manager import manager
 
 router = APIRouter()
 
