@@ -1,0 +1,298 @@
+import logging
+import asyncio
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CommandHandler, CallbackQueryHandler, filters
+
+from synapstock.presentation.telegram.keyboards.main_keyboard import get_main_keyboard
+
+logger = logging.getLogger(__name__)
+
+# 대화(Conversation) 상태 상수 정의
+WAITING_FOR_SEARCH_QUERY = 1
+WAITING_FOR_STOCK_SELECTION = 2
+WAITING_FOR_NEWS_URL = 3
+
+
+from typing import List, Dict, Any
+
+def _find_stocks_by_name(board: Any, query: str, board_name: str) -> List[Dict[str, str]]:
+    """주어진 Board에서 종목명에 query가 포함된 모든 종목과 그 경로를 검색합니다.
+
+    Args:
+        board (Any): 검색을 수행할 대상 보드 객체.
+        query (str): 사용자가 입력한 검색어 (종목명 기준).
+        board_name (str): 보드 객체의 고유 이름 (예: 'Semiconductor').
+
+    Returns:
+        List[Dict[str, str]]: 매칭된 종목의 정보를 담은 딕셔너리의 리스트. 
+        각 딕셔너리는 'board', 'name', 'ticker', 'path' 키를 포함합니다.
+    """
+    results: List[Dict[str, str]] = []
+    
+    def search_nodes(node: Any, current_path: List[str]) -> None:
+        for s in node.stocks:
+            if query in s.name:
+                results.append({
+                    "board": board_name,
+                    "name": s.name,
+                    "ticker": s.ticker,
+                    "path": f"[{board_name}] " + " > ".join(current_path + [s.name])
+                })
+        for child in node.nodes:
+            search_nodes(child, current_path + [child.name])
+            
+    # root 노드부터 하향식으로 트리 탐색 시작 (root 노드의 이름은 보통 보드명 혹은 "Root"입니다)
+    search_nodes(board.root, [board.root.name])
+    return results
+
+async def start_news_workflow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """사용자가 '📰 뉴스 추가 시작' 버튼을 누를 때 호출됩니다.
+    
+    Args:
+        update (Update): 텔레그램 서버 메시지 이벤트 객체.
+        context (ContextTypes.DEFAULT_TYPE): 실행 컨텍스트.
+        
+    Returns:
+        int: 다음 파이프라인 상태 상수 (WAITING_FOR_SEARCH_QUERY).
+    """
+    await update.message.reply_text(
+        "뉴스를 추가할 종목명을 검색해주세요. (예: 삼성전자)",
+        reply_markup=get_main_keyboard()
+    )
+    return WAITING_FOR_SEARCH_QUERY
+
+async def process_search_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """입력된 검색어로 시스템의 모든 Board(섹터)를 전수조사하여 찾고, 상태를 전환합니다.
+    
+    Args:
+        update (Update): 사용자의 응답 메시지를 포함하는 객체.
+        context (ContextTypes.DEFAULT_TYPE): 봇 데이터(board_service 등)를 포함하는 컨텍스트.
+        
+    Returns:
+        int: 결과 개수나 상태에 따른 대화 상태 상수 (단수면 URL 대기, 복수면 종목 선택).
+    """
+    query = update.message.text
+    
+    if query == "📰 뉴스 추가 시작":
+        await update.message.reply_text("검색할 종목명을 다시 입력해주세요.")
+        return WAITING_FOR_SEARCH_QUERY
+        
+    logger.info(f"뉴스 추가 타겟 검색 쿼리: {query}")
+    
+    board_service = context.bot_data['board_service']
+    try:
+        boards_list = await asyncio.to_thread(board_service.list_boards)
+    except Exception as e:
+        logger.error(f"보드 목록 로드 실패: {e}")
+        await update.message.reply_text(f"서버에서 보드 목록을 불러오는 데 실패했습니다.")
+        return ConversationHandler.END
+        
+    search_results = []
+    
+    # 시스템 내에 존재하는 모든 보드를 전수조사
+    for b_name in boards_list:
+        try:
+            board = await asyncio.to_thread(board_service.load_board, b_name)
+            res = _find_stocks_by_name(board, query, b_name)
+            search_results.extend(res)
+        except Exception as e:
+            logger.warning(f"보드 '{b_name}' 로딩 중 에러 바이패스: {e}")
+            continue
+    
+    if not search_results:
+        await update.message.reply_text(f"모든 보드를 탐색했으나 '{query}'에 해당하는 종목을 찾을 수 없습니다. 다시 검색해주세요.")
+        return WAITING_FOR_SEARCH_QUERY
+        
+    if len(search_results) == 1:
+        # 결과가 1개일 경우 바로 대기 모드로 전환
+        result = search_results[0]
+        context.user_data['target_board'] = result['board']
+        context.user_data['target_ticker'] = result['ticker']
+        context.user_data['target_stock_name'] = result['name']
+        
+        await update.message.reply_text(
+            f"✅ <b>{result['name']}</b> (티커: {result['ticker']}) 종목이 선택되었습니다.\n\n"
+            f"경로: <code>{result['path']}</code>\n\n"
+            f"이제 추가할 <b>뉴스 링크(URL)</b>를 채팅으로 보내주세요.",
+            parse_mode="HTML"
+        )
+        return WAITING_FOR_NEWS_URL
+        
+    # 결과가 여러 개일 경우: InlineKeyboardMarkup 생성
+    keyboard = []
+    # 선택 결과를 저장소(context)에 넣어두고 index로 찾아오는 방식이 콜백 64바이트 제한을 우회하기 좋습니다.
+    context.user_data['temp_search_results'] = search_results
+    
+    for idx, result in enumerate(search_results):
+        button_text = f"[{result['name']}] {result['path'][:35]}..."
+        callback_data = f"selidx_{idx}"
+        keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"'{query}'에 대한 여러 종목이 검색되었습니다.\n정확한 경로를 선택해주세요:",
+        reply_markup=reply_markup
+    )
+    
+    return WAITING_FOR_STOCK_SELECTION
+
+async def process_stock_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """사용자가 인라인 키보드에서 종목을 선택했을 때(CallbackQuery) 호출됩니다.
+    
+    Args:
+        update (Update): 텔레그램 서버 콜백 쿼리 이벤트 객체.
+        context (ContextTypes.DEFAULT_TYPE): 유저 임시 저장소(`temp_search_results`)를 보유한 컨텍스트.
+        
+    Returns:
+        int: URL 입력을 기다리는 상태 상수 (WAITING_FOR_NEWS_URL) 혹은 루프 유지.
+    """
+    query = update.callback_query
+    await query.answer() 
+    
+    data = query.data # 예: "selidx_0"
+    if data.startswith("selidx_"):
+        idx = int(data.split("_")[1])
+        results = context.user_data.get('temp_search_results', [])
+        
+        if idx < len(results):
+            selected = results[idx]
+            context.user_data['target_board'] = selected['board']
+            context.user_data['target_ticker'] = selected['ticker']
+            context.user_data['target_stock_name'] = selected['name']
+            
+            await query.edit_message_text(
+                f"✅ <b>{selected['name']}</b> (티커: {selected['ticker']}) 종목이 선택되었습니다.\n\n"
+                f"이제 추가할 <b>뉴스 링크(URL)</b>를 채팅으로 보내주세요.",
+                parse_mode="HTML"
+            )
+            # 캐시 삭제
+            if 'temp_search_results' in context.user_data:
+                del context.user_data['temp_search_results']
+                
+            return WAITING_FOR_NEWS_URL
+            
+    return WAITING_FOR_STOCK_SELECTION
+
+async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """사용자가 보낸 뉴스 링크를 스크래핑한 뒤 실제 BoardService를 통해 저장합니다.
+    
+    Args:
+        update (Update): 사용자의 대화 응답 (메시지 텍스트로 URL 포함).
+        context (ContextTypes.DEFAULT_TYPE): 타겟 종목, 티커가 저장되어 있는 세션 컨텍스트.
+        
+    Returns:
+        int: 워크플로우를 종료하는 상태 상수 (ConversationHandler.END).
+    """
+    news_url = update.message.text
+    
+    if news_url == "📰 뉴스 추가 시작":
+        await update.message.reply_text("검색을 처음부터 다시 시작합니다. 검색어를 입력해주세요.")
+        return WAITING_FOR_SEARCH_QUERY
+        
+    if not (news_url.startswith("http://") or news_url.startswith("https://")):
+        await update.message.reply_text("❌ 유효한 웹 사이트 주소(http:// 또는 https:// 로 시작하는 뉴스 링크)를 입력해주세요!")
+        return WAITING_FOR_NEWS_URL
+        
+    target_board = context.user_data.get('target_board', '')
+    target_name = context.user_data.get('target_stock_name', '알 수 없음')
+    target_ticker = context.user_data.get('target_ticker', '')
+    
+    logger.info(f"뉴스 URL 수신 - 보드: {target_board}, 대상: {target_name}({target_ticker}), 링크: {news_url}")
+    
+    # 1. 메시지 임시 전송 (처리 지연 안내)
+    progress_msg = await update.message.reply_text("🔍 뉴스 메타데이터(제목/날짜)를 추출 중입니다...")
+    
+    # 2. 실제 URL 스크래핑 시도
+    news_scraper = context.bot_data['news_scraper']
+    try:
+        scraped = await news_scraper.scrape(news_url)
+        if scraped and scraped.title:
+            title = scraped.title
+            doc_date = scraped.date
+        else:
+            await progress_msg.edit_text("❌ 유효한 뉴스 기사가 아니거나 사이트에서 접근을 차단했습니다.\n\n정상적인 뉴스 링크를 다시 입력해주세요.")
+            return WAITING_FOR_NEWS_URL
+    except Exception as e:
+        logger.error(f"스크래핑 에러: {e}")
+        await progress_msg.edit_text("❌ 링크를 분석하는 도중 서버 오류가 발생했습니다. 다시 입력해주세요.")
+        return WAITING_FOR_NEWS_URL
+        
+    # 3. BoardService 연동하여 뉴스 추가
+    board_service = context.bot_data['board_service']
+    success = False
+    try:
+        success = await asyncio.to_thread(
+            board_service.add_stock_news,
+            board_name=target_board,
+            ticker=target_ticker,
+            title=title,
+            date=doc_date,
+            url=news_url
+        )
+    except Exception as e:
+        logger.error(f"주식 뉴스 저장 에러: {e}")
+    
+    # 4. 결과 응답
+    if success:
+        # 기존 progress_msg를 업데이트
+        await progress_msg.edit_text("🔍 뉴스 메타데이터 추출 및 저장 중... 완료!")
+        # 사용자에게 새로운 메시지로 메인 키보드를 포함해 발송
+        await update.message.reply_text(
+            f"🎉 <b>{target_name}</b>에 뉴스가 성공적으로 저장되었습니다!\n\n"
+            f"📌 <b>제목</b>: {title}\n"
+            f"📅 <b>날짜</b>: {doc_date}\n"
+            f"🔗 <b>링크</b>: {news_url}\n\n"
+            f"다른 뉴스를 추가하시려면 언제든 버튼을 눌러주세요.",
+            parse_mode="HTML",
+            reply_markup=get_main_keyboard()
+        )
+    else:
+        await progress_msg.edit_text("🔍 뉴스 메타데이터 추출 및 저장 중... 에러 발생")
+        await update.message.reply_text(
+            f"❌ 알 수 없는 에러가 발생하여 뉴스 저장에 실패했습니다. (티커: {target_ticker})",
+            reply_markup=get_main_keyboard()
+        )
+    
+    context.user_data.clear()
+    return ConversationHandler.END
+
+async def cancel_workflow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """명령어나 예기치 않은 종료 시 호출됩니다.
+    
+    Args:
+        update (Update): 명령어를 입력한 메시지 객체.
+        context (ContextTypes.DEFAULT_TYPE): 유저 데이터를 초기화하기 위한 컨텍스트.
+        
+    Returns:
+        int: 워크플로우를 종료하는 상태 상수 (ConversationHandler.END).
+    """
+    context.user_data.clear()
+    await update.message.reply_text("뉴스 추가 작업을 취소했습니다.", reply_markup=get_main_keyboard())
+    return ConversationHandler.END
+
+def get_news_workflow_handler() -> ConversationHandler:
+    """뉴스 추가를 위한 텔레그램 ConversationHandler를 조립하여 반환합니다.
+    
+    Returns:
+        ConversationHandler: 단계별(검색-선택-입력) 상태가 정리된 핸들러.
+    """
+    return ConversationHandler(
+        entry_points=[
+            CommandHandler("add", start_news_workflow),
+            MessageHandler(filters.Regex("^📰 뉴스 추가 시작$"), start_news_workflow)
+        ],
+        states={
+            WAITING_FOR_SEARCH_QUERY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_search_query)
+            ],
+            WAITING_FOR_STOCK_SELECTION: [
+                CallbackQueryHandler(process_stock_selection, pattern="^selidx_")
+            ],
+            WAITING_FOR_NEWS_URL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_news_url)
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_workflow)],
+    )
