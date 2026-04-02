@@ -16,13 +16,13 @@ router = APIRouter()
 
 
 @router.get("/api/boards")
-async def get_boards() -> list:
-    """사용 가능한 마인드맵 보드 목록을 반환합니다.
+async def get_boards() -> list[dict]:
+    """사용 가능한 마인드맵 보드 메타 정보 목록을 반환합니다.
 
     Returns:
-        list[str]: 보드 파일명 문자열 목록.
+        list[dict]: 보드 id와 name을 포함하는 리스트.
     """
-    return service.list_boards()
+    return service.get_boards_info()
 
 
 @router.get("/api/board")
@@ -46,7 +46,7 @@ async def get_board_data(name: str) -> dict:
                 "name": node.name,
                 "nodes": [to_dict(n) for n in node.nodes],
                 "stocks": [
-                    {"name": s.name, "ticker": s.ticker, "reports": s.reports}
+                    {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news}
                     for s in node.stocks
                 ],
             }

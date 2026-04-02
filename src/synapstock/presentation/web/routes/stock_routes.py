@@ -138,6 +138,7 @@ async def get_all_stocks_flat() -> list:
                                 "ticker": s.ticker,
                                 "name": s.name,
                                 "board": b_name,
+                                "board_name": getattr(board, "name", b_name),
                                 "path": current_path,
                             }
                         )

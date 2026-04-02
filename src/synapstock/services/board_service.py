@@ -118,6 +118,22 @@ class BoardService:
         """
         return self._repository.list_boards()
 
+    def get_boards_info(self) -> list[dict]:
+        """모든 보드의 메타정보(id, name)를 반환합니다.
+        
+        Returns:
+            list[dict]: 각 보드의 식별자와 실제 사람 눈에 보이는 이름을 포함하는 리스트.
+        """
+        boards = self.list_boards()
+        result = []
+        for b in boards:
+            try:
+                board = self.load_board(b)
+                result.append({"id": b, "name": board.name})
+            except Exception:
+                result.append({"id": b, "name": b.replace("theme_", "")})
+        return result
+
     def sync(self, board: Board, progress_callback: Callable[[str, float], None] | None = None) -> None:
         """Board의 변경사항을 마인드맵에 동기화합니다.
         

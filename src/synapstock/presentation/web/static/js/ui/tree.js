@@ -171,7 +171,7 @@ export function renderNode(node, container, depth, globalLocalReportCounts, curr
                             <h3>${name} (${ticker})</h3>
                         </div>
                         <div class="overview-stats">
-                            <div class="stat-item">📰 <span>뉴스</span> <span class="count">0</span></div>
+                            <div class="stat-item">📰 <span>뉴스</span> <span class="count">${(stock.news || []).length}</span></div>
                             <div class="stat-item">📊 <span>리포트</span> <span class="count">${((stock.reports || []).length) + (globalLocalReportCounts[name] || 0)}</span></div>
                         </div>
                         <div class="overview-footer">
@@ -277,10 +277,12 @@ export async function initTree(loadBoardData) {
         const boards = await boardsRes.json();
 
         boardSelect.innerHTML = '<option value="" disabled selected>보드를 선택하세요</option>';
-        boards.forEach(name => {
+        boards.forEach(item => {
+            const id = item.id || item;
+            const name = item.name || item.replace('theme_', '');
             const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name.replace('theme_', '');
+            option.value = id;
+            option.textContent = name;
             boardSelect.appendChild(option);
         });
 

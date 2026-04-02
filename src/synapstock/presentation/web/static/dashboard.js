@@ -69,7 +69,7 @@ async function initGlobalSearch() {
                 div.innerHTML = `
                     <span class="search-result-name">${item.name} (${item.ticker})</span>
                     <div class="search-result-meta">
-                        <span class="search-result-board">${item.board.replace('theme_', '').replace('.json', '')}</span>
+                        <span class="search-result-board">${item.board_name || item.board.replace('theme_', '').replace('.json', '')}</span>
                         <span class="search-result-path">${item.path.join(' > ')}</span>
                     </div>
                 `;
@@ -241,10 +241,12 @@ async function initTree() {
         const boards = await boardsRes.json();
 
         boardSelect.innerHTML = '<option value="" disabled selected>보드를 선택하세요</option>';
-        boards.forEach(name => {
+        boards.forEach(item => {
+            const id = item.id || item;
+            const name = item.name || item.replace('theme_', '');
             const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name.replace('theme_', '');
+            option.value = id;
+            option.textContent = name;
             boardSelect.appendChild(option);
         });
 
@@ -374,7 +376,7 @@ function renderNode(node, container, depth) {
                                         <h3>${name} (${ticker})</h3>
                                     </div>
                                     <div class="overview-stats">
-                                        <div class="stat-item">📰 <span>뉴스</span> <span class="count">0</span></div>
+                                        <div class="stat-item">📰 <span>뉴스</span> <span class="count">${(stock.news || []).length}</span></div>
                                         <div class="stat-item">📊 <span>리포트</span> <span class="count">${((stock.reports || []).length) + (globalLocalReportCounts[name] || 0)}</span></div>
                                     </div>
                                     <div class="overview-footer">

@@ -34,10 +34,11 @@ def _find_stocks_by_name(board: Any, query: str, board_name: str) -> List[Dict[s
         for s in node.stocks:
             if query in s.name:
                 results.append({
-                    "board": board_name,
+                    "board": board_name,           # 실제 파일 ID ("theme_Bio")
+                    "board_name": board.name,      # 표시용 이름 ("바이오")
                     "name": s.name,
                     "ticker": s.ticker,
-                    "path": f"[{board_name}] " + " > ".join(current_path + [s.name])
+                    "path": f"[{board.name}] " + " > ".join(current_path + [s.name])
                 })
         for child in node.nodes:
             search_nodes(child, current_path + [child.name])
