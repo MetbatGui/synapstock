@@ -6,7 +6,10 @@ PDF 파일 온디맨드 다운로드 및 서빙 엔드포인트를 제공합니�
 import json
 import os
 import unicodedata
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from fastapi.responses import JSONResponse
 
@@ -240,7 +243,7 @@ async def serve_report_file(filename: str):
         return FileResponse(local_path)
 
     if drive_adapter:
-        print(f"[CLOUD] 파일 다운로드 시도 중: {filename}")
+        logger.info(f"[CLOUD] 파일 다운로드 시도 중: {filename}")
         if drive_adapter.download_file(filename, local_path):
             return FileResponse(local_path)
 

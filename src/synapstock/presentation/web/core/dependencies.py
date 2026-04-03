@@ -8,7 +8,10 @@ import os
 import asyncio
 import time
 from pathlib import Path
+import logging
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 from synapstock.services.board_service import BoardService
 from synapstock.adapters.local.board_repo import LocalBoardRepository
@@ -44,7 +47,7 @@ try:
             client_secret_file="secrets/client_secret.json",
         )
 except Exception as e:
-    print(f"[ERROR] GoogleDriveAdapter 초기화 실패: {e}")
+    logger.error(f"[ERROR] GoogleDriveAdapter 초기화 실패: {e}")
 
 # ── 인덱스 동기화 상태 ──────────────────────────────────────────────────────
 _last_index_sync_time = 0
@@ -84,7 +87,7 @@ async def sync_indices_if_needed(force: bool = False):
 
         try:
             if drive_adapter:
-                print("[SYSTEM] 인덱스 동기화 시작...")
+                logger.info("[SYSTEM] 인덱스 동기화 시작...")
                 # 1. list.json 동기화
                 list_data = drive_adapter.get_file("list.json")
                 if list_data:
@@ -98,6 +101,6 @@ async def sync_indices_if_needed(force: bool = False):
                         f.write(reports_data)
 
                 _last_index_sync_time = time.time()
-                print(f"[SYSTEM] 인덱스 동기화 완료: {time.ctime(_last_index_sync_time)}")
+                logger.info(f"[SYSTEM] 인덱스 동기화 완료: {time.ctime(_last_index_sync_time)}")
         except Exception as e:
-            print(f"[ERROR] 인덱스 동기화 실패: {e}")
+            logger.error(f"[ERROR] 인덱스 동기화 실패: {e}")

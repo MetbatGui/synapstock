@@ -2,8 +2,11 @@
 
 import re
 from typing import Any, cast, Callable
+import logging
 from concurrent.futures import ThreadPoolExecutor
 import requests
+
+logger = logging.getLogger(__name__)
 
 from synapstock.domain.models import Board, Node, Stock
 from synapstock.domain.ports import MindmapPort
@@ -73,7 +76,7 @@ class MiroMindmapAdapter(MindmapPort):
                 return cast(str, board["id"])
         
         # 보드가 없으면 생성
-        print(f"[*] Miro 보드 '{board_name}'가 존재하지 않아 새로 생성합니다.")
+        logger.info(f"[*] Miro 보드 '{board_name}'가 존재하지 않아 새로 생성합니다.")
         create_res = requests.post(
             f"{self.base_url}/boards", 
             headers=self.headers,

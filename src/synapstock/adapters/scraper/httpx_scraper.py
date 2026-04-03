@@ -2,9 +2,12 @@
 
 import re
 from datetime import datetime
+import logging
 from typing import Optional
 
 import httpx
+
+logger = logging.getLogger(__name__)
 from bs4 import BeautifulSoup
 
 from synapstock.domain.models import ScrapedNews
@@ -88,6 +91,5 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
                 return ScrapedNews(title=title, date=date_str, url=url)
 
         except Exception as e:
-            # 실무에서는 로거를 사용하겠지만 여기서는 인쇄로 대체
-            print(f"[HttpxNewsScraperAdapter] Error scraping {url}: {e}")
+            logger.error(f"[HttpxNewsScraperAdapter] Error scraping {url}: {e}")
             return None

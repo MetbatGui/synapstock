@@ -1,7 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+import logging
 from synapstock.domain.ports import DisclosurePort
+
+logger = logging.getLogger(__name__)
 
 class DartDisclosureAdapter(DisclosurePort):
     """DART(전자공시시스템) 상세검색을 활용한 공시 정보 어댑터입니다."""
@@ -86,5 +89,5 @@ class DartDisclosureAdapter(DisclosurePort):
             return results[:10] # 최신 10건만 반환
             
         except Exception as e:
-            print(f"[DART ERROR] Failed to fetch disclosures for {ticker}: {e}")
+            logger.error(f"[DART ERROR] Failed to fetch disclosures for {ticker}: {e}")
             return []
