@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, Optional, Any, List
 import pandas as pd
 import openpyxl
-from synapstock.domain.models import Board, ScrapedNews, SearchResult
+from synapstock.domain.models import Board, ScrapedNews
 
 
 class BoardRepositoryPort(ABC):
@@ -176,17 +176,3 @@ class NewsScraperPort(ABC):
         """URL에서 뉴스 제목과 날짜를 추출한다."""
 
 
-class StockSearchPort(ABC):
-    """보드 데이터를 기반으로 종목 및 노드를 검색하기 위한 추상 포트."""
-
-    @abstractmethod
-    def search_by_name(self, query: str) -> List[SearchResult]:
-        """이동 또는 티커로 종목/노드를 검색한다."""
-
-    @abstractmethod
-    def get_sectors(self) -> List[str]:
-        """사용 가능한 모든 섹터(보드) 목록을 가져온다."""
-
-    @abstractmethod
-    def get_stocks_in_sector(self, board_name: str) -> List[SearchResult]:
-        """특정 섹터의 모든 종목을 가져온다."""
