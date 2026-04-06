@@ -19,7 +19,10 @@ from synapstock.adapters.google.google_drive_adapter import GoogleDriveAdapter
 from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
 from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
 from synapstock.adapters.local.file_storage import LocalFileStorageAdapter
-from synapstock.services.board_service import BoardService
+from synapstock.services.query_service import BoardQueryService
+from synapstock.services.command_service import BoardCommandService
+from synapstock.services.media_service import StockMediaService
+from synapstock.services.sync_service import BoardSyncService
 from synapstock.services.report_service import ReportService
 
 logger = logging.getLogger(__name__)
@@ -53,15 +56,22 @@ class Container:
         self._drive_adapter = None
         self._init_google_drive()
         
-        # 5. 도메인 서비스 싱글톤
-        self._board_service = BoardService(
+        # 5. 도메인 유즈케이스 서비스 싱글톤
+        self._query_service = BoardQueryService(
             repository=self._repo,
-            mindmap=self._miro_adapter,
             ticker_search=self._ticker_search_adapter,
-            storage=self._pdf_storage,
             disclosure=self._disclosure_adapter,
-            financial=self._financial_adapter,
+            financial=self._financial_adapter
+        )
+        self._command_service = BoardCommandService(repository=self._repo)
+        self._media_service = StockMediaService(
+            repository=self._repo,
+            storage=self._pdf_storage,
             pdf_dir=str(self.config.pdf_dir)
+        )
+        self._sync_service = BoardSyncService(
+            mindmap=self._miro_adapter,
+            ticker_search=self._ticker_search_adapter
         )
         
         self._report_service = None
@@ -102,8 +112,20 @@ class Container:
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
 
     @property
-    def board_service(self) -> BoardService:
-        return self._board_service
+    def query_service(self) -> BoardQueryService:
+        return self._query_service
+
+    @property
+    def command_service(self) -> BoardCommandService:
+        return self._command_service
+
+    @property
+    def media_service(self) -> StockMediaService:
+        return self._media_service
+
+    @property
+    def sync_service(self) -> BoardSyncService:
+        return self._sync_service
 
     @property
     def report_service(self) -> ReportService | None:

@@ -9,7 +9,7 @@ import threading
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from synapstock.presentation.web.core.dependencies import service
+from synapstock.presentation.web.core.dependencies import query_service, command_service, media_service, sync_service
 from synapstock.presentation.web.core.websocket_manager import manager
 
 router = APIRouter()
@@ -22,7 +22,7 @@ async def get_boards() -> list[dict]:
     Returns:
         list[dict]: 보드 id와 name을 포함하는 리스트.
     """
-    return service.get_boards_info()
+    return query_service.get_boards_info()
 
 
 @router.get("/api/board")
@@ -39,7 +39,7 @@ async def get_board_data(name: str) -> dict:
         JSONResponse (404): 보드를 찾을 수 없는 경우.
     """
     try:
-        board = service.load_board(name)
+        board = query_service.load_board(name)
 
         def to_dict(node):
             return {
@@ -74,14 +74,14 @@ async def trigger_sync(name: str) -> dict:
             await manager.broadcast(json.dumps({"type": "log", "message": msg, "progress": val}))
 
         try:
-            board = service.load_board(name)
+            board = query_service.load_board(name)
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
             def sync_progress(m, v):
                 loop.run_until_complete(log_callback(m, v))
 
-            service.sync_with_miro(board, progress_callback=sync_progress)
+            sync_service.sync_with_miro(board, progress_callback=sync_progress)
         except Exception as e:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -104,7 +104,7 @@ async def add_node(board: str, parent: str, name: str) -> dict:
     Returns:
         dict: ``{"status": "success"}`` 또는 404 오류 응답.
     """
-    success = service.add_node(board, parent, name)
+    success = command_service.add_node(board, parent, name)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
@@ -123,7 +123,7 @@ async def delete_node(board: str, name: str) -> dict:
     Returns:
         dict: ``{"status": "success"}`` 또는 400 오류 응답.
     """
-    success = service.delete_node(board, name)
+    success = command_service.delete_node(board, name)
     if success:
         return {"status": "success"}
     return JSONResponse(
@@ -145,7 +145,7 @@ async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict:
     Returns:
         dict: ``{"status": "success"}`` 또는 404 오류 응답.
     """
-    success = service.add_stock(board, parent, name, ticker)
+    success = command_service.add_stock(board, parent, name, ticker)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
@@ -162,7 +162,7 @@ async def delete_stock(board: str, ticker: str) -> dict:
     Returns:
         dict: ``{"status": "success"}`` 또는 404 오류 응답.
     """
-    success = service.delete_stock(board, ticker)
+    success = command_service.delete_stock(board, ticker)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Stock not found in board"})
@@ -190,7 +190,7 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
 
     try:
         content = await file.read()
-        success = service.add_stock_report(board, ticker, content, file.filename)
+        success = media_service.add_stock_report(board, ticker, content, file.filename)
         if success:
             return {"status": "success", "filename": file.filename}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -215,7 +215,7 @@ async def delete_stock_report(board: str, ticker: str, report_path: str) -> dict
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = service.remove_stock_report(board, ticker, report_path)
+        success = media_service.remove_stock_report(board, ticker, report_path)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or report not found"})

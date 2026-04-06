@@ -81,9 +81,9 @@ async def process_search_query(update: Update, context: ContextTypes.DEFAULT_TYP
         
     logger.info(f"뉴스 추가 타겟 검색 쿼리: {query}")
     
-    board_service = context.bot_data['board_service']
+    query_service = context.bot_data['query_service']
     try:
-        boards_list = await asyncio.to_thread(board_service.list_boards)
+        boards_list = await asyncio.to_thread(query_service.list_boards)
     except Exception as e:
         logger.error(f"보드 목록 로드 실패: {e}")
         await update.message.reply_text(f"서버에서 보드 목록을 불러오는 데 실패했습니다.")
@@ -94,7 +94,7 @@ async def process_search_query(update: Update, context: ContextTypes.DEFAULT_TYP
     # 시스템 내에 존재하는 모든 보드를 전수조사
     for b_name in boards_list:
         try:
-            board = await asyncio.to_thread(board_service.load_board, b_name)
+            board = await asyncio.to_thread(query_service.load_board, b_name)
             res = _find_stocks_by_name(board, query, b_name)
             search_results.extend(res)
         except Exception as e:
@@ -220,12 +220,12 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await progress_msg.edit_text("❌ 링크를 분석하는 도중 서버 오류가 발생했습니다. 다시 입력해주세요.")
         return WAITING_FOR_NEWS_URL
         
-    # 3. BoardService 연동하여 뉴스 추가
-    board_service = context.bot_data['board_service']
+    # 3. MediaService 연동하여 뉴스 추가
+    media_service = context.bot_data['media_service']
     success = False
     try:
         success = await asyncio.to_thread(
-            board_service.add_stock_news,
+            media_service.add_stock_news,
             board_name=target_board,
             ticker=target_ticker,
             title=title,

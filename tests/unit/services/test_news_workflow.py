@@ -1,7 +1,8 @@
 import pytest
 from unittest.mock import Mock
 from synapstock.domain.models import Board, Node, Stock
-from synapstock.services.board_service import BoardService
+from synapstock.services.query_service import BoardQueryService
+from synapstock.services.media_service import StockMediaService
 from synapstock.domain.ports import BoardRepositoryPort, MindmapPort, TickerSearchPort, StoragePort
 from synapstock.domain.models import SearchResult, SearchResultType
 
@@ -56,7 +57,8 @@ def test_search_path_and_add_news(mock_board):
     ticker_search = Mock(spec=TickerSearchPort)
     storage = Mock(spec=StoragePort)
     
-    service = BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search, storage=storage)
+    query_service = BoardQueryService(repository=repo, ticker_search=ticker_search)
+    media_service = StockMediaService(repository=repo, storage=storage)
     
     # 1. 경로 검색 기능 검증 (단순 탐색 알고리즘 또는 BoardService 내의 함수 모방)
     # 현재 BoardService에 경로(Path)를 리스트로 반환하는 기능이 없다면,
@@ -72,7 +74,7 @@ def test_search_path_and_add_news(mock_board):
         return []
 
     # 검색 API가 반환할 경로
-    board = service.load_board("theme_data")
+    board = query_service.load_board("theme_data")
     path = find_node_path(board.root, "삼성전자", [])
     
     assert path == ["반도체", "IDM", "삼성전자"]
@@ -82,12 +84,12 @@ def test_search_path_and_add_news(mock_board):
     target_ticker = "005930"
     
     # 추가 전 확인
-    samsung_node = service.find_node_by_name(board.root, "IDM") # 삼성전자가 속한 부모 등
+    samsung_node = query_service.find_node_by_name(board.root, "IDM") # 삼성전자가 속한 부모 등
     assert len(samsung_node.stocks[0].news) == 0
     
-    # 뉴스 추가 (경로 또는 티커 기반. BoardService.add_stock_news 이용)
+    # 뉴스 추가 (경로 또는 티커 기반. StockMediaService.add_stock_news 이용)
     url_to_add = "https://news.example.com/123"
-    result = service.add_stock_news(
+    result = media_service.add_stock_news(
         board_name="theme_data",
         ticker=target_ticker,
         title="삼성전자 어닝 서프라이즈",
@@ -98,8 +100,8 @@ def test_search_path_and_add_news(mock_board):
     assert result is True
     
     # 뉴스 배열(news []) 업데이트 확인
-    updated_board = service.load_board("theme_data")
-    updated_parent_node = service.find_node_by_name(updated_board.root, "IDM")
+    updated_board = query_service.load_board("theme_data")
+    updated_parent_node = query_service.find_node_by_name(updated_board.root, "IDM")
     updated_stock = next(s for s in updated_parent_node.stocks if s.ticker == target_ticker)
     
     assert len(updated_stock.news) == 1

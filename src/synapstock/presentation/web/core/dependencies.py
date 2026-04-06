@@ -15,10 +15,13 @@ logger = logging.getLogger(__name__)
 
 from synapstock.infrastructure.container import container
 
-# 전역 서비스 및 어댑터 싱글톤 (컨테이너로부터 획득)
-service = container.board_service
-drive_adapter = container.drive_adapter
+# 전역 서비스 및 유즈케이스 싱글톤 (컨테이너로부터 획득)
+query_service = container.query_service
+command_service = container.command_service
+media_service = container.media_service
+sync_service = container.sync_service
 report_service = container.report_service
+drive_adapter = container.drive_adapter
 news_scraper_adapter = container.news_scraper
 
 async def sync_indices_if_needed(force: bool = False):
