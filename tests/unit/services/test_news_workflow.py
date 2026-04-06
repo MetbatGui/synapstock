@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock
 from synapstock.domain.models import Board, Node, Stock
 from synapstock.services.board_service import BoardService
-from synapstock.domain.ports import BoardRepositoryPort, MindmapPort, StockSearchPort
+from synapstock.domain.ports import BoardRepositoryPort, MindmapPort
 from synapstock.domain.models import SearchResult, SearchResultType
 
 class MockBoardRepository(BoardRepositoryPort):
