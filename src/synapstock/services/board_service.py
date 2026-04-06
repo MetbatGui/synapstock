@@ -2,7 +2,7 @@
 
 from typing import Callable
 from synapstock.domain.models import Board, Node, Stock
-from synapstock.domain.ports import MindmapPort, BoardRepositoryPort, DisclosurePort, FinancialDataPort, TickerSearchPort
+from synapstock.domain.ports import MindmapPort, BoardRepositoryPort, DisclosurePort, FinancialDataPort, TickerSearchPort, StoragePort
 
 
 class BoardService:
@@ -13,8 +13,10 @@ class BoardService:
         repository: BoardRepositoryPort, 
         mindmap: MindmapPort, 
         ticker_search: TickerSearchPort,
+        storage: StoragePort,
         disclosure: DisclosurePort = None, 
-        financial: FinancialDataPort = None
+        financial: FinancialDataPort = None,
+        pdf_dir: str = "data/pdf"
     ) -> None:
         """필요한 어댑터들과 함께 BoardService를 초기화합니다.
         
@@ -22,14 +24,18 @@ class BoardService:
             repository: 보드 데이터 퍼시스턴스를 위한 포트.
             mindmap: 외부 마인드맵(예: Miro) 동기화를 위한 포트.
             ticker_search: 종목 티커 검색을 위한 포트.
+            storage: 파일(리포트 등) 저장 처리를 위한 포트.
             disclosure: 선택사항으로, 종목 공시 정보 조회를 위한 포트.
             financial: 선택사항으로, 재무 데이터 조회를 위한 포트.
+            pdf_dir: 리포트 PDF 파일이 저장되는 기본 경로.
         """
         self._repository = repository
         self._mindmap = mindmap
         self._ticker_search = ticker_search
+        self._storage = storage
         self._disclosure = disclosure
         self._financial = financial
+        self._pdf_dir = pdf_dir
 
     def get_disclosures(self, ticker: str) -> list[dict]:
         """지정된 티커에 대한 최근 공시 항목을 가져옵니다.
@@ -259,24 +265,17 @@ class BoardService:
         Returns:
             bool: 성공적으로 추가된 경우 True.
         """
-        from pathlib import Path
-        
-        # 1. 파일 저장 경로 설정 및 디렉토리 생성
-        pdf_dir = Path("data/pdf")
-        pdf_dir.mkdir(parents=True, exist_ok=True)
-        target_path = pdf_dir / filename
-        
-        # 2. 파일 저장
-        with open(target_path, "wb") as f:
-            f.write(file_content)
+        # 1. 파일 저장 (StoragePort 사용)
+        target_path = f"{self._pdf_dir}/{filename}"
+        if not self._storage.put_file(target_path, file_content):
+            return False
             
-        # 3. 보드 데이터 업데이트
+        # 2. 보드 데이터 업데이트
         board = self.load(board_name)
-        # 웹 환경에서의 접근을 위해 'data/'를 포함한 상대 경로 저장
-        report_path = f"data/pdf/{filename}"
+        # 웹 환경에서의 접근을 위해 저장된 경로를 도메인 모델에 기록
         
         # Node 도메인 메서드 사용
-        success = board.root.find_and_add_report(ticker, report_path)
+        success = board.root.find_and_add_report(ticker, target_path)
         if success:
             self._repository.save(board)
         return success
