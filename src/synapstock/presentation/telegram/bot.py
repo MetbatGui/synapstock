@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Messa
 
 from synapstock.presentation.telegram.keyboards.main_keyboard import get_main_keyboard
 from synapstock.presentation.telegram.handlers.news_handler import get_news_workflow_handler
+from synapstock.infrastructure.container import container
 
 
 # 로거 설정
@@ -49,12 +50,11 @@ def main() -> None:
     어댑터와 서비스 등 시스템 전역 의존성을 봇 데이터(bot_data)에
     주입한 이후 기본 핸들러들을 등록합니다.
     """
-    # 1. 환경변수 로딩 및 검증
-    load_dotenv()
-    token = os.getenv("TELEGRAM_API_TOKEN")
+    # 1. 설정 검증 (Container를 통해 로드됨)
+    token = container.config.telegram_token
     
     if not token:
-        logger.error("TELEGRAM_API_TOKEN 환경변수가 설정되지 않았습니다. .env 파일을 확인해주세요.")
+        logger.error("TELEGRAM_API_TOKEN 설정이 누락되었습니다. .env 파일을 확인해주세요.")
         sys.exit(1)
         
     logger.info("텔레그램 봇 (Long Polling) 시작 준비 중...")
