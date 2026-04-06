@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from synapstock.presentation.web.core.dependencies import service
+from synapstock.presentation.web.core.dependencies import query_service, media_service
 
 router = APIRouter()
 
@@ -36,9 +36,9 @@ async def get_stock_info(ticker: str) -> dict:
         JSONResponse (500): 조회 중 예외 발생 시.
     """
     try:
-        boards = service.list_boards()
+        boards = query_service.list_boards()
         for b_name in boards:
-            board = service.load_board(b_name)
+            board = query_service.load_board(b_name)
 
             def find_stock_recursive(node):
                 if hasattr(node, "stocks") and node.stocks:
@@ -86,7 +86,7 @@ async def get_financials(name: str) -> list:
     try:
         if not name:
             return []
-        financials = service.get_financial_data(name)
+        financials = query_service.get_financial_data(name)
         return financials
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
@@ -102,7 +102,7 @@ async def search_stock(q: str) -> list:
     Returns:
         list[dict]: 자동완성 결과. 각 항목은 ``{"name": str, "ticker": str}`` 형태.
     """
-    results = service.search_ticker(q)
+    results = query_service.search_ticker(q)
     return results
 
 
@@ -123,11 +123,11 @@ async def get_all_stocks_flat() -> list:
         JSONResponse (500): 조회 중 예외 발생 시.
     """
     try:
-        boards = service.list_boards()
+        boards = query_service.list_boards()
         all_stocks = []
 
         for b_name in boards:
-            board = service.load_board(b_name)
+            board = query_service.load_board(b_name)
 
             def flatten_stocks(node, current_path=[]):
                 stocks = []
@@ -172,7 +172,7 @@ async def get_disclosures(ticker: str) -> list:
     try:
         if not ticker or ticker == "none":
             return []
-        disclosures = service.get_disclosures(ticker)
+        disclosures = query_service.get_disclosures(ticker)
         return disclosures
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
@@ -276,7 +276,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = service.add_stock_news(board, ticker, title, date, url)
+        success = media_service.add_stock_news(board, ticker, title, date, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -301,7 +301,7 @@ async def delete_stock_news(board: str, ticker: str, url: str) -> dict:
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = service.remove_stock_news(board, ticker, url)
+        success = media_service.remove_stock_news(board, ticker, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or news not found"})

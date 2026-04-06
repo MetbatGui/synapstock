@@ -59,17 +59,15 @@ def main() -> None:
         
     logger.info("텔레그램 봇 (Long Polling) 시작 준비 중...")
 
-    from synapstock.infrastructure.container import container
-    
-    board_service = container.board_service
-    news_scraper = container.news_scraper
-
     # 3. Application(봇 코어) 빌드
     application = ApplicationBuilder().token(token).build()
 
-    # 봇 전용 DI 컨테이너(bot_data)에 도메인 서비스 주입
-    application.bot_data['board_service'] = board_service
-    application.bot_data['news_scraper'] = news_scraper
+    # 봇 전용 DI 컨테이너(bot_data)에 도메인 유즈케이스 서비스 주입
+    application.bot_data['query_service'] = container.query_service
+    application.bot_data['command_service'] = container.command_service
+    application.bot_data['media_service'] = container.media_service
+    application.bot_data['sync_service'] = container.sync_service
+    application.bot_data['news_scraper'] = container.news_scraper
 
     # 4. 기본 핸들러(라우팅) 등록
     application.add_handler(CommandHandler("start", start_command))
