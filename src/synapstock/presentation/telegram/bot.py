@@ -59,24 +59,10 @@ def main() -> None:
         
     logger.info("텔레그램 봇 (Long Polling) 시작 준비 중...")
 
-    # 2. 의존성 (Dependencies) 초기화
-    from synapstock.services.board_service import BoardService
-    from synapstock.adapters.local.board_repo import LocalBoardRepository
-    from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
-    from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
-    from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
-    from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
-    from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
-    from pathlib import Path
-
-    repo = LocalBoardRepository(Path("data") / "board")
-    miro_adapter = MiroMindmapAdapter(os.getenv("MIRO_ACCESS_TOKEN", ""))
-    disclosure_adapter = DartDisclosureAdapter()
-    financial_adapter = ExcelFinancialDataAdapter(Path("data") / "financial_statements" / "financial_data.xlsx")
-    ticker_search_adapter = NaverTickerSearchAdapter()
-    board_service = BoardService(repo, miro_adapter, ticker_search_adapter, disclosure_adapter, financial_adapter)
+    from synapstock.infrastructure.container import container
     
-    news_scraper = HttpxNewsScraperAdapter()
+    board_service = container.board_service
+    news_scraper = container.news_scraper
 
     # 3. Application(봇 코어) 빌드
     application = ApplicationBuilder().token(token).build()

@@ -1,0 +1,115 @@
+"""SynapStock 전역 의존성 주입(DI) 컨테이너.
+
+애플리케이션의 모든 어댑터와 도메인 서비스의 생명주기를 중앙에서 관리합니다.
+웹 서버(FastAPI)와 텔레그램 봇 모두 이 컨테이너를 통해 싱글톤 인스턴스를 공유합니다.
+"""
+
+import os
+import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+from synapstock.adapters.local.board_repo import LocalBoardRepository
+from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
+from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
+from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
+from synapstock.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
+from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
+from synapstock.services.board_service import BoardService
+from synapstock.services.report_service import ReportService
+
+logger = logging.getLogger(__name__)
+
+class Container:
+    """애플리케이션 전역 의존성을 조립하고 관리하는 컨테이너 클래스."""
+
+    def __init__(self):
+        # 1. 환경 변수 로드
+        load_dotenv()
+        
+        # 2. 기본 경로 설정
+        self.data_dir = Path("data")
+        self.secrets_dir = Path("secrets")
+        
+        # 3. 인프라 어댑터 싱글톤
+        self._repo = LocalBoardRepository(self.data_dir / "board")
+        self._miro_adapter = MiroMindmapAdapter(os.getenv("MIRO_ACCESS_TOKEN", ""))
+        self._disclosure_adapter = DartDisclosureAdapter()
+        self._financial_adapter = ExcelFinancialDataAdapter(
+            self.data_dir / "financial_statements" / "financial_data.xlsx"
+        )
+        self._ticker_search_adapter = NaverTickerSearchAdapter()
+        self._news_scraper_adapter = HttpxNewsScraperAdapter()
+        
+        # 4. 조건부 어댑터 (Google Drive)
+        self._drive_adapter = None
+        self._init_google_drive()
+        
+        # 5. 도메인 서비스 싱글톤
+        self._board_service = BoardService(
+            repository=self._repo,
+            mindmap=self._miro_adapter,
+            ticker_search=self._ticker_search_adapter,
+            disclosure=self._disclosure_adapter,
+            financial=self._financial_adapter
+        )
+        
+        self._report_service = None
+        self._init_report_service()
+
+    def _init_google_drive(self):
+        """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
+        token_path = self.secrets_dir / "token.json"
+        client_secret_path = self.secrets_dir / "client_secret.json"
+        
+        report_folder_id = os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID")
+        sd_folder_id = os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID")
+        
+        if not token_path.exists():
+            logger.warning("[Container] Google Drive token.json 파일이 없어 어댑터를 초기화하지 않습니다.")
+            return
+
+        try:
+            folders = {
+                "report": report_folder_id,
+                "sd": sd_folder_id
+            }
+            self._drive_adapter = GoogleDriveAdapter(
+                token_file=str(token_path),
+                folders=folders,
+                client_secret_file=str(client_secret_path),
+            )
+        except Exception as e:
+            logger.error(f"[Container] Google Drive 어댑터 초기화 실패: {e}")
+
+    def _init_report_service(self):
+        """Google Drive 어댑터가 활성화된 경우 리포트 서비스를 조립한다."""
+        if self._drive_adapter:
+            report_folder_id = os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID")
+            if report_folder_id:
+                self._report_service = ReportService(
+                    storage=self._drive_adapter,
+                    report_folder_id=report_folder_id
+                )
+
+    # ── Property 접근자 (Read-only) ──────────────────────────────────────────
+
+    @property
+    def board_service(self) -> BoardService:
+        return self._board_service
+
+    @property
+    def report_service(self) -> ReportService | None:
+        return self._report_service
+
+    @property
+    def drive_adapter(self) -> GoogleDriveAdapter | None:
+        return self._drive_adapter
+
+    @property
+    def news_scraper(self) -> HttpxNewsScraperAdapter:
+        return self._news_scraper_adapter
+
+# 전역 컨테이너 인스턴스 생성
+container = Container()
