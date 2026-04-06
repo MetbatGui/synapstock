@@ -29,7 +29,12 @@ class TestStock:
         """Stock 인스턴스는 dict로 직렬화될 수 있어야 한다."""
         stock = Stock(name="카카오", ticker="035720")
         data = stock.model_dump()
-        assert data == {"name": "카카오", "ticker": "035720"}
+        assert data == {
+            "name": "카카오",
+            "ticker": "035720",
+            "news": [],
+            "reports": []
+        }
 
     def test_equality(self):
         """같은 name, ticker를 가진 두 Stock은 동일해야 한다."""

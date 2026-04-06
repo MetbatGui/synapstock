@@ -52,7 +52,7 @@ class MiroMindmapAdapter(MindmapPort):
         Returns:
             list[str]: 보드 이름 목록.
         """
-        res = requests.get(f"{self.base_url}/boards", headers=self.headers)
+        res = self.session.get(f"{self.base_url}/boards")
         res.raise_for_status()
         data = res.json()
         boards = cast(list[dict[str, str]], data.get("data", []))
@@ -67,7 +67,7 @@ class MiroMindmapAdapter(MindmapPort):
         Returns:
             str: Miro 보드 ID.
         """
-        res = requests.get(f"{self.base_url}/boards", headers=self.headers)
+        res = self.session.get(f"{self.base_url}/boards")
         res.raise_for_status()
         data = res.json()
         boards = cast(list[dict[str, str]], data.get("data", []))
@@ -77,9 +77,8 @@ class MiroMindmapAdapter(MindmapPort):
         
         # 보드가 없으면 생성
         logger.info(f"[*] Miro 보드 '{board_name}'가 존재하지 않아 새로 생성합니다.")
-        create_res = requests.post(
+        create_res = self.session.post(
             f"{self.base_url}/boards", 
-            headers=self.headers,
             json={"name": board_name, "description": "SynapStock Automated Board"}
         )
         create_res.raise_for_status()
@@ -99,7 +98,7 @@ class MiroMindmapAdapter(MindmapPort):
         """
         # _get_or_create_board_id와 중복을 피하기 위해 내부적으로만 사용하거나 삭제 고려
         # 일단 기존 코드 호환을 위해 유지
-        res = requests.get(f"{self.base_url}/boards", headers=self.headers)
+        res = self.session.get(f"{self.base_url}/boards")
         res.raise_for_status()
         data = res.json()
         boards = cast(list[dict[str, str]], data.get("data", []))
@@ -147,7 +146,7 @@ class MiroMindmapAdapter(MindmapPort):
             url = f"{self.base_url}/boards/{board_id}/items?limit=50"
             if cursor:
                 url += f"&cursor={cursor}"
-            res = requests.get(url, headers=self.headers)
+            res = self.session.get(url)
             if not res.ok:
                 break
             data = res.json()
@@ -166,7 +165,7 @@ class MiroMindmapAdapter(MindmapPort):
             url = f"{self.base_url}/boards/{board_id}/connectors?limit=50"
             if cursor:
                 url += f"&cursor={cursor}"
-            res = requests.get(url, headers=self.headers)
+            res = self.session.get(url)
             if not res.ok:
                 break
             data = res.json()

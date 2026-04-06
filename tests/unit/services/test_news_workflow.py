@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock
 from synapstock.domain.models import Board, Node, Stock
 from synapstock.services.board_service import BoardService
-from synapstock.domain.ports import BoardRepositoryPort, MindmapPort
+from synapstock.domain.ports import BoardRepositoryPort, MindmapPort, TickerSearchPort
 from synapstock.domain.models import SearchResult, SearchResultType
 
 class MockBoardRepository(BoardRepositoryPort):
@@ -53,8 +53,9 @@ def test_search_path_and_add_news(mock_board):
     repo.save(mock_board)
     
     mindmap = MockMindmapAdapter()
+    ticker_search = Mock(spec=TickerSearchPort)
     
-    service = BoardService(repository=repo, mindmap=mindmap)
+    service = BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
     
     # 1. 경로 검색 기능 검증 (단순 탐색 알고리즘 또는 BoardService 내의 함수 모방)
     # 현재 BoardService에 경로(Path)를 리스트로 반환하는 기능이 없다면,
