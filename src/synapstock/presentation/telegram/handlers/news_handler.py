@@ -16,36 +16,7 @@ WAITING_FOR_NEWS_URL = 3
 
 from typing import List, Dict, Any
 
-def _find_stocks_by_name(board: Any, query: str, board_name: str) -> List[Dict[str, str]]:
-    """주어진 Board에서 종목명에 query가 포함된 모든 종목과 그 경로를 검색합니다.
 
-    Args:
-        board (Any): 검색을 수행할 대상 보드 객체.
-        query (str): 사용자가 입력한 검색어 (종목명 기준).
-        board_name (str): 보드 객체의 고유 이름 (예: 'Semiconductor').
-
-    Returns:
-        List[Dict[str, str]]: 매칭된 종목의 정보를 담은 딕셔너리의 리스트. 
-        각 딕셔너리는 'board', 'name', 'ticker', 'path' 키를 포함합니다.
-    """
-    results: List[Dict[str, str]] = []
-    
-    def search_nodes(node: Any, current_path: List[str]) -> None:
-        for s in node.stocks:
-            if query in s.name:
-                results.append({
-                    "board": board_name,           # 실제 파일 ID ("theme_Bio")
-                    "board_name": board.name,      # 표시용 이름 ("바이오")
-                    "name": s.name,
-                    "ticker": s.ticker,
-                    "path": f"[{board.name}] " + " > ".join(current_path + [s.name])
-                })
-        for child in node.nodes:
-            search_nodes(child, current_path + [child.name])
-            
-    # root 노드부터 하향식으로 트리 탐색 시작 (root 노드의 이름은 보통 보드명 혹은 "Root"입니다)
-    search_nodes(board.root, [board.root.name])
-    return results
 
 async def start_news_workflow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """사용자가 '📰 뉴스 추가 시작' 버튼을 누를 때 호출됩니다.
@@ -83,23 +54,11 @@ async def process_search_query(update: Update, context: ContextTypes.DEFAULT_TYP
     
     query_service = context.bot_data['query_service']
     try:
-        boards_list = await asyncio.to_thread(query_service.list_boards)
+        search_results = await asyncio.to_thread(query_service.find_stocks_by_name, query)
     except Exception as e:
-        logger.error(f"보드 목록 로드 실패: {e}")
-        await update.message.reply_text(f"서버에서 보드 목록을 불러오는 데 실패했습니다.")
+        logger.error(f"종목 검색 실패: {e}")
+        await update.message.reply_text("검색 도중 오류가 발생했습니다.")
         return ConversationHandler.END
-        
-    search_results = []
-    
-    # 시스템 내에 존재하는 모든 보드를 전수조사
-    for b_name in boards_list:
-        try:
-            board = await asyncio.to_thread(query_service.load_board, b_name)
-            res = _find_stocks_by_name(board, query, b_name)
-            search_results.extend(res)
-        except Exception as e:
-            logger.warning(f"보드 '{b_name}' 로딩 중 에러 바이패스: {e}")
-            continue
     
     if not search_results:
         await update.message.reply_text(f"모든 보드를 탐색했으나 '{query}'에 해당하는 종목을 찾을 수 없습니다. 다시 검색해주세요.")

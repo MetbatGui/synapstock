@@ -36,32 +36,16 @@ async def get_stock_info(ticker: str) -> dict:
         JSONResponse (500): 조회 중 예외 발생 시.
     """
     try:
-        boards = query_service.list_boards()
-        for b_name in boards:
-            board = query_service.load_board(b_name)
-
-            def find_stock_recursive(node):
-                if hasattr(node, "stocks") and node.stocks:
-                    for s in node.stocks:
-                        if s.ticker == ticker:
-                            return s
-                if hasattr(node, "nodes") and node.nodes:
-                    for n in node.nodes:
-                        res = find_stock_recursive(n)
-                        if res:
-                            return res
-                return None
-
-            root_node = getattr(board, "root", board)
-            stock_obj = find_stock_recursive(root_node)
-
-            if stock_obj:
-                return {
-                    "ticker": ticker,
-                    "name": stock_obj.name,
-                    "reports": stock_obj.reports,
-                    "news": stock_obj.news,
-                }
+        result = query_service.get_stock_by_ticker(ticker)
+        
+        if result:
+            stock_obj, b_name = result
+            return {
+                "ticker": ticker,
+                "name": stock_obj.name,
+                "reports": stock_obj.reports,
+                "news": stock_obj.news,
+            }
 
         return {"ticker": ticker, "name": None, "reports": [], "news": []}
     except Exception as e:
@@ -123,34 +107,7 @@ async def get_all_stocks_flat() -> list:
         JSONResponse (500): 조회 중 예외 발생 시.
     """
     try:
-        boards = query_service.list_boards()
-        all_stocks = []
-
-        for b_name in boards:
-            board = query_service.load_board(b_name)
-
-            def flatten_stocks(node, current_path=[]):
-                stocks = []
-                if hasattr(node, "stocks") and node.stocks:
-                    for s in node.stocks:
-                        stocks.append(
-                            {
-                                "ticker": s.ticker,
-                                "name": s.name,
-                                "board": b_name,
-                                "board_name": getattr(board, "name", b_name),
-                                "path": current_path,
-                            }
-                        )
-                if hasattr(node, "nodes") and node.nodes:
-                    for n in node.nodes:
-                        stocks.extend(flatten_stocks(n, current_path + [n.name]))
-                return stocks
-
-            root_node = getattr(board, "root", board)
-            all_stocks.extend(flatten_stocks(root_node))
-
-        return all_stocks
+        return query_service.get_all_stocks_flat()
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
