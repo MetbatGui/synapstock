@@ -30,19 +30,18 @@ class GoogleDriveAdapter(StoragePort):
     def __init__(
         self, 
         token_file: str, 
-        root_folder_name: str = "KRX_Auto_Crawling_Data", 
-        root_folder_id: Optional[str] = None,
+        folders: Optional[dict[str, str]] = None,
         client_secret_file: Optional[str] = None
     ):
         """GoogleDriveAdapter 초기화.
 
         Args:
             token_file (str): Token JSON 파일 경로.
-            root_folder_name (str): 데이터를 저장할 최상위 폴더 이름.
-            root_folder_id (Optional[str]): 데이터를 저장할 최상위 폴더 ID.
+            folders (dict[str, str]): {'name': 'id'} 형식의 폴더 매핑.
             client_secret_file (Optional[str]): Refresh Token 갱신을 위한 Client Secret 파일 경로.
         """
         self.token_file = token_file
+        self.folders = folders or {}
         self.client_secret_file = client_secret_file
         
         if not self.token_file:
@@ -52,11 +51,18 @@ class GoogleDriveAdapter(StoragePort):
              raise FileNotFoundError(f"Token file not found: {self.token_file}")
 
         self.drive_service = self._authenticate()
-        
-        if root_folder_id:
-            self.root_folder_id = root_folder_id
-        else:
-            self.root_folder_id = self._get_or_create_folder(root_folder_name)
+
+    def _get_root_id(self, folder: Optional[str] = None) -> str:
+        """키워드에 해당하는 폴더 ID를 반환합니다."""
+        if not folder:
+            if len(self.folders) == 1:
+                return list(self.folders.values())[0]
+            raise ValueError("Multiple folders available. Please specify 'folder' keyword.")
+            
+        if folder not in self.folders:
+            raise ValueError(f"Folder keyword '{folder}' not found in registered folders.")
+            
+        return self.folders[folder]
 
     def _authenticate(self):
         """Google Drive API 인증 (OAuth 2.0 Token)."""
@@ -91,10 +97,13 @@ class GoogleDriveAdapter(StoragePort):
             return file.get('id')
 
     @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def _get_file_id(self, path: str) -> Optional[str]:
+    def _get_file_id(self, path: str, folder: Optional[str] = None, root_id: Optional[str] = None) -> Optional[str]:
         """경로에 해당하는 파일/폴더의 ID를 찾습니다."""
         parts = path.strip("/").split("/")
-        current_parent_id = self.root_folder_id
+        
+        # 1. 명시적 root_id -> 2. folder 키워드 -> 3. Error
+        target_root_id = root_id or self._get_root_id(folder)
+        current_parent_id = target_root_id
         
         for part in parts:
             query = f"name = '{part}' and '{current_parent_id}' in parents and trashed = false"
@@ -107,85 +116,58 @@ class GoogleDriveAdapter(StoragePort):
             
         return current_parent_id
 
-    def _ensure_path_directories(self, path: str) -> str:
+    def _ensure_path_directories(self, path: str, folder: Optional[str] = None, root_id: Optional[str] = None) -> str:
         """파일 경로의 상위 디렉토리들을 생성하고 마지막 부모 폴더 ID를 반환합니다."""
         parts = path.strip("/").split("/")
         dir_parts = parts[:-1]
         
-        current_parent_id = self.root_folder_id
+        target_root_id = root_id or self._get_root_id(folder)
+        current_parent_id = target_root_id
         for part in dir_parts:
             current_parent_id = self._get_or_create_folder(part, current_parent_id)
             
         return current_parent_id
 
-    def save_dataframe_excel(self, df: pd.DataFrame, path: str, **kwargs) -> bool:
-        """DataFrame을 엑셀 파일로 Google Drive에 저장합니다.
-
-        Args:
-            df (pd.DataFrame): 저장할 데이터프레임.
-            path (str): Google Drive 상의 대상 파일 경로.
-            **kwargs: to_excel로 전달할 추가 인자.
-
-        Returns:
-            bool: 저장 성공 여부.
-        """
+    def get_file(self, path: str, folder: Optional[str] = None, root_id: Optional[str] = None, **kwargs) -> Optional[bytes]:
+        """Google Drive에서 바이너리 파일을 다운로드합니다."""
         try:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, **kwargs)
-            output.seek(0)
-            self._upload_file(output, path, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            file_id = self._get_file_id(path, folder=folder, root_id=root_id)
+            if not file_id: return None
+            request = self.drive_service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            fh.seek(0)
+            return fh.read()
+        except Exception as e:
+            logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}")
+            return None
+
+    def put_file(self, path: str, data: bytes, folder: Optional[str] = None, root_id: Optional[str] = None, **kwargs) -> bool:
+        """바이너리 데이터를 Google Drive에 직접 업로드합니다."""
+        try:
+            if path.endswith('.xlsx'):
+                mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            elif path.endswith('.csv'):
+                mime_type = 'text/csv'
+            elif path.endswith('.pdf'):
+                mime_type = 'application/pdf'
+            else:
+                mime_type = 'application/octet-stream'
+
+            output = io.BytesIO(data)
+            self._upload_file(output, path, mime_type, folder=folder, root_id=root_id)
             return True
         except Exception as e:
-            logger.error(f"[GoogleDrive] Excel 업로드 실패 ({path}): {e}")
-            return False
-
-    def save_dataframe_csv(self, df: pd.DataFrame, path: str, **kwargs) -> bool:
-        """DataFrame을 CSV 파일로 Google Drive에 저장합니다.
-
-        Args:
-            df (pd.DataFrame): 저장할 데이터프레임.
-            path (str): Google Drive 상의 대상 파일 경로.
-            **kwargs: to_csv로 전달할 추가 인자 (예: encoding='cp949').
-
-        Returns:
-            bool: 저장 성공 여부.
-        """
-        try:
-            encoding = kwargs.pop('encoding', 'cp949')
-            output_str = io.StringIO()
-            df.to_csv(output_str, **kwargs)
-            output_bytes = io.BytesIO(output_str.getvalue().encode(encoding))
-            self._upload_file(output_bytes, path, 'text/csv')
-            return True
-        except Exception as e:
-            logger.error(f"[GoogleDrive] CSV 업로드 실패 ({path}): {e}")
-            return False
-
-    def save_workbook(self, book: openpyxl.Workbook, path: str) -> bool:
-        """OpenPyXL Workbook 객체를 Google Drive에 저장합니다.
-
-        Args:
-            book (openpyxl.Workbook): 저장할 엑셀 워크북 책 객체.
-            path (str): Google Drive 상의 대상 파일 경로.
-
-        Returns:
-            bool: 저장 성공 여부.
-        """
-        try:
-            output = io.BytesIO()
-            book.save(output)
-            output.seek(0)
-            self._upload_file(output, path, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            return True
-        except Exception as e:
-            logger.error(f"[GoogleDrive] Workbook 업로드 실패 ({path}): {e}")
+            logger.error(f"[GoogleDrive] 파일 업로드 실패 ({path}): {e}")
             return False
 
     @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def _upload_file(self, data: io.BytesIO, path: str, mime_type: str):
+    def _upload_file(self, data: io.BytesIO, path: str, mime_type: str, folder: Optional[str] = None, root_id: Optional[str] = None):
         filename = os.path.basename(path)
-        parent_id = self._ensure_path_directories(path)
+        parent_id = self._ensure_path_directories(path, folder=folder, root_id=root_id)
         
         query = f"name = '{filename}' and '{parent_id}' in parents and trashed = false"
         results = self.drive_service.files().list(q=query, fields="files(id)").execute()
@@ -200,132 +182,34 @@ class GoogleDriveAdapter(StoragePort):
             file_metadata = {'name': filename, 'parents': [parent_id]}
             self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-    def load_workbook(self, path: str) -> Optional[openpyxl.Workbook]:
-        """Google Drive에서 엑셀 워크북을 로드합니다.
+    def path_exists(self, path: str, folder: Optional[str] = None, root_id: Optional[str] = None, **kwargs) -> bool:
+        return self._get_file_id(path, folder=folder, root_id=root_id) is not None
 
-        Args:
-            path (str): 로드할 Google Drive 경로.
-
-        Returns:
-            Optional[openpyxl.Workbook]: 로드된 워크북 객체 (실패 시 None).
-        """
+    def ensure_directory(self, path: str, folder: Optional[str] = None, root_id: Optional[str] = None, **kwargs) -> bool:
         try:
-            file_id = self._get_file_id(path)
-            if not file_id: return None
-            request = self.drive_service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                status, done = downloader.next_chunk()
-            fh.seek(0)
-            return openpyxl.load_workbook(fh)
-        except Exception as e:
-            logger.error(f"[GoogleDrive] Workbook 로드 실패 ({path}): {e}")
-            return None
-
-    def path_exists(self, path: str) -> bool:
-        return self._get_file_id(path) is not None
-
-    def ensure_directory(self, path: str) -> bool:
-        try:
-            self._ensure_path_directories(path + "/dummy")
+            self._ensure_path_directories(path + "/dummy", folder=folder, root_id=root_id)
             return True
         except Exception:
             return False
 
-    def load_dataframe(self, path: str, sheet_name: str = None, **kwargs) -> pd.DataFrame:
-        """Google Drive에서 엑셀 파일을 읽어 DataFrame으로 반환합니다.
-
-        Args:
-            path (str): 로드할 Google Drive 리소스 경로.
-            sheet_name (str, optional): 읽어들일 시트 이름.
-            **kwargs: pd.read_excel에 전달할 추가 속성.
-
-        Returns:
-            pd.DataFrame: 데이터프레임. 못 찾거나 에러 시 빈 데이터프레임.
-        """
+    def list_files_in_folder(self, folder_path: str, **kwargs) -> List[dict]:
+        """특정 폴더 내의 파일 목록을 조회합니다 (재귀X, 단층)."""
         try:
-            file_id = self._get_file_id(path)
-            if not file_id: return pd.DataFrame()
-            request = self.drive_service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            fh.seek(0)
-            target_sheet = 0 if sheet_name is None else sheet_name
-            return pd.read_excel(fh, sheet_name=target_sheet, **kwargs)
-        except Exception as e:
-            logger.error(f"[GoogleDrive] DataFrame 로드 실패 ({path}): {e}")
-            return pd.DataFrame()
-
-    def get_file(self, path: str) -> Optional[bytes]:
-        """Google Drive에서 바이너리 파일을 다운로드합니다.
-
-        Args:
-            path (str): 다운로드할 Google Drive 파일 경로.
-
-        Returns:
-            Optional[bytes]: 다운로드 받은 파일의 바이트 스트림. (실패 시 None)
-        """
-        try:
-            file_id = self._get_file_id(path)
-            if not file_id: return None
-            request = self.drive_service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            fh.seek(0)
-            return fh.read()
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}")
-            return None
-
-    def put_file(self, path: str, data: bytes) -> bool:
-        """바이너리 텍스트 데이터를 Google Drive에 직접 업로드합니다.
-
-        Args:
-            path (str): 저장할 대상 Google Drive 경로.
-            data (bytes): 쓸 내용(바이트).
-
-        Returns:
-            bool: 성공 여부.
-        """
-        try:
-            if path.endswith('.xlsx'):
-                mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            elif path.endswith('.csv'):
-                mime_type = 'text/csv'
-            elif path.endswith('.pdf'):
-                mime_type = 'application/pdf'
-            else:
-                mime_type = 'application/octet-stream'
-
-            output = io.BytesIO(data)
-            self._upload_file(output, path, mime_type)
-            return True
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 업로드 실패 ({path}): {e}")
-            return False
-
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def list_files_in_folder(self, folder_path: str) -> List[dict]:
-        """특정 폴더 내의 파일 목록을 가져옵니다.
-        
-        Returns:
-            List[dict]: [{'id': '...', 'name': '...'}, ...]
-        """
-        folder_id = self._get_file_id(folder_path)
-        if not folder_id:
-            return []
+            folder_id = self._get_file_id(folder_path, **kwargs)
+            if not folder_id:
+                return []
+                
+            query = f"'{folder_id}' in parents and trashed = false"
+            results = self.drive_service.files().list(
+                q=query, 
+                fields="files(id, name, mimeType, size, createdTime)",
+                pageSize=1000
+            ).execute()
             
-        query = f"'{folder_id}' in parents and trashed = false"
-        results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
-        return results.get('files', [])
+            return results.get('files', [])
+        except Exception as e:
+            logger.error(f"[GoogleDrive] 리스트 조회 실패 ({folder_path}): {e}")
+            return []
 
     def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
@@ -367,12 +251,14 @@ class GoogleDriveAdapter(StoragePort):
                     
         logger.info(f"[GoogleDrive] PDF 동기화 완료: {count}개 파일 업로드됨.")
 
-    def download_file(self, filename: str, local_path: Union[str, Path]) -> bool:
+    def download_file(self, filename: str, local_path: Union[str, Path], folder: Optional[str] = None, root_id: Optional[str] = None) -> bool:
         """Google Drive에서 단일 파일을 원자적으로(Atomic) 다운로드합니다.
 
         Args:
             filename (str): 다운로드할 Google Drive 상의 파일명.
             local_path (Union[str, Path]): 저장할 로컬 파일 경로.
+            folder (Optional[str]): 등록된 폴더 키워드.
+            root_id (Optional[str]): 대상 폴더 ID.
 
         Returns:
             bool: 다운로드 성공 여부.
@@ -385,8 +271,9 @@ class GoogleDriveAdapter(StoragePort):
         from pathlib import Path
 
         try:
+            target_root_id = root_id or self._get_root_id(folder)
             results = self.drive_service.files().list(
-                q=f"name = '{filename}' and '{self.root_folder_id}' in parents and trashed = false",
+                q=f"name = '{filename}' and '{target_root_id}' in parents and trashed = false",
                 fields="files(id, name)"
             ).execute()
             files = results.get('files', [])

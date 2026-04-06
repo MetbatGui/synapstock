@@ -20,6 +20,8 @@ from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdap
 from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
 from synapstock.adapters.google.google_drive_adapter import GoogleDriveAdapter
 from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
+from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
+from synapstock.services.report_service import ReportService
 
 load_dotenv()
 
@@ -30,77 +32,52 @@ disclosure_adapter = DartDisclosureAdapter()
 financial_adapter = ExcelFinancialDataAdapter(
     Path("data") / "financial_statements" / "financial_data.xlsx"
 )
-service = BoardService(repo, miro_adapter, disclosure_adapter, financial_adapter)
+ticker_search_adapter = NaverTickerSearchAdapter()
+service = BoardService(repo, miro_adapter, ticker_search_adapter, disclosure_adapter, financial_adapter)
 
 # ── 뉴스 스크래퍼 어댑터 (신규) ──────────────────────────────────────────
 news_scraper_adapter = HttpxNewsScraperAdapter()
 
-# ── Google Drive 어댑터 (온디맨드 다운로드용) ──────────────────────────────
+# ── Google Drive 어댑터 및 서비스 싱글톤 ──────────────────────────────────────
 drive_adapter = None
+report_service = None
+
+# 폴더 ID 정의
+REPORT_FOLDER_ID = os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID")
+SUPPLY_DEMAND_FOLDER_ID = os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID")
+
 try:
     token_path = "secrets/token.json"
-    root_id = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
-    if os.path.exists(token_path) and root_id:
+    client_secret_path = "secrets/client_secret.json"
+
+    # 폴더명을 키워드로 하는 맵 생성
+    folders = {
+        "report": REPORT_FOLDER_ID,
+        "sd": SUPPLY_DEMAND_FOLDER_ID
+    }
+
+    # 범용 Google Drive 어댑터 생성
+    if os.path.exists(token_path):
         drive_adapter = GoogleDriveAdapter(
             token_file=token_path,
-            root_folder_id=root_id,
-            client_secret_file="secrets/client_secret.json",
+            folders=folders,
+            client_secret_file=client_secret_path,
+        )
+
+    # 3. 리포트 서비스 초기화
+    if drive_adapter and REPORT_FOLDER_ID:
+        report_service = ReportService(
+            storage=drive_adapter,
+            report_folder_id=REPORT_FOLDER_ID
         )
 except Exception as e:
-    logger.error(f"[ERROR] GoogleDriveAdapter 초기화 실패: {e}")
-
-# ── 인덱스 동기화 상태 ──────────────────────────────────────────────────────
-_last_index_sync_time = 0
-_sync_lock = asyncio.Lock()
-
+    logger.error(f"[ERROR] 서비스 초기화 실패: {e}")
 
 async def sync_indices_if_needed(force: bool = False):
-    """필요한 경우(또는 강제로) 리포트 인덱스를 Google Drive와 동기화합니다.
-
-    Args:
-        force (bool): ``True``일 경우 5분 경과 여부와 상관없이 즉시 동기화를 수행합니다.
-            기본값은 ``False``.
-
-    Returns:
-        None: 이 함수는 반환값이 없습니다.
-
-    Note:
-        - 마지막 동기화 시점으로부터 300초(5분)가 경과했을 때만 작동합니다.
-        - ``list.json``과 ``reports.json`` 중 하나라도 누락되면 동기화를 시도합니다.
-        - ``_sync_lock``을 통해 한 번에 하나의 프로세스만 동기화를 수행하도록 보장합니다 (Double-checked locking 패턴).
-    """
-    global _last_index_sync_time
-
-    current_time = time.time()
-
-    paths_exist = (
-        Path("data/report/list.json").exists()
-        and Path("data/report/reports.json").exists()
-    )
-    if not force and paths_exist and (current_time - _last_index_sync_time) < 300:
-        return
-
-    async with _sync_lock:
-        # 락 획득 후 다시 한 번 시간 체크 (Double-checked locking 패턴)
-        if not force and (time.time() - _last_index_sync_time) < 300:
-            return
-
-        try:
-            if drive_adapter:
-                logger.info("[SYSTEM] 인덱스 동기화 시작...")
-                # 1. list.json 동기화
-                list_data = drive_adapter.get_file("list.json")
-                if list_data:
-                    with open("data/report/list.json", "wb") as f:
-                        f.write(list_data)
-
-                # 2. reports.json 동기화
-                reports_data = drive_adapter.get_file("reports.json")
-                if reports_data:
-                    with open("data/report/reports.json", "wb") as f:
-                        f.write(reports_data)
-
-                _last_index_sync_time = time.time()
-                logger.info(f"[SYSTEM] 인덱스 동기화 완료: {time.ctime(_last_index_sync_time)}")
-        except Exception as e:
-            logger.error(f"[ERROR] 인덱스 동기화 실패: {e}")
+    """(하위 호환성 유지) ReportService를 통해 동기화를 수행합니다."""
+    if report_service:
+        if force:
+            report_service.sync_index()
+        else:
+            # ReportService 내부의 get_reports_by_stock 등이 자동 동기화를 관리함
+            pass

@@ -66,13 +66,15 @@ def main() -> None:
     from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
     from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
     from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
+    from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
     from pathlib import Path
 
     repo = LocalBoardRepository(Path("data") / "board")
     miro_adapter = MiroMindmapAdapter(os.getenv("MIRO_ACCESS_TOKEN", ""))
     disclosure_adapter = DartDisclosureAdapter()
     financial_adapter = ExcelFinancialDataAdapter(Path("data") / "financial_statements" / "financial_data.xlsx")
-    board_service = BoardService(repo, miro_adapter, disclosure_adapter, financial_adapter)
+    ticker_search_adapter = NaverTickerSearchAdapter()
+    board_service = BoardService(repo, miro_adapter, ticker_search_adapter, disclosure_adapter, financial_adapter)
     
     news_scraper = HttpxNewsScraperAdapter()
 
