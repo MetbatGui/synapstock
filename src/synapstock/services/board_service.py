@@ -2,23 +2,32 @@
 
 from typing import Callable
 from synapstock.domain.models import Board, Node, Stock
-from synapstock.domain.ports import MindmapPort, BoardRepositoryPort, DisclosurePort, FinancialDataPort
+from synapstock.domain.ports import MindmapPort, BoardRepositoryPort, DisclosurePort, FinancialDataPort, TickerSearchPort
 
 
 class BoardService:
     """보드 도메인 유즈케이스를 조정하는 서비스 레이어입니다."""
 
-    def __init__(self, repository: BoardRepositoryPort, mindmap: MindmapPort, disclosure: DisclosurePort = None, financial: FinancialDataPort = None) -> None:
+    def __init__(
+        self, 
+        repository: BoardRepositoryPort, 
+        mindmap: MindmapPort, 
+        ticker_search: TickerSearchPort,
+        disclosure: DisclosurePort = None, 
+        financial: FinancialDataPort = None
+    ) -> None:
         """필요한 어댑터들과 함께 BoardService를 초기화합니다.
         
         Args:
             repository: 보드 데이터 퍼시스턴스를 위한 포트.
             mindmap: 외부 마인드맵(예: Miro) 동기화를 위한 포트.
+            ticker_search: 종목 티커 검색을 위한 포트.
             disclosure: 선택사항으로, 종목 공시 정보 조회를 위한 포트.
             financial: 선택사항으로, 재무 데이터 조회를 위한 포트.
         """
         self._repository = repository
         self._mindmap = mindmap
+        self._ticker_search = ticker_search
         self._disclosure = disclosure
         self._financial = financial
 
@@ -144,7 +153,7 @@ class BoardService:
         self._mindmap.sync(board, progress_callback=progress_callback)
 
     def search_ticker(self, query: str) -> list[dict[str, str]]:
-        """네이버 모바일 검색 API를 사용하여 종목 티커를 검색합니다.
+        """어댑터를 사용하여 종목 티커를 검색합니다.
         
         Args:
             query: 검색어 (예: "삼성전자").
@@ -152,32 +161,7 @@ class BoardService:
         Returns:
             list[dict[str, str]]: 'name'과 'ticker'를 포함하는 검색 결과 목록.
         """
-        import requests
-        url = "https://m.stock.naver.com/front-api/search/autoComplete"
-        params = {
-            "query": query,
-            "target": "stock,index,marketindicator,coin,ipo"
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-            "Referer": "https://m.stock.naver.com/search"
-        }
-        try:
-            response = requests.get(url, params=params, headers=headers, timeout=5)
-            response.raise_for_status()
-            data = response.json()
-            # items는 result 객체 내부에 존재
-            items = data.get("result", {}).get("items", [])
-            results = []
-            for item in items:
-                # 새로운 API 필드명에 맞게 추출 (code, name)
-                name = item.get("name")
-                ticker = item.get("code")
-                if name and ticker:
-                    results.append({"name": name, "ticker": ticker})
-            return results
-        except Exception:
-            return []
+        return self._ticker_search.search(query)
 
     def find_node_by_name(self, root: Node, name: str) -> Node | None:
         """보드 계층 구조 내에서 이름으로 노드를 재귀적으로 찾습니다.

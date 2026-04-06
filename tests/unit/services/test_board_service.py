@@ -15,9 +15,21 @@ def mock_mindmap():
 
 
 @pytest.fixture
-def service(mock_mindmap):
+def mock_repo():
+    """BoardRepositoryPort Mock 픽스처."""
+    return MagicMock()
+
+
+@pytest.fixture
+def mock_ticker_search():
+    """TickerSearchPort Mock 픽스처."""
+    return MagicMock()
+
+
+@pytest.fixture
+def service(mock_repo, mock_mindmap, mock_ticker_search):
     """BoardService 픽스처."""
-    return BoardService(mindmap=mock_mindmap)
+    return BoardService(repository=mock_repo, mindmap=mock_mindmap, ticker_search=mock_ticker_search)
 
 
 @pytest.fixture
@@ -32,18 +44,18 @@ def it_board() -> Board:
 class TestBoardService:
     """BoardService 기본 동작 테스트."""
 
-    def test_load_delegates_to_mindmap(self, service, mock_mindmap, it_board):
-        """load()는 MindmapPort.load()를 호출하고 결과를 그대로 반환해야 한다.
+    def test_load_delegates_to_repo(self, service, mock_repo, it_board):
+        """load()는 BoardRepositoryPort.load()를 호출하고 결과를 그대로 반환해야 한다.
 
-        Arrange: MindmapPort Mock이 it_board를 반환하도록 설정
+        Arrange: BoardRepositoryPort Mock이 it_board를 반환하도록 설정
         Act: service.load("IT") 호출
         Assert: Mock이 정확히 1회 호출됐는지, 반환값이 동일 객체인지 확인
         """
-        mock_mindmap.load.return_value = it_board
+        mock_repo.load.return_value = it_board
 
         result = service.load("IT")
 
-        mock_mindmap.load.assert_called_once_with("IT")
+        mock_repo.load.assert_called_once_with("IT")
         assert result is it_board
 
     def test_save_delegates_to_mindmap(self, service, mock_mindmap, it_board):
@@ -55,42 +67,42 @@ class TestBoardService:
         """
         service.save(it_board)
 
-        mock_mindmap.save.assert_called_once_with(it_board)
+        mock_mindmap.save.assert_called_once_with(it_board, progress_callback=None)
 
-    def test_list_boards_delegates_to_mindmap(self, service, mock_mindmap):
-        """list_boards()는 MindmapPort.list_boards() 결과를 그대로 반환해야 한다.
+    def test_list_boards_delegates_to_repo(self, service, mock_repo):
+        """list_boards()는 BoardRepositoryPort.list_boards() 결과를 그대로 반환해야 한다.
 
-        Arrange: MindmapPort Mock이 보드 이름 목록을 반환하도록 설정
+        Arrange: BoardRepositoryPort Mock이 보드 이름 목록을 반환하도록 설정
         Act: service.list_boards() 호출
         Assert: Mock 호출 여부 및 반환값 일치 확인
         """
-        mock_mindmap.list_boards.return_value = ["IT", "바이오"]
+        mock_repo.list_boards.return_value = ["IT", "바이오"]
 
         result = service.list_boards()
 
-        mock_mindmap.list_boards.assert_called_once()
+        mock_repo.list_boards.assert_called_once()
         assert result == ["IT", "바이오"]
 
-    def test_load_not_found_propagates(self, service, mock_mindmap):
-        """MindmapPort.load()가 FileNotFoundError를 발생시키면 그대로 전파되어야 한다.
+    def test_load_not_found_propagates(self, service, mock_repo):
+        """BoardRepositoryPort.load()가 FileNotFoundError를 발생시키면 그대로 전파되어야 한다.
 
-        Arrange: MindmapPort Mock이 FileNotFoundError를 발생하도록 설정
+        Arrange: BoardRepositoryPort Mock이 FileNotFoundError를 발생하도록 설정
         Act: service.load("없는보드") 호출
         Assert: FileNotFoundError가 호출자까지 전파되는지 확인
         """
-        mock_mindmap.load.side_effect = FileNotFoundError("없는보드")
+        mock_repo.load.side_effect = FileNotFoundError("없는보드")
 
         with pytest.raises(FileNotFoundError, match="없는보드"):
             service.load("없는보드")
 
-    def test_load_returns_board_with_tree(self, service, mock_mindmap, it_board):
+    def test_load_returns_board_with_tree(self, service, mock_repo, it_board):
         """load() 결과 Board는 노드 트리 구조를 유지해야 한다.
 
-        Arrange: MindmapPort Mock이 트리 구조를 가진 it_board를 반환하도록 설정
+        Arrange: BoardRepositoryPort Mock이 트리 구조를 가진 it_board를 반환하도록 설정
         Act: service.load("IT") 호출
         Assert: 반환된 Board의 루트 노드 및 자식 노드 구조가 올바른지 확인
         """
-        mock_mindmap.load.return_value = it_board
+        mock_repo.load.return_value = it_board
 
         result = service.load("IT")
 

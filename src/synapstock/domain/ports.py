@@ -128,44 +128,52 @@ class FinancialDataPort(ABC):
 class StoragePort(ABC):
     """저장소 추상 포트.
     
-    파일 및 데이터프레임의 저장/로드를 담당한다.
+    파일의 물리적인 저장/로드를 담당하며, 바이너리 바이트 단위로 작업한다.
+    구체적인 객체 변환(DataFrame 등)은 서비스 레이어의 책임이다.
     """
 
     @abstractmethod
-    def save_dataframe_excel(self, df: pd.DataFrame, path: str, **kwargs) -> bool:
-        """DataFrame을 Excel 파일로 저장한다."""
-
-    @abstractmethod
-    def save_dataframe_csv(self, df: pd.DataFrame, path: str, **kwargs) -> bool:
-        """DataFrame을 CSV 파일로 저장한다."""
-
-    @abstractmethod
-    def save_workbook(self, book: openpyxl.Workbook, path: str) -> bool:
-        """openpyxl Workbook을 저장한다."""
-
-    @abstractmethod
-    def load_workbook(self, path: str) -> Optional[openpyxl.Workbook]:
-        """Excel Workbook을 로드한다."""
-
-    @abstractmethod
-    def path_exists(self, path: str) -> bool:
+    def path_exists(self, path: str, **kwargs) -> bool:
         """경로 존재 여부를 확인한다."""
 
     @abstractmethod
-    def ensure_directory(self, path: str) -> bool:
+    def ensure_directory(self, path: str, **kwargs) -> bool:
         """디렉토리 존재를 보장(없으면 생성)한다."""
 
     @abstractmethod
-    def load_dataframe(self, path: str, sheet_name: str = None, **kwargs) -> pd.DataFrame:
-        """파일에서 DataFrame을 로드한다."""
+    def get_file(self, path: str, **kwargs) -> Optional[bytes]:
+        """파일 내용을 바이너리 바이트로 가져온다."""
 
     @abstractmethod
-    def get_file(self, path: str) -> Optional[bytes]:
-        """파일 내용을 바이트로 가져온다."""
-
-    @abstractmethod
-    def put_file(self, path: str, data: bytes) -> bool:
+    def put_file(self, path: str, data: bytes, **kwargs) -> bool:
         """바이트 데이터를 파일로 저장한다."""
+
+    @abstractmethod
+    def list_files_in_folder(self, folder_path: str, **kwargs) -> List[dict]:
+        """특정 폴더 내의 파일 목록을 조회한다.
+        
+        Returns:
+            List[dict]: [{'id': '...', 'name': '...'}, ...]
+        """
+
+    @abstractmethod
+    def download_file(self, filename: str, local_path: str, **kwargs) -> bool:
+        """파일을 원자적으로(Atomic) 특정 경로에 다운로드한다."""
+
+
+class TickerSearchPort(ABC):
+    """주식 종목 티커 검색을 위한 추상 포트."""
+
+    @abstractmethod
+    def search(self, query: str) -> list[dict[str, str]]:
+        """검색어에 해당하는 종목 리스트를 반환한다.
+        
+        Args:
+            query: 검색어 (기업명 등)
+            
+        Returns:
+            list[dict[str, str]]: [{'name': '...', 'ticker': '...'}, ...]
+        """
 
 
 class NewsScraperPort(ABC):

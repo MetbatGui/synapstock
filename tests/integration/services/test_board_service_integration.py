@@ -5,34 +5,45 @@ from pathlib import Path
 
 import pytest
 
-from synapstock.adapters.local.folder_mindmap import LocalFolderMindmapAdapter
+from unittest.mock import MagicMock
+from synapstock.adapters.local.board_repo import LocalBoardRepository
 from synapstock.domain.models import Board, Stock
 from synapstock.services.board_service import BoardService
+from synapstock.domain.ports import MindmapPort, TickerSearchPort
 
 FIXTURES_DIR = Path(__file__).parents[2] / "fixtures" / "folder_mindmap"
 
 
 @pytest.fixture
 def service(tmp_path):
-    """실제 LocalFolderMindmapAdapter를 사용하는 BoardService 픽스처."""
-    adapter = LocalFolderMindmapAdapter(root_dir=tmp_path)
-    return BoardService(mindmap=adapter)
+    """실제 LocalBoardRepository를 사용하는 BoardService 픽스처."""
+    repo = LocalBoardRepository(root_dir=tmp_path)
+    mindmap = MagicMock(spec=MindmapPort)
+    ticker_search = MagicMock(spec=TickerSearchPort)
+    # save 호출 시 repository에도 저장되도록 mock 설정 (기존 테스트 호환성)
+    mindmap.save.side_effect = lambda b, **kwargs: repo.save(b)
+    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
 
 
 @pytest.fixture
 def fixture_service():
     """IT 픽스처 폴더 기반 읽기 전용 서비스 픽스처."""
-    adapter = LocalFolderMindmapAdapter(root_dir=FIXTURES_DIR)
-    return BoardService(mindmap=adapter)
+    repo = LocalBoardRepository(root_dir=FIXTURES_DIR)
+    mindmap = MagicMock(spec=MindmapPort)
+    ticker_search = MagicMock(spec=TickerSearchPort)
+    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
 
 
 @pytest.fixture
 def mutable_service(tmp_path):
     """픽스처를 tmp_path에 복사한 뒤 서비스를 반환한다 (변이 테스트용)."""
-    dest = tmp_path / "folder_mindmap"
+    dest = tmp_path / "board"
     shutil.copytree(FIXTURES_DIR, dest)
-    adapter = LocalFolderMindmapAdapter(root_dir=dest)
-    return BoardService(mindmap=adapter)
+    repo = LocalBoardRepository(root_dir=dest)
+    mindmap = MagicMock(spec=MindmapPort)
+    ticker_search = MagicMock(spec=TickerSearchPort)
+    mindmap.save.side_effect = lambda b, **kwargs: repo.save(b)
+    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
 
 
 class TestBoardServiceIntegration:

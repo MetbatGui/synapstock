@@ -1,0 +1,44 @@
+{
+  "name": "IT",
+  "root": {
+    "name": "IT",
+    "depth": 0,
+    "nodes": [
+      {
+        "name": "인터넷",
+        "depth": 1,
+        "stocks": [
+          { "name": "NAVER", "ticker": "035420" },
+          { "name": "카카오", "ticker": "035720" },
+          { "name": "이스트소프트", "ticker": "047540" }
+        ]
+      },
+      {
+        "name": "보안",
+        "depth": 1,
+        "nodes": [
+          {
+            "name": "정보보안",
+            "depth": 2,
+            "nodes": [
+              {
+                "name": "네트워크",
+                "depth": 3,
+                "stocks": [
+                  { "name": "윈스", "ticker": "053800" },
+                  { "name": "엑스게이트", "ticker": "136240" },
+                  { "name": "샌즈랩", "ticker": "263860" }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "소프트웨어",
+        "depth": 1,
+        "stocks": []
+      }
+    ]
+  }
+}
