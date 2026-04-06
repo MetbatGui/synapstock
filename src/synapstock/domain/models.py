@@ -41,6 +41,89 @@ class Node(BaseModel):
     stocks: list[Stock] = []
     news: list[dict[str, str]] = [] # [{"title": "...", "date": "...", "url": "..."}]
 
+    def find_node(self, name: str) -> Node | None:
+        """이름으로 하위 노드를 재귀적으로 검색한다."""
+        if self.name == name:
+            return self
+        for child in self.nodes:
+            found = child.find_node(name)
+            if found:
+                return found
+        return None
+
+    def add_stock(self, stock: Stock) -> bool:
+        """중복 체크 후 종목을 추가한다. 이미 존재하면 True(성공)를 반환한다."""
+        if any(s.ticker == stock.ticker for s in self.stocks):
+            return True
+        self.stocks.append(stock)
+        return True
+
+    def remove_stock(self, ticker: str) -> bool:
+        """티커로 종목을 찾아 삭제한다."""
+        orig_len = len(self.stocks)
+        self.stocks = [s for s in self.stocks if s.ticker != ticker]
+        return len(self.stocks) < orig_len
+
+    def find_and_remove_stock(self, ticker: str) -> bool:
+        """재귀적으로 종목을 찾아 삭제한다."""
+        if self.remove_stock(ticker):
+            return True
+        for child in self.nodes:
+            if child.find_and_remove_stock(ticker):
+                return True
+        return False
+
+    def find_and_add_news(self, ticker: str, news_entry: dict) -> bool:
+        """재귀적으로 종목을 찾아 뉴스를 추가한다."""
+        for s in self.stocks:
+            if s.ticker == ticker:
+                if not any(n["url"] == news_entry["url"] for n in s.news):
+                    s.news.append(news_entry)
+                return True
+        for child in self.nodes:
+            if child.find_and_add_news(ticker, news_entry):
+                return True
+        return False
+
+    def find_and_remove_news(self, ticker: str, url: str) -> bool:
+        """재귀적으로 종목을 찾아 특정 뉴스를 삭제한다."""
+        for s in self.stocks:
+            if s.ticker == ticker:
+                new_news = [n for n in s.news if n["url"] != url]
+                if len(new_news) < len(s.news):
+                    s.news = new_news
+                    return True
+                return False
+        for child in self.nodes:
+            if child.find_and_remove_news(ticker, url):
+                return True
+        return False
+
+    def find_and_add_report(self, ticker: str, report_path: str) -> bool:
+        """재귀적으로 종목을 찾아 리포트 경로를 추가한다."""
+        for s in self.stocks:
+            if s.ticker == ticker:
+                if report_path not in s.reports:
+                    s.reports.append(report_path)
+                return True
+        for child in self.nodes:
+            if child.find_and_add_report(ticker, report_path):
+                return True
+        return False
+
+    def find_and_remove_report(self, ticker: str, report_path: str) -> bool:
+        """재귀적으로 종목을 찾아 리포트 경로를 삭제한다."""
+        for s in self.stocks:
+            if s.ticker == ticker:
+                if report_path in s.reports:
+                    s.reports.remove(report_path)
+                    return True
+                return False
+        for child in self.nodes:
+            if child.find_and_remove_report(ticker, report_path):
+                return True
+        return False
+
     def add_child(self, name: str) -> Node:
         """자식 노드를 생성하여 추가하고 반환한다.
 
@@ -119,6 +202,43 @@ class Board(BaseModel):
         if isinstance(data, dict) and "root" not in data and "name" in data:
             data["root"] = Node(name=data["name"], depth=0)
         return data
+
+    def find_node(self, name: str) -> Node | None:
+        """보드 내에서 이름으로 노드를 검색한다."""
+        return self.root.find_node(name)
+
+    def add_node(self, parent_name: str, node_name: str) -> bool:
+        """특정 노드 하위에 새 노드를 추가한다."""
+        parent = self.find_node(parent_name)
+        if not parent:
+            return False
+        if any(n.name == node_name for n in parent.nodes):
+            return True
+        parent.add_child(node_name)
+        return True
+
+    def add_stock_to_node(self, parent_name: str, stock: Stock) -> bool:
+        """특정 노드 하위에 종목을 추가한다."""
+        parent = self.find_node(parent_name)
+        if not parent:
+            return False
+        return parent.add_stock(stock)
+
+    def delete_node(self, node_name: str) -> bool:
+        """노드를 삭제하고 하위 요소를 부모로 흡수한다. (루트 제외)"""
+        if self.root.name == node_name:
+            return False
+            
+        def find_and_remove(parent, target_name):
+            for i, child in enumerate(parent.nodes):
+                if child.name == target_name:
+                    parent.remove_child(target_name, absorb=True)
+                    return True
+                if find_and_remove(child, target_name):
+                    return True
+            return False
+            
+        return find_and_remove(self.root, node_name)
 
     def __repr__(self) -> str:
         return f"Board({self.name!r})\n{self.root!r}"

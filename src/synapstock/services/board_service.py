@@ -173,13 +173,8 @@ class BoardService:
         Returns:
             Node: 찾은 노드 객체, 또는 찾지 못한 경우 None.
         """
-        if root.name == name:
-            return root
-        for child in root.nodes:
-            found = self.find_node_by_name(child, name)
-            if found:
-                return found
-        return None
+        # Node 도메인 메서드 사용
+        return root.find_node(name)
 
     def add_node(self, board_name: str, parent_name: str, new_node_name: str) -> bool:
         """지정된 부모 노드 아래에 새로운 하위 노드를 추가합니다.
@@ -193,17 +188,11 @@ class BoardService:
             bool: 성공 시 True, 부모 노드를 찾지 못한 경우 False.
         """
         board = self.load(board_name)
-        parent = self.find_node_by_name(board.root, parent_name)
-        if not parent:
-            return False
-        
-        # 중복 체크
-        if any(n.name == new_node_name for n in parent.nodes):
-            return True
-            
-        parent.nodes.append(Node(name=new_node_name, depth=parent.depth + 1, nodes=[], stocks=[]))
-        self._repository.save(board)
-        return True
+        # Board 도메인 메서드 사용
+        success = board.add_node(parent_name, new_node_name)
+        if success:
+            self._repository.save(board)
+        return success
 
     def add_stock(self, board_name: str, parent_name: str, stock_name: str, ticker: str) -> bool:
         """지정된 부모 노드 아래에 새로운 종목 항목을 추가합니다.
@@ -218,17 +207,11 @@ class BoardService:
             bool: 성공 시 True, 부모 노드를 찾지 못한 경우 False.
         """
         board = self.load(board_name)
-        parent = self.find_node_by_name(board.root, parent_name)
-        if not parent:
-            return False
-            
-        # 중복 체크
-        if any(s.ticker == ticker for s in parent.stocks):
-            return True
-            
-        parent.stocks.append(Stock(name=stock_name, ticker=ticker))
-        self._repository.save(board)
-        return True
+        # Board 도메인 메서드 사용
+        success = board.add_stock_to_node(parent_name, Stock(name=stock_name, ticker=ticker))
+        if success:
+            self._repository.save(board)
+        return success
 
     def delete_node(self, board_name: str, node_name: str) -> bool:
         """노드를 삭제하고 그 자식들을 부모 노드에 재연결합니다.
@@ -241,24 +224,8 @@ class BoardService:
             bool: 성공 시 True, 루트 노드이거나 노드를 찾지 못한 경우 False.
         """
         board = self.load(board_name)
-        if board.root.name == node_name:
-            return False # 루트 노드는 삭제 불가
-            
-        # 부모 찾기 및 삭제 대상 찾기
-        def find_and_delete(parent, target_name):
-            for i, child in enumerate(parent.nodes):
-                if child.name == target_name:
-                    # 하위 요소 흡수
-                    parent.nodes.extend(child.nodes)
-                    parent.stocks.extend(child.stocks)
-                    # 자신 삭제
-                    parent.nodes.pop(i)
-                    return True
-                if find_and_delete(child, target_name):
-                    return True
-            return False
-            
-        success = find_and_delete(board.root, node_name)
+        # Board 도메인 메서드 사용
+        success = board.delete_node(node_name)
         if success:
             self._repository.save(board)
         return success
@@ -274,19 +241,8 @@ class BoardService:
             bool: 성공적으로 삭제된 경우 True.
         """
         board = self.load(board_name)
-        
-        def find_and_remove(node):
-            orig_len = len(node.stocks)
-            node.stocks = [s for s in node.stocks if s.ticker != ticker]
-            if len(node.stocks) < orig_len:
-                return True
-            
-            for child in node.nodes:
-                if find_and_remove(child):
-                    return True
-            return False
-            
-        success = find_and_remove(board.root)
+        # Node 도메인 메서드 사용
+        success = board.root.find_and_remove_stock(ticker)
         if success:
             self._repository.save(board)
         return success
@@ -319,18 +275,8 @@ class BoardService:
         # 웹 환경에서의 접근을 위해 'data/'를 포함한 상대 경로 저장
         report_path = f"data/pdf/{filename}"
         
-        def find_and_add_report(node):
-            for s in node.stocks:
-                if s.ticker == ticker:
-                    if report_path not in s.reports:
-                        s.reports.append(report_path)
-                    return True
-            for child in node.nodes:
-                if find_and_add_report(child):
-                    return True
-            return False
-            
-        success = find_and_add_report(board.root)
+        # Node 도메인 메서드 사용
+        success = board.root.find_and_add_report(ticker, report_path)
         if success:
             self._repository.save(board)
         return success
@@ -347,20 +293,8 @@ class BoardService:
             bool: 성공적으로 제거된 경우 True.
         """
         board = self.load(board_name)
-        
-        def find_and_remove_report(node):
-            for s in node.stocks:
-                if s.ticker == ticker:
-                    if report_path in s.reports:
-                        s.reports.remove(report_path)
-                        return True
-                    return False
-            for child in node.nodes:
-                if find_and_remove_report(child):
-                    return True
-            return False
-            
-        success = find_and_remove_report(board.root)
+        # Node 도메인 메서드 사용
+        success = board.root.find_and_remove_report(ticker, report_path)
         if success:
             self._repository.save(board)
         return success
@@ -381,18 +315,8 @@ class BoardService:
         board = self.load(board_name)
         news_entry = {"title": title, "date": date, "url": url}
         
-        def find_and_add_news(node):
-            for s in node.stocks:
-                if s.ticker == ticker:
-                    if not any(n["url"] == url for n in s.news):
-                        s.news.append(news_entry)
-                    return True
-            for child in node.nodes:
-                if find_and_add_news(child):
-                    return True
-            return False
-            
-        success = find_and_add_news(board.root)
+        # Node 도메인 메서드 사용
+        success = board.root.find_and_add_news(ticker, news_entry)
         if success:
             self._repository.save(board)
         return success
@@ -409,21 +333,8 @@ class BoardService:
             bool: 성공적으로 제거된 경우 True.
         """
         board = self.load(board_name)
-        
-        def find_and_remove_news(node):
-            for s in node.stocks:
-                if s.ticker == ticker:
-                    new_news = [n for n in s.news if n["url"] != url]
-                    if len(new_news) < len(s.news):
-                        s.news = new_news
-                        return True
-                    return False
-            for child in node.nodes:
-                if find_and_remove_news(child):
-                    return True
-            return False
-            
-        success = find_and_remove_news(board.root)
+        # Node 도메인 메서드 사용
+        success = board.root.find_and_remove_news(ticker, url)
         if success:
             self._repository.save(board)
         return success

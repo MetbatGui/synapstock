@@ -102,15 +102,90 @@ class TestBoard:
         with pytest.raises(ValidationError):
             Board()  # type: ignore
 
-    def test_tree_manipulation(self):
-        """root를 시작점으로 트리를 만들 수 있어야 한다."""
+
+    def test_board_find_node(self):
+        """보드 내에서 이름으로 노드를 검색한다.
+
+        Arrange:
+            "테마보드" 내부에 "섹터A" 노드를 생성한다.
+        Act:
+            board.find_node("섹터A")를 호출한다.
+        Assert:
+            검색 결과가 실제 섹터A 객체와 동일한지 확인한다.
+        """
         board = Board(name="테마보드")
         sector = board.root.add_child("섹터A")
-        sector.stocks.append(Stock(name="삼성전자", ticker="005930"))
+        
+        found = board.find_node("섹터A")
+        
+        assert found is sector
 
-        assert len(board.root.nodes) == 1
-        assert board.root.nodes[0].depth == 1
-        assert board.root.nodes[0].stocks[0].ticker == "005930"
+    def test_board_add_node(self):
+        """특정 노드 하위에 새 노드를 안전하게 추가한다.
+
+        Arrange:
+            "인터넷" 노드를 가진 보드를 준비한다.
+        Act:
+            1. "인터넷" 아래에 "포털" 노드를 추가한다.
+            2. 동일한 "포털" 노드를 다시 추가해본다.
+        Assert:
+            노드가 정상 추가되었으며, 중복 추가 시에도 갯수가 유지되는지 확인한다.
+        """
+        board = Board(name="IT")
+        board.root.add_child("인터넷")
+        
+        # 1. New node
+        success = board.add_node("인터넷", "포털")
+        internet = board.find_node("인터넷")
+        assert success is True
+        assert len(internet.nodes) == 1
+        assert internet.nodes[0].name == "포털"
+        
+        # 2. Duplicate
+        success_dup = board.add_node("인터넷", "포털")
+        assert success_dup is True
+        assert len(internet.nodes) == 1
+
+    def test_board_delete_node_absorption(self):
+        """노드 삭제 시 하위 요소들을 부모 노드로 흡수한다.
+
+        Arrange:
+            Root -> SectorA -> SubSector1 구조이며, SubSector1에 종목 "S1"이 있다.
+        Act:
+            SubSector1 노드를 삭제한다.
+        Assert:
+            SubSector1의 종목 "S1"이 SectorA로 이동했는지 확인한다.
+        """
+        board = Board(name="Root")
+        sector = board.root.add_child("SectorA")
+        sub = sector.add_child("SubSector1")
+        sub.add_stock(Stock(name="Stock1", ticker="S1"))
+        
+        # Act
+        success = board.delete_node("SubSector1")
+        
+        # Assert
+        assert success is True
+        assert board.find_node("SubSector1") is None
+        assert any(s.ticker == "S1" for s in sector.stocks)
+
+    def test_board_delete_root_fails(self):
+        """루트 노드는 삭제할 수 없어야 한다.
+
+        Arrange:
+            "IT" 보드를 생성한다.
+        Act:
+            board.delete_node("IT")를 호출한다.
+        Assert:
+            삭제 결과가 False이며 루트 노드가 여전히 존재하는지 확인한다.
+        """
+        board = Board(name="IT")
+        
+        success = board.delete_node("IT")
+        
+        assert success is False
+        assert board.root is not None
+        assert board.root.name == "IT"
 
 
 # ── IT 보드 트리 테스트 ───────────────────────────────────────────────────────
