@@ -9,6 +9,8 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
+from synapstock.infrastructure.config import AppConfig
+
 from synapstock.adapters.local.board_repo import LocalBoardRepository
 from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
@@ -26,26 +28,26 @@ class Container:
     """애플리케이션 전역 의존성을 조립하고 관리하는 컨테이너 클래스."""
 
     def __init__(self):
-        # 1. 환경 변수 로드
-        load_dotenv()
+        # 1. 설정 로드 (환경 변수 및 기본 경로)
+        self.config = AppConfig.load()
         
-        # 2. 기본 경로 설정
-        self.data_dir = Path("data")
-        self.secrets_dir = Path("secrets")
+        # 2. 로컬 디렉토리 보장
+        self.config.data_dir.mkdir(parents=True, exist_ok=True)
+        self.config.secrets_dir.mkdir(parents=True, exist_ok=True)
         
         # 3. 인프라 어댑터 싱글톤
-        self._repo = LocalBoardRepository(self.data_dir / "board")
-        self._miro_adapter = MiroMindmapAdapter(os.getenv("MIRO_ACCESS_TOKEN", ""))
+        self._repo = LocalBoardRepository(self.config.board_dir)
+        self._miro_adapter = MiroMindmapAdapter(self.config.miro_token)
         self._disclosure_adapter = DartDisclosureAdapter()
         self._financial_adapter = ExcelFinancialDataAdapter(
-            self.data_dir / "financial_statements" / "financial_data.xlsx"
+            self.config.financial_dir / "financial_data.xlsx"
         )
         self._ticker_search_adapter = NaverTickerSearchAdapter()
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
         
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
-        self._report_storage = LocalFileStorageAdapter(self.data_dir / "report")
-        self._pdf_storage = LocalFileStorageAdapter(self.data_dir / "pdf")
+        self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
+        self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -59,7 +61,7 @@ class Container:
             storage=self._pdf_storage,
             disclosure=self._disclosure_adapter,
             financial=self._financial_adapter,
-            pdf_dir=str(self.data_dir / "pdf")
+            pdf_dir=str(self.config.pdf_dir)
         )
         
         self._report_service = None
@@ -67,11 +69,8 @@ class Container:
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
-        token_path = self.secrets_dir / "token.json"
-        client_secret_path = self.secrets_dir / "client_secret.json"
-        
-        report_folder_id = os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID")
-        sd_folder_id = os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID")
+        token_path = self.config.secrets_dir / "token.json"
+        client_secret_path = self.config.secrets_dir / "client_secret.json"
         
         if not token_path.exists():
             logger.warning("[Container] Google Drive token.json 파일이 없어 어댑터를 초기화하지 않습니다.")
@@ -79,8 +78,8 @@ class Container:
 
         try:
             folders = {
-                "report": report_folder_id,
-                "sd": sd_folder_id
+                "report": self.config.report_folder_id,
+                "sd": self.config.sd_folder_id
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
@@ -92,15 +91,13 @@ class Container:
 
     def _init_report_service(self):
         """Google Drive 어댑터가 활성화된 경우 리포트 서비스를 조립한다."""
-        if self._drive_adapter:
-            report_folder_id = os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID")
-            if report_folder_id:
-                self._report_service = ReportService(
-                    cloud_storage=self._drive_adapter,
-                    local_storage=self._report_storage,
-                    report_folder_id=report_folder_id,
-                    report_dir=str(self.data_dir / "report")
-                )
+        if self._drive_adapter and self.config.report_folder_id:
+            self._report_service = ReportService(
+                cloud_storage=self._drive_adapter,
+                local_storage=self._report_storage,
+                report_folder_id=self.config.report_folder_id,
+                report_dir=str(self.config.report_dir)
+            )
 
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
 
