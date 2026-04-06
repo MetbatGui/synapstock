@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, List, Optional
+import unicodedata
 
 from pydantic import BaseModel, model_validator
 
@@ -276,3 +277,17 @@ class SearchResult:
     board_name: str
     node_path: List[str]  # ["조선", "재료", ...]
     ticker: Optional[str] = None  # SECTOR일 경우 None
+
+
+class Report(BaseModel):
+    """리포트 도메인 엔티티."""
+    filename: str
+    stock: str
+    title: str
+    date: str  # YYYY-MM-DD
+    provider: str
+    url: Optional[str] = None
+
+    @property
+    def stock_nfc(self) -> str:
+        return unicodedata.normalize("NFC", self.stock)
