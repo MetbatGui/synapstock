@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 from synapstock.adapters.local.board_repo import LocalBoardRepository
 from synapstock.domain.models import Board, Stock
 from synapstock.services.board_service import BoardService
-from synapstock.domain.ports import MindmapPort, TickerSearchPort
+from synapstock.domain.ports import MindmapPort, TickerSearchPort, StoragePort
 
 FIXTURES_DIR = Path(__file__).parents[2] / "fixtures" / "folder_mindmap"
 
@@ -20,9 +20,10 @@ def service(tmp_path):
     repo = LocalBoardRepository(root_dir=tmp_path)
     mindmap = MagicMock(spec=MindmapPort)
     ticker_search = MagicMock(spec=TickerSearchPort)
+    storage = MagicMock(spec=StoragePort)
     # save 호출 시 repository에도 저장되도록 mock 설정 (기존 테스트 호환성)
     mindmap.save.side_effect = lambda b, **kwargs: repo.save(b)
-    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
+    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search, storage=storage)
 
 
 @pytest.fixture
@@ -31,7 +32,8 @@ def fixture_service():
     repo = LocalBoardRepository(root_dir=FIXTURES_DIR)
     mindmap = MagicMock(spec=MindmapPort)
     ticker_search = MagicMock(spec=TickerSearchPort)
-    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
+    storage = MagicMock(spec=StoragePort)
+    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search, storage=storage)
 
 
 @pytest.fixture
@@ -42,8 +44,9 @@ def mutable_service(tmp_path):
     repo = LocalBoardRepository(root_dir=dest)
     mindmap = MagicMock(spec=MindmapPort)
     ticker_search = MagicMock(spec=TickerSearchPort)
+    storage = MagicMock(spec=StoragePort)
     mindmap.save.side_effect = lambda b, **kwargs: repo.save(b)
-    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search)
+    return BoardService(repository=repo, mindmap=mindmap, ticker_search=ticker_search, storage=storage)
 
 
 class TestBoardServiceIntegration:

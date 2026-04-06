@@ -16,6 +16,7 @@ from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapte
 from synapstock.adapters.google.google_drive_adapter import GoogleDriveAdapter
 from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
 from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
+from synapstock.adapters.local.file_storage import LocalFileStorageAdapter
 from synapstock.services.board_service import BoardService
 from synapstock.services.report_service import ReportService
 
@@ -42,6 +43,10 @@ class Container:
         self._ticker_search_adapter = NaverTickerSearchAdapter()
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
         
+        # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
+        self._report_storage = LocalFileStorageAdapter(self.data_dir / "report")
+        self._pdf_storage = LocalFileStorageAdapter(self.data_dir / "pdf")
+        
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
@@ -51,8 +56,10 @@ class Container:
             repository=self._repo,
             mindmap=self._miro_adapter,
             ticker_search=self._ticker_search_adapter,
+            storage=self._pdf_storage,
             disclosure=self._disclosure_adapter,
-            financial=self._financial_adapter
+            financial=self._financial_adapter,
+            pdf_dir=str(self.data_dir / "pdf")
         )
         
         self._report_service = None
@@ -89,8 +96,10 @@ class Container:
             report_folder_id = os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID")
             if report_folder_id:
                 self._report_service = ReportService(
-                    storage=self._drive_adapter,
-                    report_folder_id=report_folder_id
+                    cloud_storage=self._drive_adapter,
+                    local_storage=self._report_storage,
+                    report_folder_id=report_folder_id,
+                    report_dir=str(self.data_dir / "report")
                 )
 
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
