@@ -1,7 +1,7 @@
 """보드 및 종목 정보 조회 서비스를 담당하는 유즈케이스 레이어."""
 
-from typing import List, Dict, Optional
-from synapstock.domain.models import Board, Node
+from typing import List, Dict, Optional, Tuple
+from synapstock.domain.models import Board, Node, Stock
 from synapstock.domain.ports import BoardRepositoryPort, TickerSearchPort, DisclosurePort, FinancialDataPort
 
 class BoardQueryService:
@@ -60,3 +60,71 @@ class BoardQueryService:
     def find_node_by_name(self, root: Node, name: str) -> Optional[Node]:
         """노드 트리 내에서 특정 이름의 노드를 검색합니다."""
         return root.find_node(name)
+
+    def get_stock_by_ticker(self, ticker: str) -> Optional[Tuple[Stock, str]]:
+        """모든 보드를 순회하여 일치하는 티커의 종목 정보를 찾습니다."""
+        boards = self.list_boards()
+        for b_name in boards:
+            board = self.load_board(b_name)
+            
+            def find_recursive(node: Node) -> Optional[Stock]:
+                for s in node.stocks:
+                    if s.ticker == ticker:
+                        return s
+                for n in node.nodes:
+                    res = find_recursive(n)
+                    if res:
+                        return res
+                return None
+            
+            stock = find_recursive(board.root)
+            if stock:
+                return stock, b_name
+        return None
+
+    def get_all_stocks_flat(self) -> List[Dict]:
+        """모든 보드의 모든 종목 정보를 평탄화된 리스트로 반환합니다."""
+        boards = self.list_boards()
+        all_stocks = []
+        for b_name in boards:
+            board = self.load_board(b_name)
+            
+            def flatten_recursive(node: Node, current_path: List[str]):
+                stocks = []
+                for s in node.stocks:
+                    stocks.append({
+                        "ticker": s.ticker,
+                        "name": s.name,
+                        "board": b_name,
+                        "board_name": board.name,
+                        "path": current_path
+                    })
+                for n in node.nodes:
+                    stocks.extend(flatten_recursive(n, current_path + [n.name]))
+                return stocks
+            
+            all_stocks.extend(flatten_recursive(board.root, []))
+        return all_stocks
+
+    def find_stocks_by_name(self, query: str) -> List[Dict]:
+        """모든 보드에서 종목명에 query가 포함된 종목들을 검색합니다 (텔레그램용)."""
+        boards = self.list_boards()
+        results = []
+        for b_name in boards:
+            board = self.load_board(b_name)
+            
+            def search_recursive(node: Node, current_path: List[str]):
+                for s in node.stocks:
+                    if query in s.name:
+                        results.append({
+                            "board": b_name,
+                            "board_name": board.name,
+                            "name": s.name,
+                            "ticker": s.ticker,
+                            "path": f"[{board.name}] " + " > ".join(current_path + [s.name])
+                        })
+                for n in node.nodes:
+                    search_recursive(n, current_path + [n.name])
+            
+            search_recursive(board.root, [board.root.name])
+        return results
