@@ -11,19 +11,19 @@ from dotenv import load_dotenv
 
 from synapstock.infrastructure.config import AppConfig
 
-from synapstock.adapters.local.board_repo import LocalBoardRepository
-from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
-from synapstock.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
-from synapstock.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
-from synapstock.adapters.google.google_drive_adapter import GoogleDriveAdapter
-from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
-from synapstock.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
-from synapstock.adapters.local.file_storage import LocalFileStorageAdapter
-from synapstock.services.query_service import BoardQueryService
-from synapstock.services.command_service import BoardCommandService
-from synapstock.services.media_service import StockMediaService
-from synapstock.services.sync_service import BoardSyncService
-from synapstock.services.report_service import ReportService
+from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
+from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
+from synapstock.infrastructure.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
+from synapstock.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from synapstock.infrastructure.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
+from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
+from synapstock.infrastructure.adapters.local.file_storage import LocalFileStorageAdapter
+from synapstock.application.services.query_service import BoardQueryService
+from synapstock.application.services.command_service import BoardCommandService
+from synapstock.application.services.media_service import StockMediaService
+from synapstock.application.services.sync_service import BoardSyncService
+from synapstock.application.services.report_service import ReportService
 
 logger = logging.getLogger(__name__)
 
