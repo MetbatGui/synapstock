@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from synapstock.services.media_service import StockMediaService
+from synapstock.application.services.media_service import StockMediaService
 from synapstock.domain.models import Board, Node, Stock
 
 @pytest.fixture

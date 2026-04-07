@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 import shutil
-from synapstock.adapters.local.file_storage import LocalFileStorageAdapter
+from synapstock.infrastructure.adapters.local.file_storage import LocalFileStorageAdapter
 
 @pytest.fixture
 def temp_storage_dir(tmp_path):

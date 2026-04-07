@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import Mock
 from synapstock.domain.models import Board, Node, Stock
-from synapstock.services.query_service import BoardQueryService
-from synapstock.services.media_service import StockMediaService
+from synapstock.application.services.query_service import BoardQueryService
+from synapstock.application.services.media_service import StockMediaService
 from synapstock.domain.ports import BoardRepositoryPort, MindmapPort, TickerSearchPort, StoragePort
 from synapstock.domain.models import SearchResult, SearchResultType
 

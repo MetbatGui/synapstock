@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from synapstock.services.query_service import BoardQueryService
+from synapstock.application.services.query_service import BoardQueryService
 from synapstock.domain.models import Board, Node, Stock
 
 @pytest.fixture

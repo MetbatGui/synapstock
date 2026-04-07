@@ -6,7 +6,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from synapstock.adapters.miro.miro_mindmap import MiroMindmapAdapter
+from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.domain.models import Board, Node, Stock
 
 @pytest.fixture

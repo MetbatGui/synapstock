@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from synapstock.adapters.local.board_repo import LocalBoardRepository
+from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
 from synapstock.domain.models import Board, Stock
 
-FIXTURES_DIR = Path(__file__).parents[3] / "fixtures" / "boards"
+FIXTURES_DIR = Path(__file__).parents[4] / "fixtures" / "boards"
 
 
 @pytest.fixture

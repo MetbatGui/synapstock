@@ -2,7 +2,7 @@ import pytest
 import json
 from unittest.mock import MagicMock, patch
 from pathlib import Path
-from synapstock.services.report_service import ReportService
+from synapstock.application.services.report_service import ReportService
 from synapstock.domain.models import Report
 
 @pytest.fixture

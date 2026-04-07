@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from synapstock.services.sync_service import BoardSyncService
+from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.domain.models import Board, Node, Stock
 
 @pytest.fixture

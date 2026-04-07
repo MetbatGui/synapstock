@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from synapstock.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
+from synapstock.infrastructure.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
 from synapstock.domain.models import ScrapedNews
 
 @pytest.fixture

@@ -6,14 +6,14 @@ from pathlib import Path
 import pytest
 
 from unittest.mock import MagicMock
-from synapstock.adapters.local.board_repo import LocalBoardRepository
+from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
 from synapstock.domain.models import Board, Stock
-from synapstock.services.query_service import BoardQueryService
-from synapstock.services.command_service import BoardCommandService
-from synapstock.services.sync_service import BoardSyncService
+from synapstock.application.services.query_service import BoardQueryService
+from synapstock.application.services.command_service import BoardCommandService
+from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.domain.ports import MindmapPort, TickerSearchPort, StoragePort
 
-FIXTURES_DIR = Path(__file__).parents[2] / "fixtures" / "folder_mindmap"
+FIXTURES_DIR = Path(__file__).parents[3] / "fixtures" / "folder_mindmap"
 
 
 @pytest.fixture
