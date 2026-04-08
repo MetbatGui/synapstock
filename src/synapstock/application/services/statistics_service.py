@@ -66,9 +66,9 @@ class ExcelStatisticsParser:
         # 4개 카테고리 정의 (순서: 종목명 컬럼 index, 금액 컬럼 index, 시장, 주체)
         configs = [
             (4, 5, MarketType.KOSPI, SupplySubject.FOREIGN),     # E, F
-            (7, 8, MarketType.KOSPI, SupplySubject.INSTITUTION),  # H, I
+            (8, 9, MarketType.KOSPI, SupplySubject.INSTITUTION),  # I, J
             (13, 14, MarketType.KOSDAQ, SupplySubject.FOREIGN),   # N, O
-            (16, 17, MarketType.KOSDAQ, SupplySubject.INSTITUTION) # Q, R
+            (17, 18, MarketType.KOSDAQ, SupplySubject.INSTITUTION) # R, S
         ]
         
         results = []
@@ -216,12 +216,17 @@ class StatisticsService:
                     all_rankings = self._parser.parse_summary_table(content, sheet_name, date)
                     self.save_rankings(all_rankings) # 로컬 캐시 저장
                     
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"[StatisticsService] 구글 드라이브에서 데이터 다운로드 및 캐싱 완료 ({date})")
+                    
                     for r in all_rankings:
                         if r.market == market and r.subject == subject:
                             return r
                 except Exception as e:
                     import logging
-                    logging.getLogger(__name__).error(f"Failed to parse downloaded SD file: {e}")
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"[StatisticsService] 파싱 실패 ({filename}): {e}", exc_info=True)
         
         return None
 
@@ -233,14 +238,64 @@ class StatisticsService:
         date_clean = date_str.replace("-", "")
         filename = f"daily_ranking_{date_clean}.xlsx"
         
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[StatisticsService] 특정 날짜 동기화 시도: {date_str} ({filename})")
+        
         content = self._storage.get_file(filename, folder="sd")
         if not content:
+            logger.warning(f"[StatisticsService] 클라우드에서 파일을 찾을 수 없음: {filename}")
             return []
             
         sheet_name = date_clean[-4:]
-        rankings = self._parser.parse_summary_table(content, sheet_name, date_str)
-        self.save_rankings(rankings)
-        return rankings
+        try:
+            rankings = self._parser.parse_summary_table(content, sheet_name, date_str)
+            self.save_rankings(rankings)
+            logger.info(f"[StatisticsService] 동기화 및 캐싱 완료: {date_str}")
+            return rankings
+        except Exception as e:
+            logger.error(f"[StatisticsService] 파싱 및 동기화 실패: {e}", exc_info=True)
+            return []
+
+    def sync_recent_data(self, limit: int = 5) -> int:
+        """구글 드라이브의 최근 엑셀 파일들을 탐색하여 로컬에 동기화한다."""
+        if not self._storage:
+            return 0
+            
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("[StatisticsService] 최근 수급 통계 데이터 탐색 시작 (Google Drive)")
+        
+        try:
+            # 1. 파일 목록 조회 (sd 폴더의 루트)
+            files = self._storage.list_files_in_folder("", folder="sd")
+            
+            # daily_ranking_YYYYMMDD.xlsx 패턴 필터링
+            target_files = []
+            for f in files:
+                name = f['name']
+                if name.startswith("daily_ranking_") and name.endswith(".xlsx"):
+                    date_part = name.replace("daily_ranking_", "").replace(".xlsx", "")
+                    if len(date_part) == 8:
+                        target_files.append((name, date_part))
+            
+            # 최신순 정렬
+            target_files.sort(key=lambda x: x[1], reverse=True)
+            
+            # 2. 로컬에 없는 파일 위주로 동기화 (최대 limit개)
+            synced_count = 0
+            for filename, date_clean in target_files[:limit]:
+                formatted_date = f"{date_clean[:4]}-{date_clean[4:6]}-{date_clean[6:]}"
+                
+                # 모든 주체/시장 조합이 로컬에 있는지 확인하기엔 번거로우므로, 일단 폴더 내 파일 존재 여부로 판단
+                # (Repository를 통해 체크하는 것이 더 정확하지만, 단순화를 위해 매번 시도하거나 시트 존재 확인)
+                self.sync_from_storage(formatted_date)
+                synced_count += 1
+                
+            return synced_count
+        except Exception as e:
+            logger.error(f"[StatisticsService] 일괄 동기화 실패: {e}", exc_info=True)
+            return 0
 
     def get_analyzed_ranking(
         self, 

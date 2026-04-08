@@ -1,0 +1,78 @@
+"""수급 통계(Statistics) API 라우터.
+
+일별 수급 순위 분석 데이터 및 분석 가능한 날짜 목록을 제공합니다.
+"""
+import logging
+from typing import List, Optional
+from fastapi import APIRouter, Query, HTTPException
+from fastapi.responses import JSONResponse
+
+from synapstock.domain.statistics.models import MarketType, SupplySubject
+from synapstock.presentation.web.core.dependencies import statistics_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/statistics", tags=["statistics"])
+
+@router.get("/daily-ranking")
+async def get_daily_ranking(
+    date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
+    market: MarketType = Query(MarketType.KOSPI, description="시장 구분 (KOSPI/KOSDAQ)"),
+    subject: SupplySubject = Query(SupplySubject.FOREIGN, description="수급 주체 (FOREIGN/INSTITUTION)")
+):
+    """특정일의 분석된 수급 순위를 가져옵니다."""
+    try:
+        if not statistics_service:
+            raise HTTPException(status_code=500, detail="Statistics service not available")
+            
+        result = statistics_service.get_analyzed_ranking(date, market, subject)
+        if not result:
+            # 데이터가 없는 경우 404가 아닌 빈 결과 또는 메시지 반환 (UI 처리를 위해)
+            return {
+                "date": date,
+                "market": market,
+                "subject": subject,
+                "items": [],
+                "message": "No data available for this date"
+            }
+            
+        return result
+    except Exception as e:
+        logger.error(f"Error in get_daily_ranking: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@router.get("/available-dates")
+async def get_available_dates(
+    market: MarketType = Query(MarketType.KOSPI),
+    subject: SupplySubject = Query(SupplySubject.FOREIGN)
+):
+    """통계 데이터가 존재하는 날짜 목록을 반환합니다."""
+    try:
+        if not statistics_service:
+            return []
+            
+        # StatisticsService에 repo 접근용 헬퍼가 없으면 직접 repo 호출 유도 (또는 서비스에 추가)
+        # 여기서는 서비스에 위임하는 것이 좋음
+        if hasattr(statistics_service, "_repository") and statistics_service._repository:
+            return statistics_service._repository.list_available_dates(market, subject)
+        return []
+    except Exception as e:
+        logger.error(f"Error in get_available_dates: {e}")
+        return []
+
+@router.post("/sync")
+async def sync_statistics():
+    """구글 드라이브로부터 최신 수급 통계 데이터를 동기화합니다."""
+    try:
+        if not statistics_service:
+            raise HTTPException(status_code=500, detail="Statistics service not available")
+            
+        count = statistics_service.sync_recent_data(limit=5)
+        return {
+            "status": "success",
+            "message": f"{count}일치 데이터가 동기화되었습니다.",
+            "synced_count": count
+        }
+    except Exception as e:
+        logger.error(f"Error in sync_statistics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

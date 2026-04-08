@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from synapstock.presentation.web.core.dependencies import sync_indices_if_needed
 from synapstock.presentation.web.core.websocket_manager import manager
-from synapstock.presentation.web.routes import board_routes, report_routes, stock_routes
+from synapstock.presentation.web.routes import board_routes, report_routes, stock_routes, statistics_routes
 
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -40,6 +40,7 @@ report_dir.mkdir(parents=True, exist_ok=True)
 app.include_router(board_routes.router)
 app.include_router(stock_routes.router)
 app.include_router(report_routes.router)
+app.include_router(statistics_routes.router)
 
 
 # ── 페이지 라우트 ────────────────────────────────────────────────────────────
@@ -70,6 +71,12 @@ async def get_stock_dashboard(request: Request, ticker: str):
     return templates.TemplateResponse("index.html", {"request": request, "ticker": ticker, "mode": "dashboard"})
 
 
+@app.get("/statistics", response_class=HTMLResponse)
+async def get_statistics_page(request: Request):
+    """수급 통계 페이지를 서빙합니다."""
+    return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "statistics"})
+
+
 # ── WebSocket ────────────────────────────────────────────────────────────────
 @app.websocket("/ws/logs")
 async def websocket_endpoint(websocket: WebSocket):
@@ -92,12 +99,16 @@ async def websocket_endpoint(websocket: WebSocket):
 # ── 서버 시작 이벤트 ─────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_event():
-    """서버 시작 시 리포트 인덱스를 최초 1회 강제 동기화합니다.
-
-    ``sync_indices_if_needed(force=True)``를 비동기 태스크로 실행하여
-    서버 부팅 시 Google Drive에서 인덱스 파일을 다운로드합니다.
-    """
+    """서버 시작 시 인덱스 동기화 및 초기 설정을 수행합니다."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("[Startup] SynapStock 서버 시작 중...")
+    
+    # 리포트 인덱스 동기화 (Background)
+    logger.info("[Startup] 리포트 인덱스 동기화 태스크 시작 (Google Drive)")
     asyncio.create_task(sync_indices_if_needed(force=True))
+    
+    logger.info("[Startup] 서버 초기화 완료.")
 
 
 # ── 실행 헬퍼 ────────────────────────────────────────────────────────────────
