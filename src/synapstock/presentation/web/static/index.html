@@ -15,6 +15,7 @@
         <div class="nav-links">
             <a href="#" class="nav-item active" data-tab="mindmap-tab">마인드맵 관리</a>
             <a href="#" class="nav-item" data-tab="dashboard-tab">종목정보</a>
+            <a href="#" class="nav-item" data-tab="statistics-tab">수급통계</a>
         </div>
         <div class="nav-status">
             <span id="sync-status-indicator">● System Ready</span>
@@ -107,6 +108,13 @@
             </div>
             <div id="dashboard-container" style="display: none;">
                 <!-- 기존 index.html의 대시보드 내용이 여기로 동적 로드됨 -->
+            </div>
+        </section>
+
+        <!-- 수급 통계 탭 -->
+        <section id="statistics-tab" class="tab-content">
+            <div id="statistics-container">
+                <!-- statistics_view.js에 의해 렌더링됨 -->
             </div>
         </section>
     </main>

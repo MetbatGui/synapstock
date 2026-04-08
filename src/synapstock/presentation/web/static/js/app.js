@@ -14,6 +14,7 @@ import { openModal, closeModal, showAddNodeModal, showAddStockModal, triggerNews
 import { initWebSocket } from './services/websocket.js';
 import { fetchReports, uploadReport } from './services/report_service.js';
 import { fetchNews } from './services/news_service.js';
+import { statisticsView } from './ui/statistics_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -310,6 +311,14 @@ document.addEventListener('DOMContentLoaded', () => {
             switchTab('dashboard-tab', false);
             loadStockDashboard(ticker);
         }
+    } else if (path === '/statistics') {
+        switchTab('statistics-tab', false);
+    }
+
+    // 수급 통계 초기화
+    const statsContainer = document.getElementById('statistics-container');
+    if (statsContainer) {
+        statisticsView.init(statsContainer);
     }
 });
 
