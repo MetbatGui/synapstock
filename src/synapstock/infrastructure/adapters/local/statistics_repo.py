@@ -38,7 +38,9 @@ class LocalStatisticsRepository:
 
     def list_available_dates(self, market: MarketType, subject: SupplySubject) -> List[str]:
         """데이터가 존재하는 날짜 목록을 반환한다."""
-        pattern = f"*_{market}_{subject}.json"
+        market_val = market.value if hasattr(market, 'value') else market
+        subject_val = subject.value if hasattr(subject, 'value') else subject
+        pattern = f"*_{market_val}_{subject_val}.json"
         files = self.root.glob(pattern)
         # 파일명에서 날짜 부분만 추출 (YYYY-MM-DD)
         return sorted([f.name.split('_')[0] for f in files], reverse=True)

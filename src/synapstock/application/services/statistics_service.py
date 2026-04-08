@@ -9,7 +9,9 @@ from synapstock.domain.statistics.models import (
     MarketType, 
     SupplySubject, 
     RankingItem,
-    MonthlyMarketStats
+    MonthlyMarketStats,
+    AnalyzedRankingItem,
+    DailyMarketRankingAnalysis
 )
 
 class ExcelStatisticsParser:
@@ -239,3 +241,73 @@ class StatisticsService:
         rankings = self._parser.parse_summary_table(content, sheet_name, date_str)
         self.save_rankings(rankings)
         return rankings
+
+    def get_analyzed_ranking(
+        self, 
+        date: str, 
+        market: MarketType, 
+        subject: SupplySubject
+    ) -> Optional[DailyMarketRankingAnalysis]:
+        """순위 변동 및 연속 등장 정보가 포함된 분석된 랭킹(DTO)을 반환한다."""
+        raw = self.get_daily_ranking(date, market, subject)
+        if not raw or not self._repository:
+            return None
+
+        # 1. 가용한 날짜 목록 확보
+        available_dates = self._repository.list_available_dates(market, subject)
+        try:
+            current_idx = available_dates.index(date)
+        except ValueError:
+            # 현재 날짜가 목록에 없으면(방금 파싱한 경우 등) 분석 없이 기본 반환
+            analyzed_items = [AnalyzedRankingItem(**item.model_dump(), is_new=True) for item in raw.items]
+            return DailyMarketRankingAnalysis(
+                date=date, market=market, subject=subject, items=analyzed_items
+            )
+
+        # 2. 직전 거래일 대비 순위 변동 계산 데이터 준비
+        prev_date = None
+        prev_map = {}
+        if current_idx + 1 < len(available_dates):
+            prev_date = available_dates[current_idx + 1]
+            prev_ranking = self._repository.load_ranking(prev_date, market, subject)
+            if prev_ranking:
+                prev_map = {item.name: item.rank for item in prev_ranking.items}
+
+        # 3. 각 종목별 지표 계산
+        lookback_limit = 10
+        analyzed_items = []
+        
+        for item in raw.items:
+            # DTO 생성 (원본 필드 복사)
+            analyzed = AnalyzedRankingItem(**item.model_dump())
+            
+            # 순위 변동 및 신규 진입 계산
+            if item.name in prev_map:
+                analyzed.prev_rank = prev_map[item.name]
+                analyzed.rank_change = analyzed.prev_rank - analyzed.rank
+                analyzed.is_new = False
+            else:
+                analyzed.is_new = True
+                
+            # 연속 등장 횟수 계산
+            consecutive = 1
+            for i in range(current_idx + 1, min(current_idx + 1 + lookback_limit, len(available_dates))):
+                past_date = available_dates[i]
+                past_ranking = self._repository.load_ranking(past_date, market, subject)
+                if not past_ranking: break
+                
+                past_names = {p.name for p in past_ranking.items}
+                if item.name in past_names:
+                    consecutive += 1
+                else:
+                    break
+            analyzed.consecutive_days = consecutive
+            analyzed_items.append(analyzed)
+
+        return DailyMarketRankingAnalysis(
+            date=date,
+            market=market,
+            subject=subject,
+            items=analyzed_items,
+            previous_date=prev_date
+        )

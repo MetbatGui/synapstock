@@ -30,3 +30,20 @@ class MonthlyMarketStats(BaseModel):
     market: MarketType
     subject: SupplySubject
     items: List[RankingItem]
+
+# --- Analysis DTOs (조회 시점에 계산되는 뷰 모델) ---
+
+class AnalyzedRankingItem(RankingItem):
+    """순위 변동성 분석 정보가 포함된 개별 항목."""
+    prev_rank: Optional[int] = None      # 이전 거래일 순위
+    rank_change: Optional[int] = None    # 순위 변동폭 (이전-현재)
+    consecutive_days: int = 1            # 연속 상위권 등장 횟수
+    is_new: bool = False                 # 신규 진입 여부
+
+class DailyMarketRankingAnalysis(BaseModel):
+    """분석 정보가 포함된 특정일의 전체 수급 데이터."""
+    date: str
+    market: MarketType
+    subject: SupplySubject
+    items: List[AnalyzedRankingItem]
+    previous_date: Optional[str] = None  # 비교 대상이 된 이전 거래일
