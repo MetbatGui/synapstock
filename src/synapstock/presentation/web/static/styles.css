@@ -968,6 +968,9 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    max-width: 1900px;
+    /* 내부 요소 잘림 방지를 위해 너비 상향 조정 */
+    margin: 0 auto;
 }
 
 .stats-header {
@@ -1062,7 +1065,62 @@ h2 {
     overflow: auto;
     position: relative;
     min-height: 400px;
+    padding: 20px 10px;
+    /* 좌우 빈 공간을 약간 줄여서 표가 더 넓게 표현되게 */
 }
+
+.stats-markets-wrapper {
+    display: flex;
+    gap: 20px;
+    /* 코스피-코스닥 간격 축소하여 표 사이즈 확보 */
+    justify-content: center;
+    width: 100%;
+    /* 상위 컨테이너에 맞춰 확장 */
+}
+
+.stats-market-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.stats-market-title {
+    text-align: center;
+    color: var(--text-primary);
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent-blue);
+    letter-spacing: 1px;
+}
+
+.stats-subject-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    /* 외인-기관 간격 추가 축소하여 표 너비 확보 */
+}
+
+.stats-grid-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.stats-section-title {
+    color: var(--accent-blue);
+    font-size: 0.95rem;
+    /* 소분류 제목 */
+    font-weight: 700;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+}
+
 
 .stats-table {
     width: 100%;
@@ -1074,8 +1132,10 @@ h2 {
     position: sticky;
     top: 0;
     background: #111827;
-    padding: 18px 25px;
-    font-size: 0.85rem;
+    padding: 8px 10px;
+    /* 여백 대폭 축소 */
+    font-size: 0.75rem;
+    /* 폰트 축소 */
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--text-secondary);
@@ -1084,9 +1144,11 @@ h2 {
 }
 
 .stats-table td {
-    padding: 16px 25px;
+    padding: 6px 10px;
+    /* 높이(여백) 최적화 */
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    font-size: 0.95rem;
+    font-size: 0.8rem;
+    /* 폰트 축소 */
 }
 
 .stats-table tr:hover {
@@ -1098,23 +1160,36 @@ h2 {
 }
 
 .col-rank {
-    width: 80px;
+    width: 40px;
     font-weight: 700;
     color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .col-change {
-    width: 100px;
+    width: 50px;
+    white-space: nowrap;
+}
+
+.col-name {
+    min-width: 140px;
+    /* 종목명 최소 너비 보장 */
+    font-size: 0.95rem;
+    /* 글씨 크기를 좀 더 키움 */
 }
 
 .col-amount {
     text-align: right;
     font-family: monospace;
-    font-size: 1.05rem;
+    font-size: 0.9rem;
+    /* 폰트 약간 상향 */
 }
 
 .col-consecutive {
     text-align: center;
+    white-space: nowrap;
+    /* 연속행 텍스트 깨짐 방지 */
+    width: 50px;
 }
 
 .change-up {

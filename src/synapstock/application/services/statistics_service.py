@@ -24,7 +24,17 @@ class ExcelStatisticsParser:
         subject: SupplySubject, 
         date: str
     ) -> DailyMarketRanking:
-        """일별 수급 TOP 30 엑셀 파싱."""
+        """일별 단일 수급 TOP 30 엑셀 파일을 파싱합니다.
+
+        Args:
+            content (bytes): 엑셀 파일의 바이너리 데이터.
+            market (MarketType): 시장 유형 (KOSPI/KOSDAQ).
+            subject (SupplySubject): 수급 주체 (FOREIGN/INSTITUTION).
+            date (str): 데이터의 날짜 (YYYY-MM-DD 형식).
+
+        Returns:
+            DailyMarketRanking: 파싱된 일별 수급 순위 데이터 모델.
+        """
         df = pd.read_excel(io.BytesIO(content))
         
         # 엑셀 구조 분석 결과 (20260406코스피외인기관.xlsx):
@@ -56,7 +66,19 @@ class ExcelStatisticsParser:
         sheet_name: str,
         date: str
     ) -> List[DailyMarketRanking]:
-        """종합 일별 수급 순위 정리표 파싱 (E5, H5, N5, R5 구조)."""
+        """종합 일별 수급 순위 정리표를 파싱합니다.
+
+        하나의 시트에서 코스피 외인(E/F), 코스피 기관(I/J), 코스닥 외인(N/O), 코스닥 기관(R/S) 
+        4가지 데이터 셋을 동시에 파싱하여 반환합니다.
+
+        Args:
+            content (bytes): 통합 엑셀 파일의 바이너리 데이터.
+            sheet_name (str): 파싱할 타겟 시트명 (예: "0408").
+            date (str): 파싱 데이터에 부여할 기준 날짜 (YYYY-MM-DD 형식).
+
+        Returns:
+            List[DailyMarketRanking]: 4개의 시장/주체 조합이 담긴 통계 리스트.
+        """
         df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name, header=None)
         
         # 데이터 시작 행 (5행 -> index 4)
@@ -116,7 +138,17 @@ class ExcelStatisticsParser:
         subject: SupplySubject,
         month: str
     ) -> MonthlyMarketStats:
-        """월간 누적 수급 엑셀 파싱 (APR 시트 등)."""
+        """월간 누적 수급 엑셀 파일(APR 시트 등)을 파싱합니다.
+
+        Args:
+            content (bytes): 월간 통계 엑셀 파일 바이너리 데이터.
+            market (MarketType): 시장 유형.
+            subject (SupplySubject): 수급 주체.
+            month (str): 기준 월 (예: "2026-04").
+
+        Returns:
+            MonthlyMarketStats: 파싱된 월간 누적 통계 데이터.
+        """
         xl = pd.ExcelFile(io.BytesIO(content))
         
         # 월 이름을 시트명에서 찾음 (예: "APR", "MAY" 또는 숫자 "04", "05")
@@ -174,15 +206,29 @@ class ExcelStatisticsParser:
         )
 
 class StatisticsService:
-    """통계 데이터를 관리하고 동기화하는 애플리케이션 서비스."""
+    """통계 데이터를 관리하고 동기화하는 애플리케이션 서비스.
+    
+    Google Drive 등 원격 스토리지를 통해 통계 엑셀 데이터를 가져오고, 
+    이를 로컬 저장소에 캐싱하며, 가공된 데이터를 분석하여 프론트엔드에 제공합니다.
+    """
 
     def __init__(self, storage=None, repository=None):
+        """StatisticsService 객체를 초기화합니다.
+
+        Args:
+            storage (IStoragePort, optional): 외부 스토리지(예: GoogleDriveAdapter) 어댑터 인스턴스.
+            repository (IStatisticsRepository, optional): 통계 데이터를 저장/조회할 저장소 구현체.
+        """
         self._storage = storage
-        self._repository = repository  # LocalStatisticsRepository
+        self._repository = repository
         self._parser = ExcelStatisticsParser()
 
     def save_rankings(self, rankings: List[DailyMarketRanking]):
-        """파싱된 랭킹 리스트를 저장소에 영구 저장한다."""
+        """파싱된 랭킹 리스트를 애플리케이션 저장소에 영구 저장합니다.
+
+        Args:
+            rankings (List[DailyMarketRanking]): 저장할 일별 수급 순위 데이터 리스트.
+        """
         if not self._repository:
             return
         for ranking in rankings:
@@ -194,7 +240,19 @@ class StatisticsService:
         market: MarketType, 
         subject: SupplySubject
     ) -> Optional[DailyMarketRanking]:
-        """특정일의 수급 순위를 가져온다 (캐시 우선)."""
+        """특정 날짜의 수급 순위 데이터를 가져옵니다 (캐시 우선).
+
+        로컬 레포지토리에 데이터가 있으면 반환하고, 없으면 Google Drive 스토리지에서 
+        원본 종합 파일을 조회하여 파싱 후 자동 저장합니다.
+
+        Args:
+            date (str): 조회 날짜 (YYYY-MM-DD 형식).
+            market (MarketType): 시장 유형.
+            subject (SupplySubject): 수급 주체.
+
+        Returns:
+            Optional[DailyMarketRanking]: 조회된 랭킹 데이터. 존재하지 않거나 실패 시 None.
+        """
         if self._repository:
             # fix: load_ranking으로 메서드명 정정
             cached = self._repository.load_ranking(date, market, subject)
@@ -203,9 +261,9 @@ class StatisticsService:
         
         # 저장소에 없으면 Google Drive에서 시도
         if self._storage:
-            # 파일명 규칙: daily_ranking_YYYYMMDD.xlsx (종합표 기준)
+            year = date[:4]
             date_clean = date.replace("-", "")
-            filename = f"daily_ranking_{date_clean}.xlsx"
+            filename = f"{year}년/일별수급정리표/{year}일별수급순위정리표.xlsx"
             
             content = self._storage.get_file(filename, folder="sd")
             if content:
@@ -226,17 +284,25 @@ class StatisticsService:
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.error(f"[StatisticsService] 파싱 실패 ({filename}): {e}", exc_info=True)
+                    logger.error(f"[StatisticsService] 파싱 실패 ({filename}, 시트:{sheet_name}): {e}", exc_info=True)
         
         return None
 
     def sync_from_storage(self, date_str: str) -> List[DailyMarketRanking]:
-        """Google Drive에서 특정 날짜의 데이터를 가져와 로컬에 동기화한다."""
+        """지정된 날짜의 통계 데이터를 클라우드 스토리지에서 수동으로 강제 동기화합니다.
+
+        Args:
+            date_str (str): 동기화할 기준 날짜 (YYYY-MM-DD 형식).
+
+        Returns:
+            List[DailyMarketRanking]: 성공적으로 동기화된 각 랭킹 데이터 리스트. 실패 시 빈 리스트.
+        """
         if not self._storage:
             return []
             
         date_clean = date_str.replace("-", "")
-        filename = f"daily_ranking_{date_clean}.xlsx"
+        year = date_str[:4]
+        filename = f"{year}년/일별수급정리표/{year}일별수급순위정리표.xlsx"
         
         import logging
         logger = logging.getLogger(__name__)
@@ -258,40 +324,60 @@ class StatisticsService:
             return []
 
     def sync_recent_data(self, limit: int = 5) -> int:
-        """구글 드라이브의 최근 엑셀 파일들을 탐색하여 로컬에 동기화한다."""
+        """클라우드 스토리지를 탐색하여 최신 통계 데이터를 일괄 동기화합니다.
+
+        당해년도 통합 엑셀 문서(`YYYY일별수급순위정리표.xlsx`) 하나를 읽어들인 뒤, 
+        내부에 있는 최신 시트(`limit`개)들을 로컬로 일괄 파싱하여 저장합니다.
+
+        Args:
+            limit (int, optional): 동기화할 최대 최신 시트(일자) 수. 기본값 5.
+
+        Returns:
+            int: 성공적으로 동기화 처리된 일자(시트) 수.
+        """
         if not self._storage:
             return 0
             
         import logging
+        import datetime
+        import pandas as pd
+        import io
+        
         logger = logging.getLogger(__name__)
         logger.info("[StatisticsService] 최근 수급 통계 데이터 탐색 시작 (Google Drive)")
         
         try:
-            # 1. 파일 목록 조회 (sd 폴더의 루트)
-            files = self._storage.list_files_in_folder("", folder="sd")
+            year = str(datetime.datetime.now().year)
+            filename = f"{year}년/일별수급정리표/{year}일별수급순위정리표.xlsx"
             
-            # daily_ranking_YYYYMMDD.xlsx 패턴 필터링
-            target_files = []
-            for f in files:
-                name = f['name']
-                if name.startswith("daily_ranking_") and name.endswith(".xlsx"):
-                    date_part = name.replace("daily_ranking_", "").replace(".xlsx", "")
-                    if len(date_part) == 8:
-                        target_files.append((name, date_part))
+            content = self._storage.get_file(filename, folder="sd")
+            if not content:
+                logger.warning(f"[StatisticsService] 클라우드 통합 파일을 찾을 수 없음: {filename}")
+                return 0
+                
+            xl = pd.ExcelFile(io.BytesIO(content))
+            sheet_names = xl.sheet_names
             
-            # 최신순 정렬
-            target_files.sort(key=lambda x: x[1], reverse=True)
+            # 4자리 숫자(MMDD)로 된 시트명만 필터링
+            date_sheets = [s for s in sheet_names if len(s) == 4 and s.isdigit()]
+            # 최신순 (문자열 내림차순) 정렬
+            date_sheets.sort(reverse=True)
             
-            # 2. 로컬에 없는 파일 위주로 동기화 (최대 limit개)
+            target_sheets = date_sheets[:limit]
+            
             synced_count = 0
-            for filename, date_clean in target_files[:limit]:
-                formatted_date = f"{date_clean[:4]}-{date_clean[4:6]}-{date_clean[6:]}"
+            for sheet_name in target_sheets:
+                # MM-DD 포맷을 YYYY-MM-DD로 변환
+                formatted_date = f"{year}-{sheet_name[:2]}-{sheet_name[2:]}"
                 
-                # 모든 주체/시장 조합이 로컬에 있는지 확인하기엔 번거로우므로, 일단 폴더 내 파일 존재 여부로 판단
-                # (Repository를 통해 체크하는 것이 더 정확하지만, 단순화를 위해 매번 시도하거나 시트 존재 확인)
-                self.sync_from_storage(formatted_date)
-                synced_count += 1
-                
+                try:
+                    rankings = self._parser.parse_summary_table(content, sheet_name, formatted_date)
+                    self.save_rankings(rankings)
+                    synced_count += 1
+                except Exception as e:
+                    logger.error(f"[StatisticsService] {sheet_name} 시트 파싱 및 동기화 실패: {e}")
+                    
+            logger.info(f"[StatisticsService] 총 {synced_count}개 일자 동기화 완료")
             return synced_count
         except Exception as e:
             logger.error(f"[StatisticsService] 일괄 동기화 실패: {e}", exc_info=True)
@@ -303,7 +389,20 @@ class StatisticsService:
         market: MarketType, 
         subject: SupplySubject
     ) -> Optional[DailyMarketRankingAnalysis]:
-        """순위 변동 및 연속 등장 정보가 포함된 분석된 랭킹(DTO)을 반환한다."""
+        """순위 변동 및 연속 등장 횟수가 포함된 분석 랭킹 데이터를 제공합니다.
+
+        원시 매수 데이터(DailyMarketRanking)를 가져온 뒤, 직전 거래일의 정보 및 
+        과거 10일간의 데이터를 대조하여 신규 등장 여부, 순위 증감, 며칠 연속 매수인지 등을 계산합니다.
+
+        Args:
+            date (str): 조회 기준 날짜.
+            market (MarketType): 시장.
+            subject (SupplySubject): 수급 주체.
+
+        Returns:
+            Optional[DailyMarketRankingAnalysis]: 분석 및 확장된 랭킹 DTO. 
+                원시 데이터 자체가 없을 경우 None.
+        """
         raw = self.get_daily_ranking(date, market, subject)
         if not raw or not self._repository:
             return None

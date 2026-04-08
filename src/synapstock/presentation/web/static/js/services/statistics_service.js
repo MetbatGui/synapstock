@@ -19,6 +19,19 @@ export const statisticsService = {
     },
 
     /**
+     * 특정 날짜의 시장/주체별 4가지 조합 통계 데이터를 모두 가져옵니다.
+     * @param {string} date - YYYY-MM-DD 형식의 날짜
+     */
+    async getDailySummary(date) {
+        const url = `/api/statistics/daily-summary?date=${date}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Failed to fetch daily summary');
+        }
+        return await response.json();
+    },
+
+    /**
      * 데이터가 존재하는 날짜 목록을 가져옵니다.
      * @param {string} market 
      * @param {string} subject 
