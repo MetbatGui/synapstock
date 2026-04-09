@@ -15,6 +15,7 @@ import { initWebSocket } from './services/websocket.js';
 import { fetchReports, uploadReport } from './services/report_service.js';
 import { fetchNews } from './services/news_service.js';
 import { statisticsView } from './ui/statistics_view.js';
+import { statisticsMonthView } from './ui/statistics_month_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -335,10 +336,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statsContainer) {
             if (path === '/statistics' || path.includes('netbuy') || path.includes('ranking')) {
                 statisticsView.init(statsContainer);
-            } else if (path.includes('raw')) {
-                statsContainer.innerHTML = '<div class="stats-empty"><h2>일별 RAW 데이터</h2><p style="margin-top:20px; color:#9ca3af;">화면은 현재 준비 중입니다.</p></div>';
             } else if (path.includes('month')) {
-                statsContainer.innerHTML = '<div class="stats-empty"><h2>월별 누적 순매수도</h2><p style="margin-top:20px; color:#9ca3af;">화면은 현재 준비 중입니다.</p></div>';
+                statisticsMonthView.init(statsContainer);
             } else {
                 statsContainer.innerHTML = '<div class="stats-empty">존재하지 않는 페이지입니다.</div>';
             }

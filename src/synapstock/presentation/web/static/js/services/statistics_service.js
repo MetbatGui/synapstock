@@ -39,6 +39,21 @@ export const statisticsService = {
     },
 
     /**
+     * 특정 월의 코스피/코스닥 및 외인/기관의 4가지 조합 월간 누적 통계 데이터를 종합하여 가져옵니다.
+     * @async
+     * @param {string} month - YYYY-MM 형식의 월
+     * @returns {Promise<Object>} 4분할 월간 요약 통계 데이터 객체
+     */
+    async getMonthlySummary(month) {
+        const url = `/api/statistics/monthly-summary?month=${month}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Failed to fetch monthly summary');
+        }
+        return await response.json();
+    },
+
+    /**
      * 통계 데이터가 존재하는 시스템 내 가용 날짜 목록을 조회합니다.
      * @async
      * @param {string} [market='KOSPI'] - 기준 시장

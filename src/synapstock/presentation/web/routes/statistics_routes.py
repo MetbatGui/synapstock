@@ -65,6 +65,30 @@ async def get_daily_summary(
         logger.error(f"Error in get_daily_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
+@router.get("/monthly-summary")
+async def get_monthly_summary(
+    month: str = Query(..., description="조회 월 (YYYY-MM)")
+):
+    """지정된 월의 코스피/코스닥 × 외국인/기관 4가지 조합 월간 누적 수급 순위를 가져옵니다."""
+    try:
+        if not statistics_service:
+            raise HTTPException(status_code=500, detail="Statistics service not available")
+            
+        return {
+            "month": month,
+            "KOSPI": {
+                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.FOREIGN),
+                "INSTITUTION": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.INSTITUTION)
+            },
+            "KOSDAQ": {
+                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.FOREIGN),
+                "INSTITUTION": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.INSTITUTION)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error in get_monthly_summary: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
 @router.get("/available-dates")
 async def get_available_dates(
     market: MarketType = Query(MarketType.KOSPI),

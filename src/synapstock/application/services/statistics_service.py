@@ -3,6 +3,9 @@ import pandas as pd
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 from synapstock.domain.statistics.models import (
     DailyMarketRanking, 
@@ -231,16 +234,37 @@ class StatisticsService:
     이를 로컬 저장소에 캐싱하며, 가공된 데이터를 분석하여 프론트엔드에 제공합니다.
     """
 
-    def __init__(self, storage=None, repository=None):
+    def __init__(self, storage=None, repository=None, query_service=None):
         """StatisticsService 객체를 초기화합니다.
 
         Args:
             storage (IStoragePort, optional): 외부 스토리지(예: GoogleDriveAdapter) 어댑터 인스턴스.
             repository (IStatisticsRepository, optional): 통계 데이터를 저장/조회할 저장소 구현체.
+            query_service (BoardQueryService, optional): 종목 정보 조회를 위한 서비스.
         """
         self._storage = storage
         self._repository = repository
+        self._query_service = query_service
         self._parser = ExcelStatisticsParser()
+
+    def _build_local_ticker_map(self) -> dict[str, str]:
+        """시스템 내 모든 마인드맵 보드에서 종목명-티커 매핑을 빌드합니다."""
+        ticker_map = {}
+        if not self._query_service:
+            return ticker_map
+            
+        try:
+            # 모든 보드의 종목 정보를 평탄화하여 가져옴
+            all_stocks = self._query_service.get_all_stocks_flat()
+            for stock in all_stocks:
+                name = stock.get('name')
+                ticker = stock.get('ticker')
+                if name and ticker:
+                    ticker_map[name] = ticker
+        except Exception as e:
+            logger.error(f"[StatisticsService] 로컬 티커 맵 빌드 실패: {e}")
+            
+        return ticker_map
 
     def save_rankings(self, rankings: List[DailyMarketRanking]):
         """파싱된 랭킹 리스트를 애플리케이션 저장소에 영구 저장합니다.
@@ -401,6 +425,73 @@ class StatisticsService:
         except Exception as e:
             logger.error(f"[StatisticsService] 일괄 동기화 실패: {e}", exc_info=True)
             return 0
+
+    def get_monthly_ranking(
+        self,
+        year_month: str,
+        market: MarketType,
+        subject: SupplySubject
+    ) -> MonthlyMarketStats:
+        """지정된 월의 일별 데이터를 모두 취합하여 누적 수급 TOP 30 랭킹을 산출합니다.
+        
+        Args:
+            year_month (str): 취합할 대상 월 (예: "2026-04").
+            market (MarketType): 시장.
+            subject (SupplySubject): 수급 주체.
+            
+        Returns:
+            MonthlyMarketStats: 합산 및 정렬이 완료된 월간 통계 데이터.
+        """
+        if not self._repository:
+            return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=[])
+            
+        available_dates = self._repository.list_available_dates(market, subject)
+        target_dates = [d for d in available_dates if d.startswith(year_month)]
+        
+        if not target_dates:
+            logger.warning(f"[StatisticsService] 월간 집계 실패: {year_month} ({market}, {subject})에 해당하는 데이터가 없습니다.")
+            return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=[])
+            
+        logger.info(f"[StatisticsService] {year_month} 월간 집계 시작 (대상 일수: {len(target_dates)}일)")
+        accumulation = {}
+        
+        for date_str in target_dates:
+            daily = self._repository.load_ranking(date_str, market, subject)
+            if not daily:
+                continue
+            for item in daily.items:
+                accumulation[item.name] = accumulation.get(item.name, 0) + item.amount
+                
+        # amount 기준 내림차순 정렬
+        sorted_items = sorted(accumulation.items(), key=lambda x: x[1], reverse=True)[:30]
+        
+        # 성능 최적화: 로컬 티커 맵을 한 번만 빌드하여 재사용
+        local_ticker_map = self._build_local_ticker_map()
+        
+        ranking_items = []
+        for rank, (name, amount) in enumerate(sorted_items, 1):
+            # 1순위: 로컬 마인드맵 보드에서 티커 찾기
+            ticker = local_ticker_map.get(name)
+            
+            # 2순위: 보드에 없지만 이전에 검색된 적이 있는 경우 (필요 시 확장)
+            # 현재는 속도를 위해 외부 검색은 배제하거나 검색 시도를 최소화함
+            
+            ranking_items.append(RankingItem(
+                rank=rank,
+                name=name,
+                amount=amount,
+                ticker=ticker,
+                high_price_type=None
+            ))
+            
+        logger.info(f"[StatisticsService] 월간 집계 완료: {year_month} ({len(ranking_items)}개 항목)")
+            
+        return MonthlyMarketStats(
+            month=year_month,
+            market=market,
+            subject=subject,
+            items=ranking_items
+        )
 
     def get_analyzed_ranking(
         self, 
