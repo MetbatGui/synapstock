@@ -193,7 +193,7 @@ export const statisticsView = {
                         <td class="col-change">${changeHtml}</td>
                         <td class="col-name">
                             <div class="name-badge-wrapper">
-                                <span class="stock-name-text"><strong>${item.name}</strong></span>
+                                <span class="stock-name-text stock-link" data-name="${item.name}"><strong>${item.name}</strong></span>
                                 <div class="badge-container">
                                     ${consecutiveHtml}
                                     ${doubleHtml}
@@ -230,6 +230,34 @@ export const statisticsView = {
         `;
         
         container.innerHTML = html;
+
+        // 종목명(클릭 시 자동완성검색 후 리다이렉션) 이벤트 스크립트 연결
+        container.querySelectorAll('.stock-link').forEach(el => {
+            el.addEventListener('click', async (e) => {
+                const stockName = e.currentTarget.dataset.name;
+                const originalContent = e.currentTarget.innerHTML;
+                
+                try {
+                    e.currentTarget.innerHTML = `<span style="opacity:0.6;">⏳ 검색중...</span>`;
+                    const res = await fetch(`/api/stock/search?q=${encodeURIComponent(stockName)}`);
+                    if (!res.ok) throw new Error('API Error');
+                    const data = await res.json();
+                    
+                    if (data && data.length > 0) {
+                        const ticker = data[0].ticker;
+                        // app.js 의 라우팅 주소 규칙에 따라 페이지 전환
+                        window.location.href = `/stock/${ticker}`;
+                    } else {
+                        alert(`종목 [${stockName}]의 정보를 시스템에서 찾을 수 없습니다.`);
+                        e.currentTarget.innerHTML = originalContent;
+                    }
+                } catch(err) {
+                    console.error(err);
+                    alert('종목 정보(티커)를 검색하는 도중 오류가 발생했습니다.');
+                    e.currentTarget.innerHTML = originalContent;
+                }
+            });
+        });
     },
 
     getChangeIndicator(item) {
