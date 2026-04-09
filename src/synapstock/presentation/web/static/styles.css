@@ -1283,6 +1283,13 @@ h2 {
     border: 1px solid rgba(0, 210, 255, 0.3);
 }
 
+.badge-consecutive-hot {
+    background: #450a0a; /* 매우 어두운 레드 (불 이모지 가독성 확보) */
+    color: #f87171;     /* 밝은 레드 텍스트 */
+    border: 1px solid #991b1b;
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.2);
+}
+
 .badge-double {
     background: rgba(239, 68, 68, 0.15); /* 연한 빨강색 (쌍끌이 강조) */
     color: #ef4444;
