@@ -1183,6 +1183,12 @@ h2 {
     /* 폰트 약간 상향 */
 }
 
+.col-highprice {
+    text-align: center;
+    width: 65px;
+    white-space: nowrap;
+}
+
 .name-badge-wrapper {
     display: flex;
     align-items: center;
@@ -1247,6 +1253,40 @@ h2 {
     background: rgba(239, 68, 68, 0.15); /* 연한 빨강색 (쌍끌이 강조) */
     color: #ef4444;
     border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-highprice {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.badge-highprice.hp-red {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.badge-highprice.hp-orange {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fdba74;
+    border-color: rgba(249, 115, 22, 0.4);
+}
+
+.badge-highprice.hp-yellow {
+    background: rgba(234, 179, 8, 0.2);
+    color: #fde047;
+    border-color: rgba(234, 179, 8, 0.4);
+}
+
+.badge-highprice.hp-lightgreen {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.4);
 }
 
 .stats-footer {

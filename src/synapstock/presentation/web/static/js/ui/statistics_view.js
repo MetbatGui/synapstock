@@ -163,6 +163,7 @@ export const statisticsView = {
                                 <th class="col-change">변동</th>
                                 <th class="col-name">종목명</th>
                                 <th class="col-amount">순매수금액(백만)</th>
+                                <th class="col-highprice">신고가</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -176,6 +177,15 @@ export const statisticsView = {
                 const doubleHtml = doubleSet.has(item.name)
                     ? `<span class="badge-mini badge-double">쌍</span>`
                     : '';
+                let highPriceClass = 'badge-highprice';
+                if (item.high_price_type === '역·신') highPriceClass += ' hp-red';
+                else if (item.high_price_type === '역·근') highPriceClass += ' hp-orange';
+                else if (item.high_price_type === '52·신') highPriceClass += ' hp-yellow';
+                else if (item.high_price_type === '52·근') highPriceClass += ' hp-lightgreen';
+                
+                const highPriceHtml = item.high_price_type
+                    ? `<span class="${highPriceClass}">${item.high_price_type}</span>`
+                    : '<span style="color: rgba(255,255,255,0.1)">-</span>';
                     
                 html += `
                     <tr class="${item.is_new ? 'row-new' : ''}">
@@ -191,6 +201,7 @@ export const statisticsView = {
                             </div>
                         </td>
                         <td class="col-amount">${item.amount.toLocaleString()}</td>
+                        <td class="col-highprice">${highPriceHtml}</td>
                     </tr>
                 `;
             });

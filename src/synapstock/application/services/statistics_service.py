@@ -98,16 +98,16 @@ class ExcelStatisticsParser:
         start_row = 4
         num_items = 30
         
-        # 4개 카테고리 정의 (순서: 종목명 컬럼 index, 금액 컬럼 index, 시장, 주체)
+        # 4개 카테고리 정의 (순서: 종목명 컬럼 index, 금액 컬럼 index, 신고가 컬럼 index, 시장, 주체)
         configs = [
-            (4, 5, MarketType.KOSPI, SupplySubject.FOREIGN),     # E, F
-            (8, 9, MarketType.KOSPI, SupplySubject.INSTITUTION),  # I, J
-            (13, 14, MarketType.KOSDAQ, SupplySubject.FOREIGN),   # N, O
-            (17, 18, MarketType.KOSDAQ, SupplySubject.INSTITUTION) # R, S
+            (4, 5, 6, MarketType.KOSPI, SupplySubject.FOREIGN),     # E, F, G
+            (8, 9, 10, MarketType.KOSPI, SupplySubject.INSTITUTION),  # I, J, K
+            (13, 14, 15, MarketType.KOSDAQ, SupplySubject.FOREIGN),   # N, O, P
+            (17, 18, 19, MarketType.KOSDAQ, SupplySubject.INSTITUTION) # R, S, T
         ]
         
         results = []
-        for name_col, amt_col, market, subject in configs:
+        for name_col, amt_col, high_col, market, subject in configs:
             items = []
             for i in range(num_items):
                 row_idx = start_row + i
@@ -115,6 +115,7 @@ class ExcelStatisticsParser:
                 
                 name_raw = df.iloc[row_idx, name_col]
                 amount_raw = df.iloc[row_idx, amt_col]
+                high_val_raw = df.iloc[row_idx, high_col]
     
                 # 빈 셀 체크
                 if pd.isna(name_raw) or str(name_raw).strip() == "":
@@ -134,7 +135,8 @@ class ExcelStatisticsParser:
                 items.append(RankingItem(
                     rank=i + 1,
                     name=name,
-                    amount=amount
+                    amount=amount,
+                    high_price_type=str(high_val_raw).strip() if not pd.isna(high_val_raw) and str(high_val_raw).strip() not in ('nan', '') else None
                 ))
             
             results.append(DailyMarketRanking(

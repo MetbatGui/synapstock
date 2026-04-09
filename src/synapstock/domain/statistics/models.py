@@ -16,6 +16,7 @@ class RankingItem(BaseModel):
     name: str
     amount: int  # 순매수 금액 (또는 거래량)
     ticker: Optional[str] = None  # 시스템 내 매칭된 티커
+    high_price_type: Optional[str] = None  # 신고가 유형 약어 (예: 역·신, 52·근)
 
 class DailyMarketRanking(BaseModel):
     """특정일, 특정 시장, 특정 주체의 수급 TOP 30."""

@@ -45,7 +45,7 @@ def test_parse_real_daily_ranking():
     assert first_item.amount >= 0
     print(f"\n[Parsed Top 10] {file_path}")
     for item in kospi_for.items[:10]:
-        print(f"Rank {item.rank}: {item.name} ({item.amount})")
+        print(f"Rank {item.rank}: {item.name} ({item.amount}) [신고가: {item.high_price_type}]")
 
 def test_parse_real_monthly_cumulative():
     """월간 누적 엑셀 파일 파싱 테스트."""
@@ -110,3 +110,54 @@ def test_statistics_service_caching(tmp_path):
     assert loaded is not None
     assert loaded.items[0].name == "테스트종목"
     assert (repo_dir / "2026-04-08_KOSPI_FOREIGN.json").exists()
+
+def test_parse_high_price_type():
+    """신고가 유형(high_price_type)이 정상 파싱되는지 검증하는 더미 엑셀 테스트."""
+    parser = ExcelStatisticsParser()
+    import io
+    import pandas as pd
+    
+    data = []
+    # 0~3행은 파서에서 무시 (start_row=4)
+    for _ in range(4):
+        data.append([""] * 25)
+    
+    # 5행 (index 4): 첫 번째 종목
+    row1 = [""] * 25
+    row1[4] = "삼성전자 (쌍)"  # 종목명 (E열 = 인덱스 4)
+    row1[5] = 1000000        # 금액 (F열 = 인덱스 5)
+    row1[6] = "역·신"        # 신고가 약어 (G열 = 인덱스 6)
+    row1[19] = "dummy"       # 컬럼 확보 (T열)
+    data.append(row1)
+
+    # 6행 (index 5): 두 번째 종목
+    row2 = [""] * 25
+    row2[4] = "SK하이닉스"   # E열
+    row2[5] = 500000         # F열
+    row2[6] = "52·근"        # G열
+    row2[19] = "dummy"
+    data.append(row2)
+
+    df = pd.DataFrame(data)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='0407', index=False, header=False)
+    
+    content = output.getvalue()
+    
+    rankings = parser.parse_summary_table(
+        content=content,
+        sheet_name="0407",
+        date="2026-04-07"
+    )
+    
+    # configs 중 첫번째가 (4, 5, 6, MarketType.KOSPI, SupplySubject.FOREIGN)
+    kospi_for = rankings[0]
+    
+    assert len(kospi_for.items) == 2
+    assert kospi_for.items[0].name == "삼성전자"
+    assert kospi_for.items[0].high_price_type == "역·신"
+    
+    assert kospi_for.items[1].name == "SK하이닉스"
+    assert kospi_for.items[1].high_price_type == "52·근"
