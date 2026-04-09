@@ -311,14 +311,38 @@ document.addEventListener('DOMContentLoaded', () => {
             switchTab('dashboard-tab', false);
             loadStockDashboard(ticker);
         }
-    } else if (path === '/statistics') {
+    } else if (path.startsWith('/statistics')) {
         switchTab('statistics-tab', false);
-    }
+        
+        // 서브 네비게이션 액티브 갱신 및 SPA 라우팅 바인딩
+        document.querySelectorAll('.stats-nav-item').forEach(item => {
+            const route = item.dataset.route;
+            // 활성화 처리
+            if ((path === '/statistics' && route === 'netbuy-ranking') || path.includes(route)) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+            // Link Navigation
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = item.href; 
+            });
+        });
 
-    // 수급 통계 초기화
-    const statsContainer = document.getElementById('statistics-container');
-    if (statsContainer) {
-        statisticsView.init(statsContainer);
+        // 서브 뷰 동적 렌더링
+        const statsContainer = document.getElementById('statistics-container');
+        if (statsContainer) {
+            if (path === '/statistics' || path.includes('netbuy') || path.includes('ranking')) {
+                statisticsView.init(statsContainer);
+            } else if (path.includes('raw')) {
+                statsContainer.innerHTML = '<div class="stats-empty"><h2>일별 RAW 데이터</h2><p style="margin-top:20px; color:#9ca3af;">화면은 현재 준비 중입니다.</p></div>';
+            } else if (path.includes('month')) {
+                statsContainer.innerHTML = '<div class="stats-empty"><h2>월별 누적 순매수도</h2><p style="margin-top:20px; color:#9ca3af;">화면은 현재 준비 중입니다.</p></div>';
+            } else {
+                statsContainer.innerHTML = '<div class="stats-empty">존재하지 않는 페이지입니다.</div>';
+            }
+        }
     }
 });
 

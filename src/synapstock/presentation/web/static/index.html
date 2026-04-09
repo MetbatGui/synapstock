@@ -15,7 +15,7 @@
         <div class="nav-links">
             <a href="#" class="nav-item active" data-tab="mindmap-tab">마인드맵 관리</a>
             <a href="#" class="nav-item" data-tab="dashboard-tab">종목정보</a>
-            <a href="#" class="nav-item" data-tab="statistics-tab">수급통계</a>
+            <a href="#" class="nav-item" data-tab="statistics-tab">통계 분석</a>
         </div>
         <div class="nav-status">
             <span id="sync-status-indicator">● System Ready</span>
@@ -111,10 +111,19 @@
             </div>
         </section>
 
-        <!-- 수급 통계 탭 -->
+        <!-- 통계 분석 탭 (라우팅 엔트리) -->
         <section id="statistics-tab" class="tab-content">
-            <div id="statistics-container">
-                <!-- statistics_view.js에 의해 렌더링됨 -->
+            <div class="stats-page-layout">
+                <!-- 서브 라우트 탭 -->
+                <div class="stats-subnav">
+                    <a href="/statistics" class="stats-nav-item" data-route="netbuy-ranking">일별 KOSPI/KOSDAQ 수급 순위</a>
+                    <a href="/statistics/raw" class="stats-nav-item" data-route="raw">일별 RAW 데이터 (준비중)</a>
+                    <a href="/statistics/month" class="stats-nav-item" data-route="month">월별 누적 순매수도 (준비중)</a>
+                </div>
+                <!-- 하위 뷰들이 렌더링될 컨테이너 -->
+                <div id="statistics-container">
+                    <!-- statistics_view.js 등에 의해 동적 렌더링됨 -->
+                </div>
             </div>
         </section>
     </main>

@@ -73,9 +73,13 @@ async def get_stock_dashboard(request: Request, ticker: str):
 
 @app.get("/statistics", response_class=HTMLResponse)
 async def get_statistics_page(request: Request):
-    """수급 통계 페이지를 서빙합니다."""
+    """수급 통계 분석 페이지 기본 진입점을 서빙합니다."""
     return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "statistics"})
 
+@app.get("/statistics/{subpath:path}", response_class=HTMLResponse)
+async def get_statistics_subpage(request: Request, subpath: str):
+    """수급 분석 서브 라우트(netbuy/ranking 등)를 위해 SPA 템플릿을 서빙합니다."""
+    return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": f"statistics-{subpath.replace('/', '-')}"})
 
 # ── WebSocket ────────────────────────────────────────────────────────────────
 @app.websocket("/ws/logs")

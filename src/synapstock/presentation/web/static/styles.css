@@ -1102,6 +1102,40 @@ h2 {
     /* 외인-기관 간격 추가 축소하여 표 너비 확보 */
 }
 
+/* 통계 분석 서브 탭 스타일 */
+.stats-page-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.stats-subnav {
+    display: flex;
+    gap: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 15px;
+    margin-bottom: 10px;
+}
+
+.stats-nav-item {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.stats-nav-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.stats-nav-item.active {
+    color: var(--accent-blue);
+    background: rgba(0, 210, 255, 0.1);
+}
 .stats-grid-item {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
