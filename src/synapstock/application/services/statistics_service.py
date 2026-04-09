@@ -18,6 +18,19 @@ class ExcelStatisticsParser:
     """엑셀 파일을 파싱하여 통계 모델로 변환하는 유틸리티."""
 
     @staticmethod
+    def _clean_stock_name(name: str) -> str:
+        """종목명에서 '(쌍)', '(씽)', '(상)' 등의 노이즈 문자를 제거합니다.
+        
+        엑셀 수기 작성 시 '삼성전자 (쌍)' 처럼 쌍끌이를 표시하는 텍스트가 
+        포함될 경우, 이를 순수 종목명 '삼성전자'로 원복하여 동일 종목으로 판정하기 위함입니다.
+        """
+        import re
+        name_str = str(name).strip()
+        # 종목명 뒤에 공백과 함께 (쌍), (씽), (상) 등이 괄호로 붙은 경우 제거
+        cleaned = re.sub(r'\s*\([쌍씽상]\)$', '', name_str)
+        return cleaned.strip()
+
+    @staticmethod
     def parse_daily_ranking(
         content: bytes, 
         market: MarketType, 
@@ -44,7 +57,7 @@ class ExcelStatisticsParser:
             if i >= 30:
                 break
             
-            name = str(row.iloc[0]).strip()
+            name = ExcelStatisticsParser._clean_stock_name(row.iloc[0])
             amount = int(row.iloc[1])
             
             items.append(RankingItem(
@@ -100,12 +113,14 @@ class ExcelStatisticsParser:
                 row_idx = start_row + i
                 if row_idx >= len(df): break
                 
-                name = df.iloc[row_idx, name_col]
+                name_raw = df.iloc[row_idx, name_col]
                 amount_raw = df.iloc[row_idx, amt_col]
     
                 # 빈 셀 체크
-                if pd.isna(name) or str(name).strip() == "":
+                if pd.isna(name_raw) or str(name_raw).strip() == "":
                     continue
+                    
+                name = ExcelStatisticsParser._clean_stock_name(name_raw)
                 
                 # 금액 정제 (숫자 외 문자 제거)
                 amount = 0
@@ -118,7 +133,7 @@ class ExcelStatisticsParser:
     
                 items.append(RankingItem(
                     rank=i + 1,
-                    name=str(name).strip(),
+                    name=name,
                     amount=amount
                 ))
             
@@ -174,11 +189,13 @@ class ExcelStatisticsParser:
         # 순위 아이템 추출 (최대 100개 또는 데이터 끝까지)
         for i in range(start_row, len(df)):
             row = df.iloc[i]
-            name = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
+            name_raw = row.iloc[0]
             
             # 빈 행이면 종료
-            if not name or name == "nan":
+            if pd.isna(name_raw) or str(name_raw).strip() in ("", "nan"):
                 continue
+                
+            name = ExcelStatisticsParser._clean_stock_name(name_raw)
                 
             # 금액 컬럼 (보통 1번 또는 2번 인덱스)
             amount_raw = row.iloc[1] if len(row) > 1 else 0

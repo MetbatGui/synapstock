@@ -968,8 +968,8 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    max-width: 1900px;
-    /* 내부 요소 잘림 방지를 위해 너비 상향 조정 */
+    max-width: 2100px;
+    /* 이전 1900px에서 약 10% 가량 추가 확장 */
     margin: 0 auto;
 }
 
@@ -1132,10 +1132,8 @@ h2 {
     position: sticky;
     top: 0;
     background: #111827;
-    padding: 8px 10px;
-    /* 여백 대폭 축소 */
-    font-size: 0.75rem;
-    /* 폰트 축소 */
+    padding: 10px 12px;
+    font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--text-secondary);
@@ -1144,11 +1142,11 @@ h2 {
 }
 
 .stats-table td {
-    padding: 6px 10px;
-    /* 높이(여백) 최적화 */
+    padding: 9px 12px;
+    /* 높이(여백) 살짝 증가 */
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    font-size: 0.8rem;
-    /* 폰트 축소 */
+    font-size: 0.9rem;
+    /* 폰트 살짝 증가 */
 }
 
 .stats-table tr:hover {
@@ -1174,22 +1172,31 @@ h2 {
 .col-name {
     min-width: 140px;
     /* 종목명 최소 너비 보장 */
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     /* 글씨 크기를 좀 더 키움 */
 }
 
 .col-amount {
     text-align: right;
     font-family: monospace;
-    font-size: 0.9rem;
+    font-size: 1rem;
     /* 폰트 약간 상향 */
 }
 
-.col-consecutive {
-    text-align: center;
+.name-badge-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stock-name-text {
     white-space: nowrap;
-    /* 연속행 텍스트 깨짐 방지 */
-    width: 50px;
+}
+
+.badge-container {
+    display: flex;
+    gap: 4px;
+    align-items: center;
 }
 
 .change-up {
@@ -1221,14 +1228,25 @@ h2 {
     font-weight: 800;
 }
 
+.badge-mini {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
 .badge-consecutive {
-    background: rgba(0, 210, 255, 0.1);
+    background: rgba(0, 210, 255, 0.15);
     color: var(--accent-blue);
     border: 1px solid rgba(0, 210, 255, 0.3);
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
+}
+
+.badge-double {
+    background: rgba(239, 68, 68, 0.15); /* 연한 빨강색 (쌍끌이 강조) */
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .stats-footer {

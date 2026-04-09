@@ -4,6 +4,16 @@ import glob
 from synapstock.application.services.statistics_service import ExcelStatisticsParser
 from synapstock.domain.statistics.models import MarketType, SupplySubject
 
+def test_clean_stock_name():
+    """종목명 정제 로직 테스트 ((쌍), (씽), (상) 등 제거 확인)"""
+    parser = ExcelStatisticsParser()
+    assert parser._clean_stock_name("삼성전자") == "삼성전자"
+    assert parser._clean_stock_name("삼성전자 (쌍)") == "삼성전자"
+    assert parser._clean_stock_name("SK하이닉스(씽)") == "SK하이닉스"
+    assert parser._clean_stock_name("LG에너지솔루션 (상)") == "LG에너지솔루션"
+    assert parser._clean_stock_name("  현대차 (쌍)  ") == "현대차"
+    assert parser._clean_stock_name("정상종목 (우)") == "정상종목 (우)" # 우 우선주는 제거하면 안됨
+
 def test_parse_real_daily_ranking():
     """테스트 픽스처의 일별 수급 엑셀 파일 파싱 테스트."""
     # 고정된 테스트용 픽스처 경로 사용
@@ -45,11 +55,10 @@ def test_parse_real_monthly_cumulative():
     import io
     import pandas as pd
     
-    # 순위, 종목명, 금액 구조
     data = [
         ["종목명", "순매수금액"],
-        ["삼성전자", 1000000],
-        ["SK하이닉스", 500000],
+        ["삼성전자 (쌍)", 1000000],
+        ["SK하이닉스 (씽)", 500000],
         ["LG에너지솔루션", 300000],
     ]
     df = pd.DataFrame(data)

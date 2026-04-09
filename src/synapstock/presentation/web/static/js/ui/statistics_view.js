@@ -141,7 +141,16 @@ export const statisticsView = {
             return;
         }
 
-        const renderSubTable = (title, rankingData) => {
+        const getIntersection = (catF, catI) => {
+            const setF = new Set(catF?.items?.map(i => i.name) || []);
+            const setI = new Set(catI?.items?.map(i => i.name) || []);
+            return new Set([...setF].filter(x => setI.has(x)));
+        };
+
+        const kospiDouble = getIntersection(data.KOSPI.FOREIGN, data.KOSPI.INSTITUTION);
+        const kosdaqDouble = getIntersection(data.KOSDAQ.FOREIGN, data.KOSDAQ.INSTITUTION);
+
+        const renderSubTable = (title, rankingData, doubleSet) => {
             if (!rankingData || !rankingData.items) return `<div>데이터 없음</div>`;
             
             let html = `
@@ -154,7 +163,6 @@ export const statisticsView = {
                                 <th class="col-change">변동</th>
                                 <th class="col-name">종목명</th>
                                 <th class="col-amount">순매수금액(백만)</th>
-                                <th class="col-consecutive">연속</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -163,16 +171,26 @@ export const statisticsView = {
             rankingData.items.forEach(item => {
                 const changeHtml = this.getChangeIndicator(item);
                 const consecutiveHtml = item.consecutive_days > 1 
-                    ? `<span class="badge-consecutive">${item.consecutive_days}일</span>`
-                    : '-';
+                    ? `<span class="badge-mini badge-consecutive">🔥 ${item.consecutive_days}</span>`
+                    : '';
+                const doubleHtml = doubleSet.has(item.name)
+                    ? `<span class="badge-mini badge-double">쌍</span>`
+                    : '';
                     
                 html += `
                     <tr class="${item.is_new ? 'row-new' : ''}">
                         <td class="col-rank">${item.rank}</td>
                         <td class="col-change">${changeHtml}</td>
-                        <td class="col-name"><strong>${item.name}</strong></td>
+                        <td class="col-name">
+                            <div class="name-badge-wrapper">
+                                <span class="stock-name-text"><strong>${item.name}</strong></span>
+                                <div class="badge-container">
+                                    ${consecutiveHtml}
+                                    ${doubleHtml}
+                                </div>
+                            </div>
+                        </td>
                         <td class="col-amount">${item.amount.toLocaleString()}</td>
-                        <td class="col-consecutive">${consecutiveHtml}</td>
                     </tr>
                 `;
             });
@@ -186,15 +204,15 @@ export const statisticsView = {
                 <div class="stats-market-block">
                     <h2 class="stats-market-title">KOSPI</h2>
                     <div class="stats-subject-grid">
-                        ${renderSubTable('외국인', data.KOSPI.FOREIGN)}
-                        ${renderSubTable('기관', data.KOSPI.INSTITUTION)}
+                        ${renderSubTable('외국인', data.KOSPI.FOREIGN, kospiDouble)}
+                        ${renderSubTable('기관', data.KOSPI.INSTITUTION, kospiDouble)}
                     </div>
                 </div>
                 <div class="stats-market-block">
                     <h2 class="stats-market-title">KOSDAQ</h2>
                     <div class="stats-subject-grid">
-                        ${renderSubTable('외국인', data.KOSDAQ.FOREIGN)}
-                        ${renderSubTable('기관', data.KOSDAQ.INSTITUTION)}
+                        ${renderSubTable('외국인', data.KOSDAQ.FOREIGN, kosdaqDouble)}
+                        ${renderSubTable('기관', data.KOSDAQ.INSTITUTION, kosdaqDouble)}
                     </div>
                 </div>
             </div>
@@ -207,10 +225,17 @@ export const statisticsView = {
         if (item.is_new) return '<span class="badge-new">NEW</span>';
         
         const change = item.rank_change;
+        const absChange = Math.abs(change);
+        
+        // 10단계 이상 변동이면 두 자릿수(폭발적) 진입이므로 삼각형 크기를 눈에 띄게 키움
+        const iconStyle = absChange >= 10 
+            ? 'font-size: 1.4rem; line-height: 1; transform: translateY(1px);' 
+            : 'font-size: 0.8rem;';
+
         if (change > 0) {
-            return `<span class="change-up"><i class="fas fa-caret-up"></i> ${change}</span>`;
+            return `<span class="change-up"><span style="${iconStyle}">▲</span> ${change}</span>`;
         } else if (change < 0) {
-            return `<span class="change-down"><i class="fas fa-caret-down"></i> ${Math.abs(change)}</span>`;
+            return `<span class="change-down"><span style="${iconStyle}">▼</span> ${absChange}</span>`;
         } else {
             return '<span class="change-none">-</span>';
         }
