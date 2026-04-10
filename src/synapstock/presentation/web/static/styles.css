@@ -1176,11 +1176,15 @@ h2 {
 }
 
 .stats-table td {
-    padding: 9px 12px;
-    /* 높이(여백) 살짝 증가 */
+    padding: 8px 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    font-size: 0.9rem;
-    /* 폰트 살짝 증가 */
+    font-size: 0.95rem;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+.stats-table tr {
+    height: 42px; /* 행 높이 축소 (48px -> 42px) */
 }
 
 .stats-table tr:hover {

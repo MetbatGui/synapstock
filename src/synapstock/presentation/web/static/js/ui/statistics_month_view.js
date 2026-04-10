@@ -157,7 +157,10 @@ export const statisticsMonthView = {
                     <tr>
                         <td class="col-rank">${item.rank}</td>
                         <td class="col-name">
-                            <span class="stock-name-text stock-link" data-name="${item.name}"><strong>${item.name}</strong></span>
+                            <div class="name-badge-wrapper">
+                                <span class="stock-name-text stock-link" data-name="${item.name}"><strong>${item.name}</strong></span>
+                                <div class="badge-container"></div>
+                            </div>
                         </td>
                         <td class="col-amount" style="font-weight:700; color:var(--text-primary);">${item.amount.toLocaleString()}</td>
                     </tr>
