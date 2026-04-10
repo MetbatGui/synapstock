@@ -14,7 +14,9 @@ from synapstock.domain.statistics.models import (
     RankingItem,
     MonthlyMarketStats,
     AnalyzedRankingItem,
-    DailyMarketRankingAnalysis
+    DailyMarketRankingAnalysis,
+    CeilingItem,
+    CeilingAnalysisReport
 )
 
 class ExcelStatisticsParser:
@@ -150,6 +152,78 @@ class ExcelStatisticsParser:
             ))
             
         return results
+
+    @staticmethod
+    def parse_ceiling_report(
+        content: bytes,
+        title: str = "상한가 분석 리포트"
+    ) -> CeilingAnalysisReport:
+        """상한가 분석 엑셀 파일을 파싱하여 도메인 모델로 변환합니다.
+        
+        Args:
+            content (bytes): 엑셀 파일 바이너리.
+            title (str): 리포트 제목.
+
+        Returns:
+            CeilingAnalysisReport: 파싱된 상한가 분석 데이터.
+        """
+        import re
+        df = pd.read_excel(io.BytesIO(content))
+        
+        # 1. 컬럼 구조 분석 (인덱스 기반 접근)
+        col_names = df.columns.tolist()
+        if len(col_names) < 3:
+            raise ValueError(f"상한가 분석 엑셀 형식이 올바르지 않습니다. (컬럼 수: {len(col_names)})")
+            
+        name_col = col_names[0]
+        tag_col = col_names[1]
+        rate_col = col_names[-1]
+        
+        # YYMMDD 형식의 날짜 컬럼 추출 (가운데 위치한 6자리 숫자 컬럼들)
+        date_cols = sorted([str(c) for c in col_names if str(c).isdigit() and len(str(c)) == 6])
+        
+        def parse_rate(val) -> float:
+            if pd.isna(val): return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            cleaned = re.sub(r'[^0-9.-]', '', str(val))
+            return float(cleaned) if cleaned else 0.0
+
+        def format_date(yymmdd: str) -> str:
+            return f"20{yymmdd[:2]}-{yymmdd[2:4]}-{yymmdd[4:]}"
+
+        # 2. 개별 항목 파싱
+        ceiling_items = []
+        for _, row in df.iterrows():
+            name = str(row[name_col]).strip()
+            # 빈 행 또는 잘못된 데이터 제외
+            if not name or name.lower() in ('nan', 'none', ''):
+                continue
+                
+            prices = []
+            for d_col in date_cols:
+                price_val = row[d_col]
+                if not pd.isna(price_val):
+                    try:
+                        prices.append(int(price_val))
+                    except (ValueError, TypeError):
+                        continue
+            
+            ceiling_items.append(CeilingItem(
+                name=ExcelStatisticsParser._clean_stock_name(name),
+                entry_tag=str(row[tag_col]).strip() if not pd.isna(row[tag_col]) else "",
+                closing_prices=prices,
+                change_rate=parse_rate(row[rate_col]),
+                is_completed=(len(prices) >= 10)
+            ))
+            
+        # 3. 리포트 객체 생성
+        return CeilingAnalysisReport(
+            title=title,
+            start_date=format_date(date_cols[0]) if date_cols else "",
+            end_date=format_date(date_cols[-1]) if date_cols else "",
+            items=ceiling_items,
+            is_fully_collected=all(it.is_completed for it in ceiling_items) if ceiling_items else False
+        )
 
     @staticmethod
     def parse_monthly_stats(

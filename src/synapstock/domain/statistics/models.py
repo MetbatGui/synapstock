@@ -48,3 +48,22 @@ class DailyMarketRankingAnalysis(BaseModel):
     subject: SupplySubject
     items: List[AnalyzedRankingItem]
     previous_date: Optional[str] = None  # 비교 대상이 된 이전 거래일
+
+# --- Ceiling Analysis Models (상한가 분석 모델) ---
+
+class CeilingItem(BaseModel):
+    """상한가 분석의 개별 종목 항목."""
+    name: str              # 종목명
+    entry_tag: str         # 진입 태그 (상, 52신 등)
+    closing_prices: List[int] # 수집된 n거래일 종가 리스트
+    change_rate: float     # 수익률 (단위: %)
+    is_completed: bool     # 10개 일자 수집 완료 여부
+    ticker: Optional[str] = None # 매칭된 티커
+
+class CeilingAnalysisReport(BaseModel):
+    """상한가 분석 전체 리포트 모델."""
+    title: str             # 리포트 제목
+    start_date: str        # 분석 대상 시작일 (YYYY-MM-DD)
+    end_date: str          # 분석 대상 종료일 (YYYY-MM-DD)
+    items: List[CeilingItem]
+    is_fully_collected: bool # 전체 항목 완결 여부
