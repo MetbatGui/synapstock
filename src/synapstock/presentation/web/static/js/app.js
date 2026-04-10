@@ -14,6 +14,8 @@ import { openModal, closeModal, showAddNodeModal, showAddStockModal, triggerNews
 import { initWebSocket } from './services/websocket.js';
 import { fetchReports, uploadReport } from './services/report_service.js';
 import { fetchNews } from './services/news_service.js';
+import { statisticsView } from './ui/statistics_view.js';
+import { statisticsMonthView } from './ui/statistics_month_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -309,6 +311,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ticker && ticker !== 'none') {
             switchTab('dashboard-tab', false);
             loadStockDashboard(ticker);
+        }
+    } else if (path.startsWith('/statistics')) {
+        switchTab('statistics-tab', false);
+        
+        // 서브 네비게이션 액티브 갱신 및 SPA 라우팅 바인딩
+        document.querySelectorAll('.stats-nav-item').forEach(item => {
+            const route = item.dataset.route;
+            // 활성화 처리
+            if ((path === '/statistics' && route === 'netbuy-ranking') || path.includes(route)) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+            // Link Navigation
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = item.href; 
+            });
+        });
+
+        // 서브 뷰 동적 렌더링
+        const statsContainer = document.getElementById('statistics-container');
+        if (statsContainer) {
+            if (path === '/statistics' || path.includes('netbuy') || path.includes('ranking')) {
+                statisticsView.init(statsContainer);
+            } else if (path.includes('month')) {
+                statisticsMonthView.init(statsContainer);
+            } else {
+                statsContainer.innerHTML = '<div class="stats-empty">존재하지 않는 페이지입니다.</div>';
+            }
         }
     }
 });

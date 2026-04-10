@@ -23,6 +23,7 @@ sync_service = container.sync_service
 report_service = container.report_service
 drive_adapter = container.drive_adapter
 news_scraper_adapter = container.news_scraper
+statistics_service = container.statistics_service
 
 async def sync_indices_if_needed(force: bool = False):
     """(하위 호환성 유지) ReportService를 통해 동기화를 수행합니다."""

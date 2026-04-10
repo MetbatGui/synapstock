@@ -94,24 +94,31 @@ class ReportService:
     def sync_index(self) -> List[str]:
         """클라우드 저장소에서 인덱스 파일들을 강제로 동기화한다."""
         updated = []
+        logger.info("[ReportService] 클라우드 인덱스 동기화 시작 (folder: report)")
         try:
             # 1. list.json 동기화
-            list_data = self._cloud_storage.get_file("list.json")
+            list_data = self._cloud_storage.get_file("list.json", folder="report")
             if list_data:
                 self._local_storage.put_file("list.json", list_data)
                 updated.append("list.json")
+            else:
+                logger.warning("[ReportService] 클라우드에서 list.json을 찾을 수 없습니다.")
 
             # 2. reports.json 동기화
-            reports_data = self._cloud_storage.get_file("reports.json")
+            reports_data = self._cloud_storage.get_file("reports.json", folder="report")
             if reports_data:
                 self._local_storage.put_file("reports.json", reports_data)
                 updated.append("reports.json")
+            else:
+                logger.warning("[ReportService] 클라우드에서 reports.json을 찾을 수 없습니다.")
 
             self._last_sync_time = time.time()
             if updated:
                 logger.info(f"[ReportService] 인덱스 동기화 완료: {', '.join(updated)}")
+            else:
+                logger.info("[ReportService] 동기화할 새로운 인덱스 파일이 없습니다.")
         except Exception as e:
-            logger.error(f"[ReportService] 동기화 중 오류 발생: {e}")
+            logger.error(f"[ReportService] 동기화 중 오류 발생: {e}", exc_info=True)
         
         return updated
 
@@ -123,8 +130,9 @@ class ReportService:
 
         # 2. 로컬 존재 확인 및 다운로드
         if not self._local_storage.path_exists(filename):
-            logger.info(f"[ReportService] 클라우드에서 파일 다운로드 시도: {filename}")
-            if not self._cloud_storage.download_file(filename, str(Path(self._report_dir) / filename)):
+            logger.info(f"[ReportService] 클라우드에서 파일 다운로드 시도 (folder: report): {filename}")
+            if not self._cloud_storage.download_file(filename, str(Path(self._report_dir) / filename), folder="report"):
+                logger.error(f"[ReportService] 파일 다운로드 실패 (folder: report): {filename}")
                 return None
 
         # 3. 절대 경로 반환 (FastAPI 서빙용)

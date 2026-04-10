@@ -57,25 +57,34 @@ class GoogleDriveAdapter(StoragePort):
         if not folder:
             if len(self.folders) == 1:
                 return list(self.folders.values())[0]
-            raise ValueError("Multiple folders available. Please specify 'folder' keyword.")
+            
+            keys = ", ".join(self.folders.keys())
+            raise ValueError(f"Multiple folders available ({keys}). Please specify 'folder' keyword.")
             
         if folder not in self.folders:
-            raise ValueError(f"Folder keyword '{folder}' not found in registered folders.")
+            keys = ", ".join(self.folders.keys())
+            raise ValueError(f"Folder keyword '{folder}' not found. Available: {keys}")
             
         return self.folders[folder]
 
     def _authenticate(self):
         """Google Drive API 인증 (OAuth 2.0 Token)."""
+        logger.info(f"[GoogleDrive] 인증 시도 (Token: {self.token_file})")
         try:
             creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
             
             if creds and creds.expired and creds.refresh_token:
+                logger.info("[GoogleDrive] 토큰 만료됨. 갱신 시도 중...")
                 creds.refresh(Request())
                 with open(self.token_file, 'w') as token:
                     token.write(creds.to_json())
-                    
-            return build('drive', 'v3', credentials=creds)
+                logger.info("[GoogleDrive] 토큰 갱신 완료.")
+            
+            service = build('drive', 'v3', credentials=creds)
+            logger.info("[GoogleDrive] API 서비스 객체 생성 성공.")
+            return service
         except Exception as e:
+            logger.error("[GoogleDrive] 인증 실패", exc_info=True)
             raise RuntimeError(f"Google Drive 인증 실패: {e}")
 
     @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
@@ -106,6 +115,8 @@ class GoogleDriveAdapter(StoragePort):
         current_parent_id = target_root_id
         
         for part in parts:
+            if not part:
+                continue
             query = f"name = '{part}' and '{current_parent_id}' in parents and trashed = false"
             results = self.drive_service.files().list(q=query, fields="files(id, mimeType)").execute()
             files = results.get('files', [])
@@ -130,9 +141,13 @@ class GoogleDriveAdapter(StoragePort):
 
     def get_file(self, path: str, folder: Optional[str] = None, root_id: Optional[str] = None, **kwargs) -> Optional[bytes]:
         """Google Drive에서 바이너리 파일을 다운로드합니다."""
+        logger.debug(f"[GoogleDrive] get_file 요청: {path} (folder={folder})")
         try:
             file_id = self._get_file_id(path, folder=folder, root_id=root_id)
-            if not file_id: return None
+            if not file_id:
+                logger.warning(f"[GoogleDrive] 파일을 찾을 수 없음: {path}")
+                return None
+            
             request = self.drive_service.files().get_media(fileId=file_id)
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request)
@@ -140,9 +155,11 @@ class GoogleDriveAdapter(StoragePort):
             while not done:
                 _, done = downloader.next_chunk()
             fh.seek(0)
-            return fh.read()
+            data = fh.read()
+            logger.info(f"[GoogleDrive] 파일 로드 성공: {path} ({len(data)} bytes)")
+            return data
         except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}")
+            logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}", exc_info=True)
             return None
 
     def put_file(self, path: str, data: bytes, folder: Optional[str] = None, root_id: Optional[str] = None, **kwargs) -> bool:
@@ -206,7 +223,11 @@ class GoogleDriveAdapter(StoragePort):
                 pageSize=1000
             ).execute()
             
-            return results.get('files', [])
+            files = results.get('files', [])
+            logger.info(f"[GoogleDrive] 폴더 내 파일 조회 성공: {len(files)}개 발견")
+            for f in files[:5]:
+                logger.info(f"  - 파일: {f['name']} (ID: {f['id']})")
+            return files
         except Exception as e:
             logger.error(f"[GoogleDrive] 리스트 조회 실패 ({folder_path}): {e}")
             return []

@@ -74,6 +74,8 @@ export function switchTab(tabId, updateHistory = true) {
             history.pushState({ tab: 'mindmap' }, '', '/');
         } else if (tabId === 'dashboard-tab' && !window.location.pathname.startsWith('/stock/')) {
             history.pushState({ tab: 'dashboard' }, '', '/stock/none');
+        } else if (tabId === 'statistics-tab') {
+            history.pushState({ tab: 'statistics' }, '', '/statistics');
         }
     }
 

@@ -24,6 +24,8 @@ from synapstock.application.services.command_service import BoardCommandService
 from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.application.services.report_service import ReportService
+from synapstock.application.services.statistics_service import StatisticsService
+from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,7 @@ class Container:
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
+        self._statistics_repo = LocalStatisticsRepository(self.config.data_dir / "statistics")
         
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -72,6 +75,11 @@ class Container:
         self._sync_service = BoardSyncService(
             mindmap=self._miro_adapter,
             ticker_search=self._ticker_search_adapter
+        )
+        self._statistics_service = StatisticsService(
+            storage=self._drive_adapter,
+            repository=self._statistics_repo,
+            query_service=self._query_service
         )
         
         self._report_service = None
@@ -138,6 +146,10 @@ class Container:
     @property
     def news_scraper(self) -> HttpxNewsScraperAdapter:
         return self._news_scraper_adapter
+
+    @property
+    def statistics_service(self) -> StatisticsService:
+        return self._statistics_service
 
 # 전역 컨테이너 인스턴스 생성
 container = Container()
