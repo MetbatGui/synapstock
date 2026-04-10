@@ -156,19 +156,21 @@ class ExcelStatisticsParser:
     @staticmethod
     def parse_ceiling_report(
         content: bytes,
-        title: str = "상한가 분석 리포트"
+        title: str = "상한가 분석 리포트",
+        sheet_name: Optional[str] = None
     ) -> CeilingAnalysisReport:
         """상한가 분석 엑셀 파일을 파싱하여 도메인 모델로 변환합니다.
         
         Args:
             content (bytes): 엑셀 파일 바이너리.
             title (str): 리포트 제목.
+            sheet_name (str, optional): 파싱할 시트명 (YYYYMMDD 형식). 지정되지 않으면 첫 시트를 사용합니다.
 
         Returns:
             CeilingAnalysisReport: 파싱된 상한가 분석 데이터.
         """
         import re
-        df = pd.read_excel(io.BytesIO(content))
+        df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name)
         
         # 1. 컬럼 구조 분석 (인덱스 기반 접근)
         col_names = df.columns.tolist()
@@ -308,17 +310,19 @@ class StatisticsService:
     이를 로컬 저장소에 캐싱하며, 가공된 데이터를 분석하여 프론트엔드에 제공합니다.
     """
 
-    def __init__(self, storage=None, repository=None, query_service=None):
+    def __init__(self, storage=None, repository=None, query_service=None, ceiling_repository=None):
         """StatisticsService 객체를 초기화합니다.
 
         Args:
             storage (IStoragePort, optional): 외부 스토리지(예: GoogleDriveAdapter) 어댑터 인스턴스.
             repository (IStatisticsRepository, optional): 통계 데이터를 저장/조회할 저장소 구현체.
             query_service (BoardQueryService, optional): 종목 정보 조회를 위한 서비스.
+            ceiling_repository (ICeilingRepository, optional): 상한가 분석 저장소 구현체.
         """
         self._storage = storage
         self._repository = repository
         self._query_service = query_service
+        self._ceiling_repo = ceiling_repository
         self._parser = ExcelStatisticsParser()
 
     def _build_local_ticker_map(self) -> dict[str, str]:
@@ -596,7 +600,7 @@ class StatisticsService:
         try:
             current_idx = available_dates.index(date)
         except ValueError:
-            # 현재 날짜가 목록에 없으면(방금 파싱한 경우 등) 분석 없이 기본 반환
+            # 현재 날짜가 목록에 없으면 분석 없이 기본 반환
             analyzed_items = [AnalyzedRankingItem(**item.model_dump(), is_new=True) for item in raw.items]
             return DailyMarketRankingAnalysis(
                 date=date, market=market, subject=subject, items=analyzed_items
@@ -619,13 +623,9 @@ class StatisticsService:
         local_ticker_map = self._build_local_ticker_map()
         
         for item in raw.items:
-            # DTO 생성 (원본 필드 복사)
             analyzed = AnalyzedRankingItem(**item.model_dump())
-            
-            # 티커 매핑 주입
             analyzed.ticker = local_ticker_map.get(item.name)
             
-            # 순위 변동 및 신규 진입 계산
             if item.name in prev_map:
                 analyzed.prev_rank = prev_map[item.name]
                 analyzed.rank_change = analyzed.prev_rank - analyzed.rank
@@ -633,7 +633,6 @@ class StatisticsService:
             else:
                 analyzed.is_new = True
                 
-            # 연속 등장 횟수 계산
             consecutive = 1
             for i in range(current_idx + 1, min(current_idx + 1 + lookback_limit, len(available_dates))):
                 past_date = available_dates[i]
@@ -655,3 +654,68 @@ class StatisticsService:
             items=analyzed_items,
             previous_date=prev_date
         )
+
+    def get_ceiling_analysis(
+        self,
+        date: str,
+        force_sync: bool = False
+    ) -> Optional[CeilingAnalysisReport]:
+        """특정 날짜의 상한가 분석 리포트를 가져옵니다 (캐시 우선).
+
+        로컬 레포지토리에 해당 날짜의 JSON이 있으면 반환하고, 없으면 구글 드라이브에서 
+        통합 엑셀 파일을 다운로드하여 해당 일자 시트를 파싱 후 저장합니다.
+
+        Args:
+            date (str): 조회 날짜 (YYYY-MM-DD 형식).
+            force_sync (bool, optional): 캐시 여부와 무관하게 클라우드에서 강제 동기화 여부.
+
+        Returns:
+            Optional[CeilingAnalysisReport]: 조회된 리포트 데이터.
+        """
+        if not self._ceiling_repo:
+            logger.error("[StatisticsService] 상한가 레포지토리가 설정되지 않았습니다.")
+            return None
+
+        # 1. 로컬 캐시 확인
+        if not force_sync:
+            cached = self._ceiling_repo.load_report(date)
+            if cached:
+                logger.debug(f"[StatisticsService] 상한가 로컬 캐시 히트: {date}")
+                return cached
+
+        # 2. 클라우드에서 가져오기
+        if not self._storage:
+            logger.warning("[StatisticsService] 클라우드 스토리지가 설정되지 않았습니다.")
+            return None
+
+        # 상한가분석(2026년).xlsx
+        year = date[:4]
+        filename = f"상한가분석({year}년).xlsx"
+        
+        content = self._storage.get_file(filename, folder="ceiling")
+        if not content:
+            logger.error(f"[StatisticsService] 클라우드에서 상한가 분석 파일을 찾을 수 없음: {filename}")
+            return None
+
+        # 3. 날짜 변환 (YYYY-MM-DD -> YYMMDD) 및 파싱
+        try:
+            # 2026-04-01 -> 260401
+            sheet_name = date[2:4] + date[5:7] + date[8:10]
+            
+            report = self._parser.parse_ceiling_report(
+                content=content,
+                title=f"{year}년 상한가 분석 ({date})",
+                sheet_name=sheet_name
+            )
+            
+            # 리포트의 end_date를 요청한 날짜로 강제 보정
+            report.end_date = date
+            
+            # 4. 로컬 저장 및 반환
+            self._ceiling_repo.save_report(report)
+            logger.info(f"[StatisticsService] 상한가 리포트 동기화 완료: {date}")
+            return report
+            
+        except Exception as e:
+            logger.error(f"[StatisticsService] 상한가 리포트 파싱 실패 ({date}): {e}", exc_info=True)
+            return None

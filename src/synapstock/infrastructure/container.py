@@ -83,7 +83,8 @@ class Container:
         self._statistics_service = StatisticsService(
             storage=self._drive_adapter,
             repository=self._statistics_repo,
-            query_service=self._query_service
+            query_service=self._query_service,
+            ceiling_repository=self._ceiling_repo
         )
         
         self._report_service = None
