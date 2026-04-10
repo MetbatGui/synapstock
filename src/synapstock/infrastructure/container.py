@@ -25,7 +25,10 @@ from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
+from synapstock.infrastructure.adapters.local.statistics_repo import (
+    LocalStatisticsRepository,
+    LocalCeilingRepository
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +57,7 @@ class Container:
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
+        self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
         
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -139,6 +143,10 @@ class Container:
     @property
     def report_service(self) -> ReportService | None:
         return self._report_service
+
+    @property
+    def ceiling_repo(self) -> LocalCeilingRepository:
+        return self._ceiling_repo
 
     @property
     def drive_adapter(self) -> GoogleDriveAdapter | None:
