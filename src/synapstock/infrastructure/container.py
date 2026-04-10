@@ -53,7 +53,7 @@ class Container:
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
-        self._statistics_repo = LocalStatisticsRepository(self.config.data_dir / "statistics")
+        self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
         
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -97,7 +97,8 @@ class Container:
         try:
             folders = {
                 "report": self.config.report_folder_id,
-                "sd": self.config.sd_folder_id
+                "sd": self.config.sd_folder_id,
+                "ceiling": self.config.ceiling_folder_id
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),

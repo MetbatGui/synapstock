@@ -20,6 +20,8 @@ class AppConfig(BaseModel):
     report_dir: Path = Path("data/report")
     pdf_dir: Path = Path("data/pdf")
     financial_dir: Path = Path("data/financial_statements")
+    statistics_dir: Path = Path("data/statistics")
+    netbuy_dir: Path = Path("data/statistics/netbuy")
 
     # 외부 API 토큰 (환경 변수)
     miro_token: str = ""
@@ -28,6 +30,7 @@ class AppConfig(BaseModel):
     # Google Drive 폴더 ID (환경 변수)
     report_folder_id: Optional[str] = None
     sd_folder_id: Optional[str] = None
+    ceiling_folder_id: Optional[str] = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -46,8 +49,11 @@ class AppConfig(BaseModel):
             report_dir=data_root / "report",
             pdf_dir=data_root / "pdf",
             financial_dir=data_root / "financial_statements",
+            statistics_dir=data_root / "statistics",
+            netbuy_dir=data_root / "statistics" / "netbuy",
             miro_token=os.getenv("MIRO_ACCESS_TOKEN", ""),
             telegram_token=os.getenv("TELEGRAM_API_TOKEN", ""),
             report_folder_id=os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID"),
-            sd_folder_id=os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID")
+            sd_folder_id=os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID"),
+            ceiling_folder_id=os.getenv("GOOGLE_DRIVE_CEILLING_FOLDER_ID")
         )

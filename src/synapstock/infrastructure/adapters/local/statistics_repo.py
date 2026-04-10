@@ -6,7 +6,7 @@ from synapstock.domain.statistics.models import DailyMarketRanking, MarketType, 
 class LocalStatisticsRepository:
     """통계 데이터를 로컬 JSON 파일로 관리하는 저장소."""
 
-    def __init__(self, data_root: str = "data/statistics"):
+    def __init__(self, data_root: str = "data/statistics/netbuy"):
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
