@@ -541,9 +541,15 @@ class StatisticsService:
         lookback_limit = 10
         analyzed_items = []
         
+        # 성능 최적화: 로컬 티커 맵 빌드
+        local_ticker_map = self._build_local_ticker_map()
+        
         for item in raw.items:
             # DTO 생성 (원본 필드 복사)
             analyzed = AnalyzedRankingItem(**item.model_dump())
+            
+            # 티커 매핑 주입
+            analyzed.ticker = local_ticker_map.get(item.name)
             
             # 순위 변동 및 신규 진입 계산
             if item.name in prev_map:
