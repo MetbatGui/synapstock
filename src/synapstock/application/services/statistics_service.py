@@ -193,28 +193,34 @@ class ExcelStatisticsParser:
         def format_date(yymmdd: str) -> str:
             return f"20{yymmdd[:2]}-{yymmdd[2:4]}-{yymmdd[4:]}"
 
-        # 2. 개별 항목 파싱
+            # 2. 개별 항목 파싱
         ceiling_items = []
         for _, row in df.iterrows():
-            name = str(row[name_col]).strip()
-            # 빈 행 또는 잘못된 데이터 제외
-            if not name or name.lower() in ('nan', 'none', ''):
+            name_val = row.iloc[0]
+            if pd.isna(name_val) or str(name_val).strip() == "":
                 continue
                 
+            name = str(name_val).strip()
+            
+            # 가격 추이 추출: 2번 컬럼부터 최대 10개 (D+1 ~ D+10)
             prices = []
-            for d_col in date_cols:
-                price_val = row[d_col]
+            for i in range(2, 12):
+                if i >= len(row): break
+                price_val = row.iloc[i]
                 if not pd.isna(price_val):
                     try:
                         prices.append(int(price_val))
                     except (ValueError, TypeError):
                         continue
             
+            # 마지막 컬럼을 등락률로 간주
+            rate_val = row.iloc[-1]
+            
             ceiling_items.append(CeilingItem(
                 name=ExcelStatisticsParser._clean_stock_name(name),
-                entry_tag=str(row[tag_col]).strip() if not pd.isna(row[tag_col]) else "",
+                entry_tag=str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else "",
                 closing_prices=prices,
-                change_rate=parse_rate(row[rate_col]),
+                change_rate=parse_rate(rate_val),
                 is_completed=(len(prices) >= 10)
             ))
             
@@ -711,11 +717,41 @@ class StatisticsService:
             # 리포트의 end_date를 요청한 날짜로 강제 보정
             report.end_date = date
             
-            # 4. 로컬 저장 및 반환
+            # 4. 데이터 보강 (티커 및 신고가 배지)
+            ticker_map = self._build_local_ticker_map()
+            
+            # 해당 날짜의 수급 순위 정보를 가져와 신고가 태그 정보 매핑
+            high_price_map = {}
+            summary = self.get_daily_summary(date)
+            if summary:
+                # KOSPI, KOSDAQ의 모든 주체 리스트 순회
+                for market in ["KOSPI", "KOSDAQ"]:
+                    for subject in ["FOREIGN", "INSTITUTION"]:
+                        cat_data = summary.get(market, {}).get(subject)
+                        if cat_data and hasattr(cat_data, 'items'):
+                            for rank_item in cat_data.items:
+                                if rank_item.high_price_type:
+                                    high_price_map[rank_item.name] = rank_item.high_price_type
+
+            for item in report.items:
+                # 티커 주입
+                item.ticker = ticker_map.get(item.name)
+                
+                # 신고가 배지 보강 (수급 순위 데이터가 더 정확하거나 최신인 경우 우선 적용)
+                if item.name in high_price_map:
+                    item.entry_tag = high_price_map[item.name]
+            
+            # 5. 로컬 저장 및 반환
             self._ceiling_repo.save_report(report)
-            logger.info(f"[StatisticsService] 상한가 리포트 동기화 완료: {date}")
+            logger.info(f"[StatisticsService] 상한가 리포트 동기화 및 보강 완료: {date}")
             return report
             
         except Exception as e:
             logger.error(f"[StatisticsService] 상한가 리포트 파싱 실패 ({date}): {e}", exc_info=True)
             return None
+
+    def list_available_ceiling_dates(self) -> List[str]:
+        """상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
+        if not self._ceiling_repo:
+            return []
+        return self._ceiling_repo.list_available_dates()

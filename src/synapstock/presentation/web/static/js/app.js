@@ -16,6 +16,7 @@ import { fetchReports, uploadReport } from './services/report_service.js';
 import { fetchNews } from './services/news_service.js';
 import { statisticsView } from './ui/statistics_view.js';
 import { statisticsMonthView } from './ui/statistics_month_view.js';
+import { ceilingView } from './ui/ceiling_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -338,6 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 statisticsView.init(statsContainer);
             } else if (path.includes('month')) {
                 statisticsMonthView.init(statsContainer);
+            } else if (path.includes('ceiling')) {
+                ceilingView.init(statsContainer);
             } else {
                 statsContainer.innerHTML = '<div class="stats-empty">존재하지 않는 페이지입니다.</div>';
             }

@@ -1416,3 +1416,181 @@ h2 {
 .stats-btn-sync:active {
     transform: translateY(0);
 }
+
+/* ── 상한가 분석 (Ceiling Analysis) 전용 스타일 ─────────────────────────────── */
+
+.ceiling-report-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 12px 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+}
+
+.ceiling-report-info .report-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: linear-gradient(90deg, #fff, #9ca3af);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.ceiling-report-info .report-period {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-family: monospace;
+}
+
+.balance-badge {
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.badge-completed {
+    background: rgba(52, 211, 153, 0.1);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.1);
+}
+
+.badge-collecting {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.1);
+}
+
+.ceiling-table .ceiling-tag {
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    text-align: center;
+    border-radius: 6px;
+    font-weight: 900;
+    font-size: 0.85rem;
+}
+
+.no-tag {
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0 5px;
+}
+
+.tag-ceiling {
+    background: linear-gradient(135deg, #ef4444, #991b1b);
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.tag-newhigh {
+    background: linear-gradient(135deg, #fbbf24, #b45309);
+    color: white;
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+}
+
+/* 가격 추이 박스 시퀀스 */
+.price-sequence-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.first-price {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #e5e7eb;
+    min-width: 70px;
+    text-align: right;
+}
+
+.price-sequence {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 6px 10px;
+    border-radius: 8px;
+    width: fit-content;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.price-box {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.12); /* 기존 0.05에서 상향하여 시인성 확보 */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.23s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    cursor: help;
+}
+
+.price-box:hover {
+    transform: scale(1.2) translateY(-2px);
+    z-index: 10;
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.price-box.p-up {
+    background: linear-gradient(180deg, #f87171, #ef4444);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.price-box.p-down {
+    background: linear-gradient(180deg, #60a5fa, #3b82f6);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+}
+
+.price-box.empty {
+    background: transparent;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* 수집 상태 닷 */
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.dot-done {
+    background: #34d399;
+    box-shadow: 0 0 10px #34d399aa;
+}
+
+.dot-active {
+    background: #fbbf24;
+    box-shadow: 0 0 10px #fbbf24aa;
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0% { transform: scale(0.9); opacity: 0.7; box-shadow: 0 0 5px #fbbf2455; }
+    50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 15px #fbbf24aa; }
+    100% { transform: scale(0.9); opacity: 0.7; box-shadow: 0 0 5px #fbbf2455; }
+}
+
+.status-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.font-bold {
+    font-weight: 700;
+}

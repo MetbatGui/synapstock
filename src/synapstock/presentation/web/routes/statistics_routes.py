@@ -124,3 +124,38 @@ async def sync_statistics():
     except Exception as e:
         logger.error(f"Error in sync_statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/ceiling-report")
+async def get_ceiling_report(
+    date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
+    force_sync: bool = Query(False, description="강제 동기화 여부")
+):
+    """특정 날짜의 상한가 분석 리포트를 가져옵니다."""
+    try:
+        if not statistics_service:
+            raise HTTPException(status_code=500, detail="Statistics service not available")
+            
+        result = statistics_service.get_ceiling_analysis(date, force_sync=force_sync)
+        if not result:
+            return {
+                "date": date,
+                "items": [],
+                "message": "No ceiling data available for this date"
+            }
+            
+        return result
+    except Exception as e:
+        logger.error(f"Error in get_ceiling_report: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+@router.get("/ceiling-dates")
+async def get_ceiling_dates():
+    """상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
+    try:
+        if not statistics_service:
+            return []
+            
+        return statistics_service.list_available_ceiling_dates()
+    except Exception as e:
+        logger.error(f"Error in get_ceiling_dates: {e}")
+        return []

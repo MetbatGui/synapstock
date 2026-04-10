@@ -77,5 +77,33 @@ export const statisticsService = {
         const response = await fetch('/api/statistics/sync', { method: 'POST' });
         if (!response.ok) throw new Error('Sync failed');
         return await response.json();
+    },
+
+    /**
+     * 특정 날짜의 상한가 분석 리포트 데이터를 가져옵니다.
+     * @async
+     * @param {string} date - YYYY-MM-DD 형식의 날짜
+     * @param {boolean} [forceSync=false] - 강제 동기화 여부
+     * @returns {Promise<Object>} 상한가 분석 리포트 객체
+     */
+    async getCeilingReport(date, forceSync = false) {
+        const url = `/api/statistics/ceiling-report?date=${date}&force_sync=${forceSync}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Failed to fetch ceiling report');
+        }
+        return await response.json();
+    },
+
+    /**
+     * 상한가 분석 데이터가 존재하는 가용 날짜 목록을 조회합니다.
+     * @async
+     * @returns {Promise<string[]>} 날짜 문자열 배열
+     */
+    async getCeilingDates() {
+        const url = '/api/statistics/ceiling-dates';
+        const response = await fetch(url);
+        if (!response.ok) return [];
+        return await response.json();
     }
 };
