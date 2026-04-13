@@ -751,7 +751,45 @@ class StatisticsService:
             return None
 
     def list_available_ceiling_dates(self) -> List[str]:
-        """상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
-        if not self._ceiling_repo:
-            return []
-        return self._ceiling_repo.list_available_dates()
+        """상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다.
+        
+        로컬 캐시파일 목록뿐만 아니라 구글 드라이브 엑셀 시트 목록까지 포함하여
+        아직 동기화되지 않은 가용한 모든 날짜를 반환합니다.
+        """
+        # 1. 로컬 저장소의 날짜 목록 (이미 다운로드된 것)
+        local_dates = set(self._ceiling_repo.list_available_dates() if self._ceiling_repo else [])
+        
+        # 2. 구글 드라이브 엑셀 시트 목록 조회
+        drive_dates = set()
+        try:
+            # 2026년 고정 또는 AppConfig의 year 정보 활용 가능
+            target_year_file = "상한가분석(2026년).xlsx"
+            content = self._drive_adapter.get_file(target_year_file, folder="ceiling")
+            if content:
+                # 시트 목록만 빠르게 읽기 위해 pd.ExcelFile 사용
+                excel = pd.ExcelFile(io.BytesIO(content))
+                for sheet in excel.sheet_names:
+                    # YYMMDD 형식을 YYYY-MM-DD로 변환
+                    if len(sheet) == 6 and sheet.isdigit():
+                        formatted = f"20{sheet[:2]}-{sheet[2:4]}-{sheet[4:]}"
+                        drive_dates.add(formatted)
+        except Exception as e:
+            logger.warning(f"[StatisticsService] 드라이브 상한가 가용 날짜 조회 실패: {e}")
+            
+        # 3. 병합 및 정렬 (최신순)
+        all_dates = sorted(list(local_dates | drive_dates), reverse=True)
+        return all_dates
+
+    def get_daily_summary(self, date: str) -> dict:
+        """지정된 날짜의 코스피/코스닥 × 외국인/기관 4가지 조합 분석 데이터를 종합하여 반환합니다."""
+        return {
+            "date": date,
+            "KOSPI": {
+                "FOREIGN": self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
+                "INSTITUTION": self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION)
+            },
+            "KOSDAQ": {
+                "FOREIGN": self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
+                "INSTITUTION": self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION)
+            }
+        }

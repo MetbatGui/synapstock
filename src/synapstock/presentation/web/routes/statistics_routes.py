@@ -50,17 +50,7 @@ async def get_daily_summary(
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
             
-        return {
-            "date": date,
-            "KOSPI": {
-                "FOREIGN": statistics_service.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION)
-            },
-            "KOSDAQ": {
-                "FOREIGN": statistics_service.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION)
-            }
-        }
+        return statistics_service.get_daily_summary(date)
     except Exception as e:
         logger.error(f"Error in get_daily_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})

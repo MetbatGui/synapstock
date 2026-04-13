@@ -1499,43 +1499,92 @@ h2 {
     box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
 }
 
-/* 가격 추이 박스 시퀀스 */
-.price-sequence-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.first-price {
-    font-family: 'Inter', sans-serif;
-    font-weight: 700;
-    font-size: 1rem;
-    color: #e5e7eb;
-    min-width: 70px;
-    text-align: right;
-}
-
-.price-sequence {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 6px 10px;
-    border-radius: 8px;
-    width: fit-content;
+/* 상한가 분석 테이블 가로 스크롤 및 컬럼 스타일 */
+.stats-table-scroll-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 15px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.price-box {
-    width: 18px;
-    height: 18px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.12); /* 기존 0.05에서 상향하여 시인성 확보 */
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    transition: all 0.23s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    cursor: help;
+.ceiling-table {
+    min-width: 1300px; /* 컬럼 확장 반영 */
+    border-collapse: collapse;
 }
+
+.col-date {
+    background: rgba(255, 255, 255, 0.03) !important;
+    font-size: 0.8rem !important;
+    color: #9ca3af !important;
+    text-align: center !important;
+    padding: 12px 6px !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.col-price-cell {
+    text-align: center;
+    font-size: 0.85rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    color: #f3f4f6;
+    padding: 12px 4px;
+    border-left: 1px solid rgba(255, 255, 255, 0.03);
+    min-width: 82px;
+}
+
+.col-name {
+    width: 160px;
+    min-width: 160px;
+    max-width: 160px;
+}
+
+.col-price-cell.empty {
+    background: transparent;
+}
+
+.col-price-cell.p-up {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.col-price-cell.p-down {
+    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.price-cell.p-up {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.price-cell.p-down {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+.price-cell.empty {
+    opacity: 0.4;
+}
+
+.day-label {
+    font-size: 0.65rem;
+    color: #9ca3af;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.price-val {
+    font-size: 0.85rem;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    color: #f3f4f6;
+}
+
+.price-cell.p-up .price-val { color: #f87171; }
+.price-cell.p-down .price-val { color: #60a5fa; }
+.price-cell.empty .price-val { color: #4b5563; }
 
 .price-box:hover {
     transform: scale(1.2) translateY(-2px);

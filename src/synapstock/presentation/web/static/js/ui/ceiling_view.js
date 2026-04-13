@@ -143,30 +143,45 @@ export const ceilingView = {
             '52·근': 'hp-lightgreen'
         };
 
+        // 10거래일 날짜 헤더 계산
+        const tradingDates = this.getTradingDays(report.start_date, 10);
+        
+        // 오늘 날짜 추출 (YYYY-MM-DD 형식으로 비교용)
+        const todayStr = new Date().toISOString().split('T')[0];
+        
+        const headerDatesHtml = tradingDates.map(d => {
+            // "MM-DD" 형식을 "YYYY-MM-DD"로 추정하여 미래 날짜 판단
+            // (report.start_date의 연도를 활용)
+            const year = report.start_date.substring(0, 4);
+            const fullDate = `${year}-${d}`;
+            const isFuture = fullDate > todayStr;
+            return `<th class="col-date">${isFuture ? '' : d}</th>`;
+        }).join('');
+
         let html = `
             <div class="ceiling-report-info">
                 <span class="report-title">${report.title}</span>
-                <span class="report-period">${report.start_date} ~ ${report.end_date}</span>
                 <span class="balance-badge ${report.is_fully_collected ? 'badge-completed' : 'badge-collecting'}">
                     ${report.is_fully_collected ? '분석 완료' : '수집 중'}
                 </span>
             </div>
-            <table class="stats-table ceiling-table">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">순번</th>
-                        <th style="width: 70px;">태그</th>
-                        <th>종목명</th>
-                        <th style="width: 320px;">10일 가격 추이 (D+1 ~ D+10)</th>
-                        <th style="width: 100px;">현재등락률</th>
-                        <th style="width: 90px;">상태</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div class="stats-table-scroll-wrapper">
+                <table class="stats-table ceiling-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 55px;">순번</th>
+                            <th style="width: 75px;">신고가</th>
+                            <th style="width: 160px;">종목명</th>
+                            ${headerDatesHtml}
+                            <th style="width: 100px;">등락률</th>
+                            <th style="width: 90px;">상태</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
 
         report.items.forEach((item, idx) => {
-            // 태그 스타일 결정 (수급 순위표와 일관성 유지)
+            // 태그 스타일 결정
             const hasTag = !!item.entry_tag;
             const hpClassSuffix = HIGH_PRICE_CLASSES[item.entry_tag] || '';
             const tagClass = hasTag 
@@ -175,26 +190,40 @@ export const ceilingView = {
             
             const changeClass = item.change_rate > 0 ? 'change-up' : (item.change_rate < 0 ? 'change-down' : 'change-none');
             const changeSign = item.change_rate > 0 ? '+' : '';
+            const superHighClass = Math.abs(item.change_rate) >= 100 ? 'rate-super-high' : '';
 
-            // 가격 추이 시각화 (박스 형태 + 첫날 가격 숫자)
-            const pricesHtml = this.renderPriceSequence(item.closing_prices);
+            // 10일 가격 데이터 TD 생성 (수치만)
+            let pricesTdHtml = '';
+            for (let i = 0; i < 10; i++) {
+                const p = item.closing_prices[i];
+                let cellContent = '';
+                let cellClass = 'col-price-cell';
+                
+                if (p !== undefined) {
+                    let diffClass = '';
+                    if (i > 0 && item.closing_prices[i-1] !== undefined) {
+                        const prev = item.closing_prices[i-1];
+                        diffClass = p > prev ? 'p-up' : (p < prev ? 'p-down' : '');
+                    }
+                    cellClass += ` ${diffClass}`;
+                    cellContent = p.toLocaleString();
+                } else {
+                    cellContent = ''; // 데이터 없으면 완전 공백
+                    cellClass += ' empty';
+                }
+                
+                pricesTdHtml += `<td class="${cellClass}">${cellContent}</td>`;
+            }
 
             html += `
                 <tr>
                     <td class="col-rank">${idx + 1}</td>
                     <td><span class="${tagClass}">${item.entry_tag || '-'}</span></td>
-                    <td class="col-name">
+                    <td class="col-name" style="width: 160px; min-width: 160px;">
                         <span class="stock-name-text stock-link" data-name="${item.name}">${item.name}</span>
                     </td>
-                    <td>
-                        <div class="price-sequence-wrapper">
-                            <span class="first-price">${item.closing_prices.length > 0 ? item.closing_prices[0].toLocaleString() : '-'}</span>
-                            <div class="price-sequence">
-                                ${pricesHtml}
-                            </div>
-                        </div>
-                    </td>
-                    <td class="${changeClass} font-bold">${changeSign}${item.change_rate.toFixed(2)}%</td>
+                    ${pricesTdHtml}
+                    <td class="${changeClass} ${superHighClass} font-bold">${changeSign}${item.change_rate.toFixed(2)}%</td>
                     <td>
                         <span class="status-dot ${item.is_completed ? 'dot-done' : 'dot-active'}"></span>
                         <span class="status-text">${item.is_completed ? '완결' : (item.closing_prices.length + '일')}</span>
@@ -203,32 +232,38 @@ export const ceilingView = {
             `;
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
 
         this.bindEventsAfterRender(container);
     },
 
+
     /**
-     * 10일치 가격 추이를 시각화합니다.
+     * 시작일로부터 주말을 제외한 지정된 개수의 거래일 목록을 만듭니다.
      * @private
+     * @param {string} startDateStr - 시작일 (YYYY-MM-DD)
+     * @param {number} count - 거래일 개수
+     * @returns {string[]} MM-DD 형식의 날짜 목록
      */
-    renderPriceSequence(prices) {
-        // 박스 10개를 생성 (데이터가 있으면 p-up/p-down, 없으면 empty)
-        let html = '';
-        for (let i = 0; i < 10; i++) {
-            const p = prices[i];
-            if (p !== undefined) {
-                let diffClass = '';
-                if (i > 0 && prices[i-1] !== undefined) {
-                    diffClass = p > prices[i-1] ? 'p-up' : (p < prices[i-1] ? 'p-down' : '');
-                }
-                html += `<div class="price-box ${diffClass}" title="Day ${i+1}: ${p.toLocaleString()}원"></div>`;
-            } else {
-                html += `<div class="price-box empty" title="데이터 수집 전"></div>`;
+    getTradingDays(startDateStr, count) {
+        if (!startDateStr) return [];
+        
+        const days = [];
+        let curr = new Date(startDateStr);
+        
+        while (days.length < count) {
+            // 0: 일, 6: 토 (주말 제외)
+            const dayOfWeek = curr.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                const mm = String(curr.getMonth() + 1).padStart(2, '0');
+                const dd = String(curr.getDate()).padStart(2, '0');
+                days.push(`${mm}-${dd}`);
             }
+            // 다음날로 이동
+            curr.setDate(curr.getDate() + 1);
         }
-        return html;
+        return days;
     },
 
     /**
