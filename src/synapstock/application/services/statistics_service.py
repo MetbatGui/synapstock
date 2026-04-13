@@ -111,13 +111,13 @@ class StatisticsService:
         return self._fetch_and_sync_rankings(date_str)
 
     def _fetch_and_sync_rankings(self, date_str: str) -> List[DailyMarketRanking]:
-        """클라우드에서 엑셀을 다운로드하여 파싱하고 저장소에 캐싱합니다.
+        """클라우드 스토리지에서 엑셀 파일을 다운로드하여 파싱하고 로컬 저장소에 캐싱합니다.
 
         Args:
-            date_str (str): 기준 날짜 (YYYY-MM-DD).
+            date_str (str): 기준 날짜 (YYYY-MM-DD 형식).
 
         Returns:
-            List[DailyMarketRanking]: 파싱된 랭킹 리스트. 실패 시 빈 리스트.
+            List[DailyMarketRanking]: 파싱된 모든 마켓/주체별 랭킹 리스트. 실패 시 빈 리스트.
         """
         if not self._storage:
             return []
@@ -228,7 +228,16 @@ class StatisticsService:
         return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=ranking_items)
 
     def _aggregate_monthly_amounts(self, target_dates: List[str], market: MarketType, subject: SupplySubject) -> Dict[str, float]:
-        """일별 데이터로부터 종목별 누적 합계를 계산합니다."""
+        """지정된 기간(일자 리스트) 동안의 종목별 순매수 합계를 계산합니다.
+
+        Args:
+            target_dates (List[str]): 합산 대상 거래일 리스트.
+            market (MarketType): 시장 유형.
+            subject (SupplySubject): 수급 주체.
+
+        Returns:
+            Dict[str, float]: {종목명: 누적합계} 형태의 딕셔너리.
+        """
         accumulation: Dict[str, float] = {}
         for date_str in target_dates:
             daily = self._repository.load_ranking(date_str, market, subject)
@@ -286,16 +295,24 @@ class StatisticsService:
         market: MarketType,
         subject: SupplySubject
     ) -> AnalyzedRankingItem:
-        """단일 종목의 순위 변동 및 연속 등장 지표를 계산합니다."""
+        """단일 종목에 대해 이전 기록(순위 변동, 연속 등장) 지표를 분석합니다.
+
+        Args:
+            item (RankingItem): 현재 시점의 종목 데이터.
+            prev_map (Dict[str, int]): {종목명: 이전순위} 맵.
+            current_idx (int): 전체 날짜 목록 중 현재 날짜의 인덱스.
+            available_dates (List[str]): 가용한 전체 거래일 목록.
+            market (MarketType): 시장 유형.
+            subject (SupplySubject): 수급 주체.
+
+        Returns:
+            AnalyzedRankingItem: 분석 결과(이전순위, 변동폭, 연속일)가 포함된 확장 모델.
+        """
         analyzed = AnalyzedRankingItem(**item.model_dump())
         
-        # 순위 변동 계산
+        # 1. 이전 순위 정보 설정 (나머지 지표는 모델이 자동 계산)
         if item.name in prev_map:
             analyzed.prev_rank = prev_map[item.name]
-            analyzed.rank_change = analyzed.prev_rank - analyzed.rank
-            analyzed.is_new = False
-        else:
-            analyzed.is_new = True
             
         # 연속 등장 횟수 계산
         consecutive = 1
@@ -360,7 +377,14 @@ class StatisticsService:
         return report
 
     def _fetch_remote_ceiling_report(self, date: str) -> Optional[CeilingAnalysisReport]:
-        """클라우드에서 상한가 분석 리포트를 가져와 파싱합니다."""
+        """클라우드 스토리지에서 해당 일자의 상한가 분석 시트를 파싱합니다.
+
+        Args:
+            date (str): 조회 날짜 (YYYY-MM-DD 형식).
+
+        Returns:
+            Optional[CeilingAnalysisReport]: 파싱된 일자별 상한가 분석 리포트. 실패 시 None.
+        """
         if not self._storage:
             return None
             
@@ -384,7 +408,13 @@ class StatisticsService:
             return None
 
     def _enrich_ceiling_report_data(self, report: CeilingAnalysisReport, date: str, force_sync: bool):
-        """상한가 리포트 항목에 티커 및 신고가 전이 태그를 보강합니다."""
+        """리포트의 각 종목에 대해 티커 매핑 및 당일 신고가 배지 정보를 보강합니다.
+
+        Args:
+            report (CeilingAnalysisReport): 보강할 대상 리포트.
+            date (str): 기준 날짜.
+            force_sync (bool): 신고가 정보를 가져올 때 강제 동기화 여부.
+        """
         ticker_map = self._build_local_ticker_map()
         high_price_map = {}
         

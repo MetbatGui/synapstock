@@ -217,7 +217,14 @@ class ExcelStatisticsParser:
 
     @staticmethod
     def _extract_ceiling_dates(df: pd.DataFrame) -> tuple[List[str], List[Any]]:
-        """데이터프레임 헤더에서 날짜 정보가 담긴 컬럼들을 추출합니다."""
+        """데이터프레임 헤더에서 날짜 정보(YYMMDD)가 담긴 컬럼들을 추출합니다.
+
+        Args:
+            df (pd.DataFrame): 엑셀 시트 데이터프레임.
+
+        Returns:
+            tuple[List[str], List[Any]]: (정렬된 날짜 문자열 리스트, 원본 컬럼 인덱스/객체 리스트).
+        """
         date_pattern = re.compile(r"^(\d{6}|\d{8})$")
         date_cols_with_orig = []
         
@@ -233,7 +240,15 @@ class ExcelStatisticsParser:
 
     @staticmethod
     def _parse_ceiling_row(row: pd.Series, date_cols: List[Any]) -> Optional[CeilingItem]:
-        """상한가 분석 데이터의 단일 행을 파싱합니다."""
+        """상한가 분석 데이터의 단일 행을 파싱하여 도메인 모델로 변환합니다.
+
+        Args:
+            row (pd.Series): 엑셀의 단일 행 데이터.
+            date_cols (List[Any]): 날짜 데이터가 포함된 컬럼 목록.
+
+        Returns:
+            Optional[CeilingItem]: 파싱된 항목 모델. 종목명이 없으면 None 반환.
+        """
         name_val = row.iloc[0]
         if pd.isna(name_val) or str(name_val).strip() == "":
             return None
@@ -256,9 +271,7 @@ class ExcelStatisticsParser:
         return CeilingItem(
             name=ExcelStatisticsParser._clean_stock_name(str(name_val)),
             entry_tag=str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else "",
-            closing_prices=prices,
-            change_rate=ExcelStatisticsParser._parse_rate(rate_val),
-            is_completed=(len(prices) >= 10)
+            closing_prices=prices
         )
 
     @staticmethod
@@ -327,7 +340,15 @@ class ExcelStatisticsParser:
 
     @staticmethod
     def _find_monthly_sheet(sheet_names: List[str], month: str) -> str:
-        """월 정보(숫자 또는 약어)를 바탕으로 대상 시트명을 결정합니다."""
+        """기준 월 정보(숫자 또는 약어)를 바탕으로 대상 시트명을 결정합니다.
+
+        Args:
+            sheet_names (List[str]): 엑셀 파일 내 전체 시트명 리스트.
+            month (str): 기준 월 (YYYY-MM).
+
+        Returns:
+            str: 결정된 시트명. 매칭 실패 시 마지막 시트 반환.
+        """
         target_month_num = month[-2:]
         month_abbrs = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
         
@@ -338,7 +359,15 @@ class ExcelStatisticsParser:
 
     @staticmethod
     def _parse_monthly_row(row: pd.Series, rank: int) -> Optional[RankingItem]:
-        """월간 통계 데이터의 단일 행을 파싱합니다."""
+        """월간 통계 데이터의 단일 행을 파싱하여 랭킹 모델로 변환합니다.
+
+        Args:
+            row (pd.Series): 엑셀의 단일 행 데이터.
+            rank (int): 해당 종목에 부여할 순위.
+
+        Returns:
+            Optional[RankingItem]: 파싱된 랭킹 모델. 종목명이 없으면 None 반환.
+        """
         name_raw = row.iloc[0]
         if pd.isna(name_raw) or str(name_raw).strip() in ("", "nan"):
             return None
