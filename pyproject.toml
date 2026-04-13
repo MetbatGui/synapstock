@@ -59,3 +59,12 @@ ignore_missing_imports = true
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-ra -q --asyncio-mode=strict"
+markers = [
+    "unit: 유닛 테스트 (외부 의존성 없음)",
+    "integration: 통합 테스트 (DB, API, 파일 등 외부 연동 포함)"
+]
