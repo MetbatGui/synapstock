@@ -1,64 +1,68 @@
+# v1.0.1 - StatisticsService fix for TypeError
 import io
-import pandas as pd
-from typing import List, Optional
-from datetime import datetime
-from pathlib import Path
 import logging
+import re
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+
+import pandas as pd
+
+from synapstock.domain.statistics.models import (
+    AnalyzedRankingItem,
+    CeilingAnalysisReport,
+    CeilingItem,
+    DailyMarketRanking,
+    DailyMarketRankingAnalysis,
+    MarketType,
+    MonthlyMarketStats,
+    RankingItem,
+    SupplySubject,
+)
 
 logger = logging.getLogger(__name__)
 
-from synapstock.domain.statistics.models import (
-    DailyMarketRanking, 
-    MarketType, 
-    SupplySubject, 
-    RankingItem,
-    MonthlyMarketStats,
-    AnalyzedRankingItem,
-    DailyMarketRankingAnalysis,
-    CeilingItem,
-    CeilingAnalysisReport
-)
-
 class ExcelStatisticsParser:
-    """엑셀 파일을 파싱하여 통계 모델로 변환하는 유틸리티."""
+    """엑셀 통계 파일(수급 순위, 상한가 등)을 도메인 모델로 변환하는 파서 클래스."""
 
     @staticmethod
     def _clean_stock_name(name: str) -> str:
         """종목명에서 '(쌍)', '(씽)', '(상)' 등의 노이즈 문자를 제거합니다.
-        
-        엑셀 수기 작성 시 '삼성전자 (쌍)' 처럼 쌍끌이를 표시하는 텍스트가 
-        포함될 경우, 이를 순수 종목명 '삼성전자'로 원복하여 동일 종목으로 판정하기 위함입니다.
+
+        엑셀 수기 작성 시 '삼성전자 (쌍)' 처럼 쌍끌이를 표시하는 텍스트가 포함될 경우,
+        이를 순수 종목명 '삼성전자'로 원복하여 인덱싱 오류를 방지합니다.
+
+        Args:
+            name (str): 원본 종목명 데이터.
+
+        Returns:
+            str: 괄호 노이즈가 제거된 정제된 종목명.
         """
-        import re
         name_str = str(name).strip()
         # 종목명 뒤에 공백과 함께 (쌍), (씽), (상) 등이 괄호로 붙은 경우 제거
-        cleaned = re.sub(r'\s*\([쌍씽상]\)$', '', name_str)
+        cleaned = re.sub(r"\s*\([쌍씽상]\)$", "", name_str)
         return cleaned.strip()
 
     @staticmethod
     def parse_daily_ranking(
-        content: bytes, 
-        market: MarketType, 
-        subject: SupplySubject, 
-        date: str
+        content: bytes, market: MarketType, subject: SupplySubject, date: str
     ) -> DailyMarketRanking:
-        """일별 단일 수급 TOP 30 엑셀 파일을 파싱합니다.
+        """특정 시장/주체의 일별 수급 순위 단일 엑셀 시트를 파싱합니다.
 
         Args:
-            content (bytes): 엑셀 파일의 바이너리 데이터.
-            market (MarketType): 시장 유형 (KOSPI/KOSDAQ).
-            subject (SupplySubject): 수급 주체 (FOREIGN/INSTITUTION).
-            date (str): 데이터의 날짜 (YYYY-MM-DD 형식).
+            content (bytes): 엑셀 파일 바이너리 내용.
+            market (MarketType): 대상 시장 (KOSPI/KOSDAQ).
+            subject (SupplySubject): 대상 주체 (FOREIGN/INSTITUTION).
+            date (str): 데이터의 기준 날짜 (YYYY-MM-DD).
 
         Returns:
-            DailyMarketRanking: 파싱된 일별 수급 순위 데이터 모델.
+            DailyMarketRanking: 파싱된 일별 수급 순위 도메인 모델.
         """
         df = pd.read_excel(io.BytesIO(content))
         
         # 엑셀 구조 분석 결과 (20260406코스피외인기관.xlsx):
         # 컬럼 0: 종목명, 컬럼 1: 순매수금액
-        items = []
-        for i, row in df.iterrows():
+        items: List[RankingItem] = []
+        for i, (_, row) in enumerate(df.iterrows()):
             if i >= 30:
                 break
             
@@ -80,22 +84,17 @@ class ExcelStatisticsParser:
 
     @staticmethod
     def parse_summary_table(
-        content: bytes,
-        sheet_name: str,
-        date: str
+        content: bytes, sheet_name: str, date: str
     ) -> List[DailyMarketRanking]:
-        """종합 일별 수급 순위 정리표를 파싱합니다.
-
-        하나의 시트에서 코스피 외인(E/F), 코스피 기관(I/J), 코스닥 외인(N/O), 코스닥 기관(R/S) 
-        4가지 데이터 셋을 동시에 파싱하여 반환합니다.
+        """하나의 시트에 4개 조합(시장 x 주체)이 포함된 종합 수급표를 파싱합니다.
 
         Args:
-            content (bytes): 통합 엑셀 파일의 바이너리 데이터.
+            content (bytes): 종합 엑셀 파일 바이너리 데이터.
             sheet_name (str): 파싱할 타겟 시트명 (예: "0408").
-            date (str): 파싱 데이터에 부여할 기준 날짜 (YYYY-MM-DD 형식).
+            date (str): 파싱 데이터에 부여할 기준 날짜 (YYYY-MM-DD).
 
         Returns:
-            List[DailyMarketRanking]: 4개의 시장/주체 조합이 담긴 통계 리스트.
+            List[DailyMarketRanking]: 4가지(KOSPI/KOSDAQ x 외인/기관) 조합의 순위 리스트.
         """
         df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name, header=None)
         
@@ -111,12 +110,13 @@ class ExcelStatisticsParser:
             (17, 18, 19, MarketType.KOSDAQ, SupplySubject.INSTITUTION) # R, S, T
         ]
         
-        results = []
+        results: List[DailyMarketRanking] = []
         for name_col, amt_col, high_col, market, subject in configs:
-            items = []
+            items: List[RankingItem] = []
             for i in range(num_items):
                 row_idx = start_row + i
-                if row_idx >= len(df): break
+                if row_idx >= len(df):
+                    break
                 
                 name_raw = df.iloc[row_idx, name_col]
                 amount_raw = df.iloc[row_idx, amt_col]
@@ -155,45 +155,67 @@ class ExcelStatisticsParser:
 
     @staticmethod
     def parse_ceiling_report(
-        content: bytes,
-        title: str = "상한가 분석 리포트",
-        sheet_name: Optional[str] = None
+        content: bytes, title: str = "상한가 분석 리포트", sheet_name: Optional[str] = None
     ) -> CeilingAnalysisReport:
         """상한가 분석 엑셀 파일을 파싱하여 도메인 모델로 변환합니다.
-        
+
+        D+1 ~ D+10까지의 가격 데이터를 추출하며, 중간의 공백(휴장일 등)은 스킵하여
+        연속적인 가격 리스트를 형성합니다.
+
         Args:
-            content (bytes): 엑셀 파일 바이너리.
-            title (str): 리포트 제목.
-            sheet_name (str, optional): 파싱할 시트명 (YYYYMMDD 형식). 지정되지 않으면 첫 시트를 사용합니다.
+            content (bytes): 엑셀 파일 바이너리 데이터.
+            title (str): 생성할 리포트의 제목.
+            sheet_name (Optional[str]): 파싱할 시트 이름 (YYMMDD 형식). 
+                None일 경우 첫 번째 시트를 사용합니다.
 
         Returns:
-            CeilingAnalysisReport: 파싱된 상한가 분석 데이터.
+            CeilingAnalysisReport: 파싱된 상한가 리포트 데이터 모델.
+
+        Raises:
+            ValueError: 엑셀 파일 형식이 올바르지 않거나 필수 컬럼이 없을 경우.
         """
-        import re
-        df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name)
+        df = pd.read_excel(io.BytesIO(content), sheet_name=sheet_name if sheet_name is not None else 0)
         
-        # 1. 컬럼 구조 분석 (인덱스 기반 접근)
-        col_names = df.columns.tolist()
-        if len(col_names) < 3:
-            raise ValueError(f"상한가 분석 엑셀 형식이 올바르지 않습니다. (컬럼 수: {len(col_names)})")
-            
-        name_col = col_names[0]
-        tag_col = col_names[1]
-        rate_col = col_names[-1]
+        # 1. 컬럼 구조 분석
         
-        # YYMMDD 형식의 날짜 컬럼 추출 (가운데 위치한 6자리 숫자 컬럼들)
-        date_cols = sorted([str(c) for c in col_names if str(c).isdigit() and len(str(c)) == 6])
+        # 날짜 헤더 추출 (정규식 사용: 6자리 또는 8자리 숫자)
+        date_pattern = re.compile(r"^(\d{6}|\d{8})$")
+        date_cols_with_orig = [] # (변환된이름, 원본컬럼객체)
         
+        for i, col in enumerate(df.columns):
+            c_str = str(col).replace('.0', '').strip()
+            if date_pattern.match(c_str):
+                # 8자리인 경우 6자리로 변환 (YYYYMMDD -> YYMMDD)
+                if len(c_str) == 8:
+                    c_str = c_str[2:]
+                date_cols_with_orig.append((c_str, col))
+        
+        # 날짜순 정렬
+        date_cols_with_orig.sort(key=lambda x: x[0])
+        
+        date_strs = [d[0] for d in date_cols_with_orig]
+        date_cols = [d[1] for d in date_cols_with_orig]
+        
+        logger.info(f"[ExcelStatisticsParser] 상한가 시트 파싱 시작: {sheet_name if sheet_name else '첫 번째 시트'}")
+        logger.info(f"[ExcelStatisticsParser] 감지된 날짜 컬럼들({len(date_strs)}개): {date_strs}")
+
         def parse_rate(val) -> float:
-            if pd.isna(val): return 0.0
-            if isinstance(val, (int, float)): return float(val)
+            if pd.isna(val):
+                return 0.0
+            if isinstance(val, (int, float)):
+                return float(val)
             cleaned = re.sub(r'[^0-9.-]', '', str(val))
-            return float(cleaned) if cleaned else 0.0
+            try:
+                return float(cleaned) if cleaned else 0.0
+            except ValueError:
+                return 0.0
 
         def format_date(yymmdd: str) -> str:
+            if not yymmdd or len(yymmdd) < 6:
+                return ""
             return f"20{yymmdd[:2]}-{yymmdd[2:4]}-{yymmdd[4:]}"
 
-            # 2. 개별 항목 파싱
+        # 2. 개별 항목 파싱
         ceiling_items = []
         for _, row in df.iterrows():
             name_val = row.iloc[0]
@@ -202,16 +224,21 @@ class ExcelStatisticsParser:
                 
             name = str(name_val).strip()
             
-            # 가격 추이 추출: 2번 컬럼부터 최대 10개 (D+1 ~ D+10)
+            # 날짜 헤더가 있는 열들만 추출하여 유효한 가격 리스트 생성 (NaN 발생 시 직전가 유지)
             prices = []
-            for i in range(2, 12):
-                if i >= len(row): break
-                price_val = row.iloc[i]
+            for d_col in date_cols:
+                price_val = row[d_col]
                 if not pd.isna(price_val):
                     try:
-                        prices.append(int(price_val))
+                        # float 경유하여 int 변환 (pd nan 호환 및 소수점 제거)
+                        prices.append(int(float(price_val)))
                     except (ValueError, TypeError):
-                        continue
+                        # 변환 실패 시 자리수 유지를 위해 직전가 사용
+                        prices.append(prices[-1] if prices else 0)
+                else:
+                    # NaN(공백)인 경우 직전 가격으로 채움 (Forward Fill)
+                    # 이는 휴장일이나 데이터 누락 시 차트/분석의 연속성을 위함
+                    prices.append(prices[-1] if prices else 0)
             
             # 마지막 컬럼을 등락률로 간주
             rate_val = row.iloc[-1]
@@ -225,10 +252,13 @@ class ExcelStatisticsParser:
             ))
             
         # 3. 리포트 객체 생성
+        logger.info(f"[ExcelStatisticsParser] 파싱 완료: {len(ceiling_items)}개 종목 추출됨")
+        
         return CeilingAnalysisReport(
             title=title,
-            start_date=format_date(date_cols[0]) if date_cols else "",
-            end_date=format_date(date_cols[-1]) if date_cols else "",
+            start_date=format_date(date_strs[0]) if date_strs else "",
+            end_date=format_date(date_strs[-1]) if date_strs else "",
+            dates=[f"{c[2:4]}-{c[4:6]}" for c in date_strs], # MM-DD 리스트 추가
             items=ceiling_items,
             is_fully_collected=all(it.is_completed for it in ceiling_items) if ceiling_items else False
         )
@@ -266,7 +296,7 @@ class ExcelStatisticsParser:
         
         # 데이터 시작 위치 탐색 (제목행 제외하고 실 데이터부터)
         # 보통 1~2행은 제목이나 범례일 가능성이 높음. "종목명" 키워드 위치를 찾거나 0행부터 탐색
-        items = []
+        items: List[RankingItem] = []
         start_row = 0
         for idx, row in df.iterrows():
             if "종목명" in str(row.values):
@@ -300,7 +330,8 @@ class ExcelStatisticsParser:
                 amount=amount
             ))
             
-            if len(items) >= 100: break
+            if len(items) >= 100:
+                break
             
         return MonthlyMarketStats(
             month=month,
@@ -331,9 +362,9 @@ class StatisticsService:
         self._ceiling_repo = ceiling_repository
         self._parser = ExcelStatisticsParser()
 
-    def _build_local_ticker_map(self) -> dict[str, str]:
-        """시스템 내 모든 마인드맵 보드에서 종목명-티커 매핑을 빌드합니다."""
-        ticker_map = {}
+    def _build_local_ticker_map(self) -> Dict[str, str]:
+        """마인드맵 보드의 모든 종목명-티커 매핑을 가져옵니다."""
+        ticker_map: Dict[str, str] = {}
         if not self._query_service:
             return ticker_map
             
@@ -365,23 +396,14 @@ class StatisticsService:
         self, 
         date: str, 
         market: MarketType, 
-        subject: SupplySubject
+        subject: SupplySubject,
+        force_sync: bool = False
     ) -> Optional[DailyMarketRanking]:
-        """특정 날짜의 수급 순위 데이터를 가져옵니다 (캐시 우선).
-
-        로컬 레포지토리에 데이터가 있으면 반환하고, 없으면 Google Drive 스토리지에서 
-        원본 종합 파일을 조회하여 파싱 후 자동 저장합니다.
-
-        Args:
-            date (str): 조회 날짜 (YYYY-MM-DD 형식).
-            market (MarketType): 시장 유형.
-            subject (SupplySubject): 수급 주체.
-
-        Returns:
-            Optional[DailyMarketRanking]: 조회된 랭킹 데이터. 존재하지 않거나 실패 시 None.
+        """특정 날짜의 수급 순위 데이터를 가져옵니다.
+        
+        force_sync가 True이면 로컬 캐시를 무시하고 클라우드에서 다시 조회합니다.
         """
-        if self._repository:
-            # fix: load_ranking으로 메서드명 정정
+        if self._repository and not force_sync:
             cached = self._repository.load_ranking(date, market, subject)
             if cached:
                 return cached
@@ -464,17 +486,11 @@ class StatisticsService:
         """
         if not self._storage:
             return 0
-            
-        import logging
-        import datetime
-        import pandas as pd
-        import io
-        
-        logger = logging.getLogger(__name__)
+
         logger.info("[StatisticsService] 최근 수급 통계 데이터 탐색 시작 (Google Drive)")
         
         try:
-            year = str(datetime.datetime.now().year)
+            year = str(datetime.now().year)
             filename = f"{year}년/일별수급정리표/{year}일별수급순위정리표.xlsx"
             
             content = self._storage.get_file(filename, folder="sd")
@@ -537,14 +553,14 @@ class StatisticsService:
             return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=[])
             
         logger.info(f"[StatisticsService] {year_month} 월간 집계 시작 (대상 일수: {len(target_dates)}일)")
-        accumulation = {}
+        accumulation: Dict[str, float] = {}
         
         for date_str in target_dates:
             daily = self._repository.load_ranking(date_str, market, subject)
             if not daily:
                 continue
             for item in daily.items:
-                accumulation[item.name] = accumulation.get(item.name, 0) + item.amount
+                accumulation[item.name] = accumulation.get(item.name, 0.0) + float(item.amount)
                 
         # amount 기준 내림차순 정렬
         sorted_items = sorted(accumulation.items(), key=lambda x: x[1], reverse=True)[:30]
@@ -563,7 +579,7 @@ class StatisticsService:
             ranking_items.append(RankingItem(
                 rank=rank,
                 name=name,
-                amount=amount,
+                amount=int(amount),
                 ticker=ticker,
                 high_price_type=None
             ))
@@ -581,23 +597,11 @@ class StatisticsService:
         self, 
         date: str, 
         market: MarketType, 
-        subject: SupplySubject
+        subject: SupplySubject,
+        force_sync: bool = False
     ) -> Optional[DailyMarketRankingAnalysis]:
-        """순위 변동 및 연속 등장 횟수가 포함된 분석 랭킹 데이터를 제공합니다.
-
-        원시 매수 데이터(DailyMarketRanking)를 가져온 뒤, 직전 거래일의 정보 및 
-        과거 10일간의 데이터를 대조하여 신규 등장 여부, 순위 증감, 며칠 연속 매수인지 등을 계산합니다.
-
-        Args:
-            date (str): 조회 기준 날짜.
-            market (MarketType): 시장.
-            subject (SupplySubject): 수급 주체.
-
-        Returns:
-            Optional[DailyMarketRankingAnalysis]: 분석 및 확장된 랭킹 DTO. 
-                원시 데이터 자체가 없을 경우 None.
-        """
-        raw = self.get_daily_ranking(date, market, subject)
+        """순위 변동 및 연속 등장 횟수가 포함된 분석 랭킹 데이터를 제공합니다."""
+        raw = self.get_daily_ranking(date, market, subject, force_sync=force_sync)
         if not raw or not self._repository:
             return None
 
@@ -643,7 +647,8 @@ class StatisticsService:
             for i in range(current_idx + 1, min(current_idx + 1 + lookback_limit, len(available_dates))):
                 past_date = available_dates[i]
                 past_ranking = self._repository.load_ranking(past_date, market, subject)
-                if not past_ranking: break
+                if not past_ranking:
+                    break
                 
                 past_names = {p.name for p in past_ranking.items}
                 if item.name in past_names:
@@ -660,6 +665,26 @@ class StatisticsService:
             items=analyzed_items,
             previous_date=prev_date
         )
+
+    def get_daily_summary(self, date: str, force_sync: bool = False) -> dict:
+        """지정된 날짜의 모든 시장/주체 조합 통계를 가져옵니다.
+        
+        Args:
+            date (str): 조회 날짜.
+            force_sync (bool): 강제 동기화 여부.
+        """
+        logger.debug(f"[StatisticsService] get_daily_summary 호출: date={date}, force_sync={force_sync}")
+        return {
+            "date": date,
+            "KOSPI": {
+                "FOREIGN": self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN, force_sync=force_sync),
+                "INSTITUTION": self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION, force_sync=force_sync)
+            },
+            "KOSDAQ": {
+                "FOREIGN": self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN, force_sync=force_sync),
+                "INSTITUTION": self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION, force_sync=force_sync)
+            }
+        }
 
     def get_ceiling_analysis(
         self,
@@ -707,6 +732,7 @@ class StatisticsService:
         try:
             # 2026-04-01 -> 260401
             sheet_name = date[2:4] + date[5:7] + date[8:10]
+            logger.info(f"[StatisticsService] 상한가 리포트 추출 시도: {filename} (시트: {sheet_name})")
             
             report = self._parser.parse_ceiling_report(
                 content=content,
@@ -714,30 +740,31 @@ class StatisticsService:
                 sheet_name=sheet_name
             )
             
+            if not report or not report.items:
+                logger.warning(f"[StatisticsService] 상한가 리포트 파싱 결과가 비어있습니다: {date}")
+                return None
+                
             # 리포트의 end_date를 요청한 날짜로 강제 보정
             report.end_date = date
+            logger.debug(f"[StatisticsService] 상한가 리포트 파싱 성공: {len(report.items)}개 항목")
             
-            # 4. 데이터 보강 (티커 및 신고가 배지)
+            # 4. 데이터 보강 (티커 및 신고가 배지) - force_sync 적용하여 수집 기능 강화
             ticker_map = self._build_local_ticker_map()
-            
-            # 해당 날짜의 수급 순위 정보를 가져와 신고가 태그 정보 매핑
             high_price_map = {}
-            summary = self.get_daily_summary(date)
+            summary = self.get_daily_summary(date, force_sync)
+            
             if summary:
                 # KOSPI, KOSDAQ의 모든 주체 리스트 순회
-                for market in ["KOSPI", "KOSDAQ"]:
-                    for subject in ["FOREIGN", "INSTITUTION"]:
-                        cat_data = summary.get(market, {}).get(subject)
+                for market_key in ["KOSPI", "KOSDAQ"]:
+                    for subject_key in ["FOREIGN", "INSTITUTION"]:
+                        cat_data = summary.get(market_key, {}).get(subject_key)
                         if cat_data and hasattr(cat_data, 'items'):
                             for rank_item in cat_data.items:
                                 if rank_item.high_price_type:
                                     high_price_map[rank_item.name] = rank_item.high_price_type
 
             for item in report.items:
-                # 티커 주입
                 item.ticker = ticker_map.get(item.name)
-                
-                # 신고가 배지 보강 (수급 순위 데이터가 더 정확하거나 최신인 경우 우선 적용)
                 if item.name in high_price_map:
                     item.entry_tag = high_price_map[item.name]
             
@@ -750,46 +777,64 @@ class StatisticsService:
             logger.error(f"[StatisticsService] 상한가 리포트 파싱 실패 ({date}): {e}", exc_info=True)
             return None
 
-    def list_available_ceiling_dates(self) -> List[str]:
-        """상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다.
+    def list_available_ceiling_years(self) -> List[str]:
+        """조회 가능한 상한가 분석 연도 목록을 반환합니다 (2020~2026)."""
+        years = set()
         
-        로컬 캐시파일 목록뿐만 아니라 구글 드라이브 엑셀 시트 목록까지 포함하여
-        아직 동기화되지 않은 가용한 모든 날짜를 반환합니다.
+        # 1. 구글 드라이브 파일 목록에서 연도 추출
+        if self._storage:
+            try:
+                files = self._storage.list_files_in_folder("", folder="ceiling")
+                for f in files:
+                    # '상한가분석(2025년).xlsx' 패턴에서 연도 추출
+                    match = re.search(r"\((\d{4})년\)", f["name"])
+                    if match:
+                        years.add(match.group(1))
+            except Exception as e:
+                logger.warning(f"[StatisticsService] 드라이브 연도 목록 조회 실패: {e}")
+        
+        # 2. 로컬 저장소 파일들에서도 연도 추출 (오프라인 캐시 고려)
+        if self._ceiling_repo:
+            local_dates = self._ceiling_repo.list_available_dates()
+            for d in local_dates:
+                years.add(d[:4])
+                
+        # 데이터가 아예 없는 경우 현재 연도라도 반환
+        if not years:
+            years.add(datetime.now().strftime("%Y"))
+            
+        return sorted(list(years), reverse=True)
+
+    def list_available_ceiling_dates(self, year: Optional[str] = None) -> List[str]:
+        """특정 연도의 상한가 분석 가용 날짜 목록을 반환합니다.
+        
+        Args:
+            year (Optional[str]): 조회할 연도 (YYYY 형식). 
+                None일 경우 현재 연도를 기준으로 합니다.
         """
-        # 1. 로컬 저장소의 날짜 목록 (이미 다운로드된 것)
-        local_dates = set(self._ceiling_repo.list_available_dates() if self._ceiling_repo else [])
+        target_year = year if year else datetime.now().strftime("%Y")
+        
+        # 1. 로컬 저장소의 날짜 목록 (해당 연도만 필터링)
+        all_local = self._ceiling_repo.list_available_dates() if self._ceiling_repo else []
+        local_dates = set(d for d in all_local if d.startswith(target_year))
         
         # 2. 구글 드라이브 엑셀 시트 목록 조회
         drive_dates = set()
-        try:
-            # 2026년 고정 또는 AppConfig의 year 정보 활용 가능
-            target_year_file = "상한가분석(2026년).xlsx"
-            content = self._drive_adapter.get_file(target_year_file, folder="ceiling")
-            if content:
-                # 시트 목록만 빠르게 읽기 위해 pd.ExcelFile 사용
-                excel = pd.ExcelFile(io.BytesIO(content))
-                for sheet in excel.sheet_names:
-                    # YYMMDD 형식을 YYYY-MM-DD로 변환
-                    if len(sheet) == 6 and sheet.isdigit():
-                        formatted = f"20{sheet[:2]}-{sheet[2:4]}-{sheet[4:]}"
-                        drive_dates.add(formatted)
-        except Exception as e:
-            logger.warning(f"[StatisticsService] 드라이브 상한가 가용 날짜 조회 실패: {e}")
+        if self._storage:
+            try:
+                target_year_file = f"상한가분석({target_year}년).xlsx"
+                content = self._storage.get_file(target_year_file, folder="ceiling")
+                if content:
+                    # 시트 목록만 빠르게 읽기 위해 pd.ExcelFile 사용
+                    excel = pd.ExcelFile(io.BytesIO(content))
+                    for sheet in excel.sheet_names:
+                        # YYMMDD 형식을 YYYY-MM-DD로 변환
+                        if len(sheet) == 6 and sheet.isdigit():
+                            if sheet.startswith(target_year[2:]):
+                                formatted = f"20{sheet[:2]}-{sheet[2:4]}-{sheet[4:]}"
+                                drive_dates.add(formatted)
+            except Exception as e:
+                logger.warning(f"[StatisticsService] {target_year}년 드라이브 가용 날짜 조회 실패: {e}")
             
         # 3. 병합 및 정렬 (최신순)
-        all_dates = sorted(list(local_dates | drive_dates), reverse=True)
-        return all_dates
-
-    def get_daily_summary(self, date: str) -> dict:
-        """지정된 날짜의 코스피/코스닥 × 외국인/기관 4가지 조합 분석 데이터를 종합하여 반환합니다."""
-        return {
-            "date": date,
-            "KOSPI": {
-                "FOREIGN": self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION)
-            },
-            "KOSDAQ": {
-                "FOREIGN": self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION)
-            }
-        }
+        return sorted(list(local_dates | drive_dates), reverse=True)

@@ -1374,6 +1374,44 @@ h2 {
     animation: fadeIn 0.5s ease-out forwards;
 }
 
+/* Statistics Loader & Progress */
+.stats-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    gap: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    margin: 20px 0;
+}
+
+.stats-loader i {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.loader-sub-text {
+    font-size: 0.9rem;
+    color: var(--primary-light);
+    opacity: 0.8;
+    font-family: 'Space Mono', monospace;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 5px 12px;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+.date-cascading-dropdown {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .stats-empty {
     display: flex;
     justify-content: center;
@@ -1525,7 +1563,7 @@ h2 {
 
 .col-price-cell {
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     font-family: 'Inter', sans-serif;
     font-weight: 600;
     color: #f3f4f6;
@@ -1552,6 +1590,73 @@ h2 {
 .col-price-cell.p-down {
     color: #60a5fa;
     background: rgba(59, 130, 246, 0.05);
+}
+
+/* 당일 상한가 강조 */
+.col-price-cell.is-ceiling {
+    font-weight: 800 !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    position: relative;
+    color: #ff4d4d;
+}
+
+/* 당일 하한가 강조 */
+.col-price-cell.is-floor {
+    font-weight: 800 !important;
+    background: rgba(59, 130, 246, 0.12) !important;
+    position: relative;
+    color: #4da6ff;
+}
+
+/* 거래 정지 강조 */
+.col-price-cell.is-stopped {
+    font-weight: 700 !important;
+    background: rgba(107, 114, 128, 0.12) !important;
+    position: relative;
+    color: #9ca3af;
+}
+
+.ceiling-badge, .floor-badge, .stop-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.75rem;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.ceiling-badge {
+    background: #ef4444;
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+}
+
+.floor-badge {
+    background: #3b82f6;
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.4);
+}
+
+.stop-badge {
+    background: #6b7280;
+    box-shadow: 0 0 5px rgba(107, 114, 128, 0.4);
+}
+
+/* 누적 등락률 100% 이상 강조 (슈퍼 하이) */
+.rate-super-high {
+    color: #fbbf24 !important; /* Gold */
+    text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+    position: relative;
+}
+
+.rate-super-high::after {
+    content: '🔥';
+    font-size: 0.8rem;
+    margin-left: 4px;
 }
 
 .price-cell.p-up {

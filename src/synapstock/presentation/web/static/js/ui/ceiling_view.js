@@ -31,7 +31,11 @@ export const ceilingView = {
                 <div class="stats-header">
                     <h2><i class="fas fa-crown"></i> 상한가 종목 추적 분석</h2>
                     <div class="stats-filters">
-                        <select id="ceiling-date" class="stats-select"></select>
+                        <div class="date-cascading-dropdown">
+                            <select id="ceiling-year" class="stats-select" title="연도 선택"></select>
+                            <select id="ceiling-month" class="stats-select" title="월 선택"></select>
+                            <select id="ceiling-day" class="stats-select" title="일 선택"></select>
+                        </div>
                         <button id="ceiling-refresh" class="stats-btn-refresh" title="원시 데이터 다시 가져오기"><i class="fas fa-sync-alt"></i></button>
                     </div>
                 </div>
@@ -49,10 +53,14 @@ export const ceilingView = {
      * @private
      */
     attachEvents() {
-        const dateSelect = document.getElementById('ceiling-date');
+        const yearSelect = document.getElementById('ceiling-year');
+        const monthSelect = document.getElementById('ceiling-month');
+        const daySelect = document.getElementById('ceiling-day');
         const refreshBtn = document.getElementById('ceiling-refresh');
 
-        dateSelect.addEventListener('change', () => this.loadData());
+        yearSelect.addEventListener('change', () => this.onYearChange());
+        monthSelect.addEventListener('change', () => this.onMonthChange());
+        daySelect.addEventListener('change', () => this.loadData());
         refreshBtn.addEventListener('click', () => this.loadData(true));
     },
 
@@ -69,23 +77,68 @@ export const ceilingView = {
      * 가용 날짜 목록을 업데이트합니다.
      * @async
      */
+    /**
+     * 가용 연도 목록을 업데이트하고 초기 날짜를 로드합니다.
+     * @async
+     */
     async updateDateList() {
         try {
-            const dates = await statisticsService.getCeilingDates();
-            const dateSelect = document.getElementById('ceiling-date');
-            if (!dateSelect) return;
+            const years = await statisticsService.getCeilingYears();
+            const yearSelect = document.getElementById('ceiling-year');
+            if (!yearSelect) return;
 
-            const currentVal = dateSelect.value;
-            dateSelect.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
-
-            if (dates.includes(currentVal)) {
-                dateSelect.value = currentVal;
-            } else if (dates.length > 0) {
-                dateSelect.value = dates[0];
+            yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}년</option>`).join('');
+            
+            // 최신 연도 자동 선택
+            if (years.length > 0) {
+                yearSelect.value = years[0];
             }
+            
+            // 연도가 세팅되었으므로 월/일 목록 순차 갱신
+            await this.onYearChange();
         } catch (error) {
-            console.error('Failed to update ceiling dates:', error);
+            console.error('Failed to update ceiling years:', error);
         }
+    },
+
+    /**
+     * 연도 변경 시 처리 로직
+     * @async
+     */
+    async onYearChange() {
+        const year = document.getElementById('ceiling-year').value;
+        const dates = await statisticsService.getCeilingDates(year);
+        this.currentYearDates = dates; // 해당 연도의 모든 YYYY-MM-DD 목록 캐시
+
+        // 월 목록 추출 (중복 제거)
+        const months = [...new Set(dates.map(d => d.substring(5, 7)))].sort((a, b) => b - a);
+        const monthSelect = document.getElementById('ceiling-month');
+        monthSelect.innerHTML = months.map(m => `<option value="${m}">${parseInt(m)}월</option>`).join('');
+
+        await this.onMonthChange();
+    },
+
+    /**
+     * 월 변경 시 처리 로직
+     */
+    async onMonthChange() {
+        const month = document.getElementById('ceiling-month').value;
+        const daySelect = document.getElementById('ceiling-day');
+        
+        // 캐시된 날짜 중 해당 월에 속하는 일자들만 필터링
+        const days = this.currentYearDates
+            .filter(d => d.substring(5, 7) === month)
+            .map(d => d.substring(8, 10))
+            .sort((a, b) => b - a);
+
+        daySelect.innerHTML = days.map(d => `<option value="${d}">${parseInt(d)}일</option>`).join('');
+        
+        // 최신 일자 자동 선택
+        if (days.length > 0) {
+            daySelect.value = days[0];
+        }
+        
+        await this.loadData();
     },
 
     /**
@@ -95,21 +148,39 @@ export const ceilingView = {
      */
     async loadData(forceSync = false) {
         const tableWrapper = document.getElementById('ceiling-table-container');
-        const dateSelect = document.getElementById('ceiling-date');
-        const date = dateSelect.value;
-
-        if (!date) {
-            tableWrapper.innerHTML = '<div class="stats-empty">데이터가 없습니다.</div>';
+        const yearSelect = document.getElementById('ceiling-year');
+        const monthSelect = document.getElementById('ceiling-month');
+        const daySelect = document.getElementById('ceiling-day');
+        
+        const year = yearSelect.value;
+        const month = monthSelect.value;
+        const day = daySelect.value;
+        
+        if (!year || !month || !day) {
+            tableWrapper.innerHTML = '<div class="stats-empty">날짜를 선택해 주세요.</div>';
             return;
         }
 
+        const date = `${year}-${month}-${day}`;
         const refreshBtn = document.getElementById('ceiling-refresh');
         const icon = refreshBtn.querySelector('i');
         
         try {
             refreshBtn.disabled = true;
             icon.classList.add('fa-spin');
-            tableWrapper.innerHTML = '<div class="stats-loader"><i class="fas fa-spinner fa-spin"></i> 구글 드라이브에서 데이터를 동기화 중입니다...</div>';
+            
+            const mainMsg = forceSync ? '구글 드라이브 동기화 중' : '데이터를 분석 중입니다';
+            const subMsg = forceSync 
+                ? `[${year}년] 엑셀 파일에서 ${month}월 ${day}일 시트를 찾는 중...`
+                : `[${year}년] 로컬 캐시 확인 및 데이터 로딩 중...`;
+
+            tableWrapper.innerHTML = `
+                <div class="stats-loader">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                    <div>${mainMsg}</div>
+                    <div class="loader-sub-text">${subMsg}</div>
+                </div>
+            `;
 
             const report = await statisticsService.getCeilingReport(date, forceSync);
             
@@ -201,12 +272,33 @@ export const ceilingView = {
                 
                 if (p !== undefined) {
                     let diffClass = '';
+                    let badgeHtml = '';
+                    
                     if (i > 0 && item.closing_prices[i-1] !== undefined) {
                         const prev = item.closing_prices[i-1];
-                        diffClass = p > prev ? 'p-up' : (p < prev ? 'p-down' : '');
+                        if (prev > 0) {
+                            const dailyRate = ((p - prev) / prev) * 100;
+                            diffClass = p > prev ? 'p-up' : (p < prev ? 'p-down' : '');
+                            
+                            if (dailyRate >= 29.8) {
+                                cellClass += ' is-ceiling';
+                                badgeHtml = '<span class="ceiling-badge">상</span>';
+                            } else if (dailyRate <= -29.8) {
+                                cellClass += ' is-floor';
+                                badgeHtml = '<span class="floor-badge">하</span>';
+                            } else if (dailyRate === 0) {
+                                cellClass += ' is-stopped';
+                                badgeHtml = '<span class="stop-badge">정</span>';
+                            }
+                        }
+                    } else if (i === 0) {
+                        // 첫날(상한가 진입일)은 기본적으로 상한가
+                        cellClass += ' is-ceiling';
+                        badgeHtml = '<span class="ceiling-badge">상</span>';
                     }
+
                     cellClass += ` ${diffClass}`;
-                    cellContent = p.toLocaleString();
+                    cellContent = p.toLocaleString() + badgeHtml;
                 } else {
                     cellContent = ''; // 데이터 없으면 완전 공백
                     cellClass += ' empty';

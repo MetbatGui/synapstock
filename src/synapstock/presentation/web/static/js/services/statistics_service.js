@@ -98,12 +98,25 @@ export const statisticsService = {
     /**
      * 상한가 분석 데이터가 존재하는 가용 날짜 목록을 조회합니다.
      * @async
+     * @param {string} [year] - 필터링할 연도 (YYYY)
      * @returns {Promise<string[]>} 날짜 문자열 배열
      */
-    async getCeilingDates() {
-        const url = '/api/statistics/ceiling-dates';
+    async getCeilingDates(year = null) {
+        const url = `/api/statistics/ceiling-dates${year ? `?year=${year}` : ''}`;
         const response = await fetch(url);
         if (!response.ok) return [];
+        return await response.json();
+    },
+
+    /**
+     * 상한가 분석이 가능한 연도 목록을 조회합니다.
+     * @async
+     * @returns {Promise<string[]>} 연도 문자열 배열 (예: ['2026', '2025', ...])
+     */
+    async getCeilingYears() {
+        const url = '/api/statistics/ceiling-years';
+        const response = await fetch(url);
+        if (!response.ok) return [new Date().getFullYear().toString()];
         return await response.json();
     }
 };

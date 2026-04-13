@@ -3,7 +3,8 @@
 일별 수급 순위 분석 데이터 및 분석 가능한 날짜 목록을 제공합니다.
 """
 import logging
-from typing import List, Optional
+from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -138,14 +139,28 @@ async def get_ceiling_report(
         logger.error(f"Error in get_ceiling_report: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
+@router.get("/ceiling-years")
+async def get_ceiling_years():
+    """상한가 분석이 가능한 연도 목록을 반환합니다."""
+    try:
+        if not statistics_service:
+            return [datetime.now().strftime("%Y")]
+            
+        return statistics_service.list_available_ceiling_years()
+    except Exception as e:
+        logger.error(f"Error in get_ceiling_years: {e}")
+        return [datetime.now().strftime("%Y")]
+
 @router.get("/ceiling-dates")
-async def get_ceiling_dates():
-    """상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
+async def get_ceiling_dates(
+    year: Optional[str] = Query(None, description="조회할 연도 (YYYY)")
+):
+    """특정 연도의 상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
     try:
         if not statistics_service:
             return []
             
-        return statistics_service.list_available_ceiling_dates()
+        return statistics_service.list_available_ceiling_dates(year=year)
     except Exception as e:
         logger.error(f"Error in get_ceiling_dates: {e}")
         return []
