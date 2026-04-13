@@ -158,7 +158,7 @@ export const statisticsMonthView = {
                         <td class="col-rank">${item.rank}</td>
                         <td class="col-name">
                             <div class="name-badge-wrapper">
-                                <span class="stock-name-text stock-link" data-name="${item.name}"><strong>${item.name}</strong></span>
+                                <span class="stock-name-text stock-link" data-name="${item.name}" data-ticker="${item.ticker || ''}"><strong>${item.name}</strong></span>
                                 <div class="badge-container"></div>
                             </div>
                         </td>
@@ -204,8 +204,16 @@ export const statisticsMonthView = {
         container.querySelectorAll('.stock-link').forEach(el => {
             el.addEventListener('click', async (e) => {
                 const stockName = e.currentTarget.dataset.name;
+                const ticker = e.currentTarget.dataset.ticker;
                 const originalContent = e.currentTarget.innerHTML;
                 
+                // 1. 이미 티커 정보가 있는 경우 (백엔드 최적화로 제공됨)
+                if (ticker) {
+                    window.location.href = `/stock/${ticker}`;
+                    return;
+                }
+
+                // 2. 티커가 없는 경우에만 검색 API 호출
                 try {
                     e.currentTarget.innerHTML = `<span style="opacity:0.6;">⏳ 검색중...</span>`;
                     const res = await fetch(`/api/stock/search?q=${encodeURIComponent(stockName)}`);

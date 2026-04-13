@@ -25,7 +25,10 @@ from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
+from synapstock.infrastructure.adapters.local.statistics_repo import (
+    LocalStatisticsRepository,
+    LocalCeilingRepository
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,8 @@ class Container:
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
-        self._statistics_repo = LocalStatisticsRepository(self.config.data_dir / "statistics")
+        self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
+        self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
         
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -79,7 +83,8 @@ class Container:
         self._statistics_service = StatisticsService(
             storage=self._drive_adapter,
             repository=self._statistics_repo,
-            query_service=self._query_service
+            query_service=self._query_service,
+            ceiling_repository=self._ceiling_repo
         )
         
         self._report_service = None
@@ -97,7 +102,8 @@ class Container:
         try:
             folders = {
                 "report": self.config.report_folder_id,
-                "sd": self.config.sd_folder_id
+                "sd": self.config.sd_folder_id,
+                "ceiling": self.config.ceiling_folder_id
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
@@ -138,6 +144,10 @@ class Container:
     @property
     def report_service(self) -> ReportService | None:
         return self._report_service
+
+    @property
+    def ceiling_repo(self) -> LocalCeilingRepository:
+        return self._ceiling_repo
 
     @property
     def drive_adapter(self) -> GoogleDriveAdapter | None:
