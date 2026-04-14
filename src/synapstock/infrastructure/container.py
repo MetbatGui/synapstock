@@ -4,10 +4,7 @@
 웹 서버(FastAPI)와 텔레그램 봇 모두 이 컨테이너를 통해 싱글톤 인스턴스를 공유합니다.
 """
 
-import os
 import logging
-from pathlib import Path
-from dotenv import load_dotenv
 
 from synapstock.infrastructure.config import AppConfig
 

@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from typing import Optional, List
 from synapstock.domain.statistics.models import DailyMarketRanking, MarketType, SupplySubject, CeilingAnalysisReport

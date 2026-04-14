@@ -1,8 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Any, List
-import pandas as pd
-import openpyxl
+from typing import Callable, Optional, List
 from synapstock.domain.models import Board, ScrapedNews
 
 

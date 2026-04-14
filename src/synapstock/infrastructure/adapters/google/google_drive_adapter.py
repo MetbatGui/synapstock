@@ -2,18 +2,15 @@
 
 import os
 import io
-import json
 from typing import Optional, List, Any, Callable, Union
 from pathlib import Path
-import pandas as pd
-import openpyxl
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from synapstock.domain.ports import StoragePort
 import logging
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type, retry_if_result
+from tenacity import retry, wait_exponential, stop_after_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -419,7 +416,7 @@ class GoogleDriveAdapter(StoragePort):
                         os.remove(temp_path)
                     raise e
                     
-            except Exception as e:
+            except Exception:
                 with stats_lock:
                     failed_count += 1
                 return False
