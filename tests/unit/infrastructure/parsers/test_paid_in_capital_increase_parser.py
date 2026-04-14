@@ -85,3 +85,30 @@ def test_parse_paid_in_capital_increase_with_dirty_data():
     # % 문자가 있으면 float 변환 시 주의가 필요할 수도 있으나, 현재 정규식은 숫자와 점만 추출함
     # "0.15%" -> "0.15" -> 0.15
     assert item.shares_per_old == 0.15
+
+def test_parse_paid_in_capital_increase_multi_sheets():
+    """여러 시트(연도별)에 데이터가 나누어져 있을 때 모든 데이터를 파싱하는지 검증합니다."""
+    columns = ["일자", "종목명", "기재정정여부", "유상증자공시일", "접수번호", "신주발행주식수"]
+    
+    # 2023 시트 데이터
+    row_2023 = ["2023-01-01", "2023종목", "N", "2023-01-01", "101", 100]
+    df_2023 = pd.DataFrame([row_2023], columns=columns)
+    
+    # 2024 시트 데이터
+    row_2024 = ["2024-01-01", "2024종목", "N", "2024-01-01", "102", 200]
+    df_2024 = pd.DataFrame([row_2024], columns=columns)
+    
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_2023.to_excel(writer, sheet_name='2023', index=False)
+        df_2024.to_excel(writer, sheet_name='2024', index=False)
+    content = output.getvalue()
+    
+    parser = ExcelStatisticsParser()
+    results = parser.parse_paid_in_capital_increase(content)
+    
+    # 모든 시트의 데이터 합계 확인
+    assert len(results) == 2
+    names = [item.name for item in results]
+    assert "2023종목" in names
+    assert "2024종목" in names
