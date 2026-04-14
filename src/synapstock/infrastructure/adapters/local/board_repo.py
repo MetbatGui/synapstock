@@ -63,7 +63,7 @@ class LocalBoardRepository(BoardRepositoryPort):
         """Board를 id.json 파일로 저장한다. id가 없으면 name을 시도한다."""
         filename = board.id or board.name
         self._path(filename).write_text(
-            board.model_dump_json(indent=2, exclude={'id'}), encoding="utf-8"
+            board.model_dump_json(indent=2, exclude={'id'}, exclude_defaults=True), encoding="utf-8"
         )
 
     def list_boards(self) -> list[str]:

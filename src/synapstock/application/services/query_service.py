@@ -95,6 +95,7 @@ class BoardQueryService:
                     stocks.append({
                         "ticker": s.ticker,
                         "name": s.name,
+                        "aliases": s.aliases,
                         "board": b_name,
                         "board_name": board.name,
                         "path": current_path
@@ -115,7 +116,7 @@ class BoardQueryService:
             
             def search_recursive(node: Node, current_path: List[str]):
                 for s in node.stocks:
-                    if query in s.name:
+                    if query in s.name or any(query in alias for alias in s.aliases):
                         results.append({
                             "board": b_name,
                             "board_name": board.name,
