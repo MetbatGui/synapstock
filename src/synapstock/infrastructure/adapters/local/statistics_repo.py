@@ -4,6 +4,7 @@ from synapstock.domain.statistics.models import (
     CeilingAnalysisReport,
     DailyMarketRanking,
     MarketType,
+    PaidInCapitalIncrease,
     SupplySubject,
 )
 
@@ -107,3 +108,30 @@ class LocalCeilingRepository:
             except Exception:
                 continue
         return sorted(dates, reverse=True)
+
+
+class LocalCapitalIncreaseRepository:
+    """유상증자 분석 데이터를 로컬 JSON 파일로 관리하는 저장소."""
+
+    def __init__(self, data_root: str = "data/statistics/capital_increase"):
+        self.root = Path(data_root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_data(self, items: list[PaidInCapitalIncrease]):
+        """유상증자 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        path = self.root / "capital_increase_data.json"
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            data = [item.model_dump() for item in items]
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def load_data(self) -> list[PaidInCapitalIncrease]:
+        """로컬에 저장된 유상증자 데이터 리스트를 불러옵니다."""
+        path = self.root / "capital_increase_data.json"
+        if not path.exists():
+            return []
+
+        import json
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+            return [PaidInCapitalIncrease.model_validate(item) for item in data]
