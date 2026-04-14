@@ -40,15 +40,16 @@ async def get_stock_info(ticker: str) -> dict | JSONResponse:
         result = query_service.get_stock_by_ticker(ticker)
 
         if result:
-            stock_obj, b_name = result
+            stock_obj, b_name, path = result
             return {
                 "ticker": ticker,
                 "name": stock_obj.name,
                 "reports": stock_obj.reports,
                 "news": stock_obj.news,
+                "path": path,
             }
 
-        return {"ticker": ticker, "name": None, "reports": [], "news": []}
+        return {"ticker": ticker, "name": None, "reports": [], "news": [], "path": []}
     except Exception as e:
         import traceback
         traceback.print_exc()

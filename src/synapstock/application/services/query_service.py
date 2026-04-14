@@ -69,25 +69,27 @@ class BoardQueryService:
         """노드 트리 내에서 특정 이름의 노드를 검색합니다."""
         return root.find_node(name)
 
-    def get_stock_by_ticker(self, ticker: str) -> tuple[Stock, str] | None:
+    def get_stock_by_ticker(self, ticker: str) -> tuple[Stock, str, list[str]] | None:
         """모든 보드를 순회하여 일치하는 티커의 종목 정보를 찾습니다."""
         boards = self.list_boards()
         for b_name in boards:
             board = self.load_board(b_name)
 
-            def find_recursive(node: Node) -> Stock | None:
+            def find_recursive(node: Node, current_path: list[str]) -> tuple[Stock, list[str]] | None:
                 for s in node.stocks:
                     if s.ticker == ticker:
-                        return s
+                        return s, current_path
                 for n in node.nodes:
-                    res = find_recursive(n)
+                    res = find_recursive(n, current_path + [n.name])
                     if res:
                         return res
                 return None
 
-            stock = find_recursive(board.root)
-            if stock:
-                return stock, b_name
+            # [보드이름]을 경로의 시작으로 설정하여 대략적인 위치 파악 용이하게 함
+            result = find_recursive(board.root, [board.name])
+            if result:
+                stock, path = result
+                return stock, b_name, path
         return None
 
     def get_all_stocks_flat(self) -> list[dict]:
