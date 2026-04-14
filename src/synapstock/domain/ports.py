@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, List
+from collections.abc import Callable
+
 from synapstock.domain.models import Board, ScrapedNews
 
 
@@ -125,7 +127,7 @@ class FinancialDataPort(ABC):
 
 class StoragePort(ABC):
     """저장소 추상 포트.
-    
+
     파일의 물리적인 저장/로드를 담당하며, 바이너리 바이트 단위로 작업한다.
     구체적인 객체 변환(DataFrame 등)은 서비스 레이어의 책임이다.
     """
@@ -139,7 +141,7 @@ class StoragePort(ABC):
         """디렉토리 존재를 보장(없으면 생성)한다."""
 
     @abstractmethod
-    def get_file(self, path: str, **kwargs) -> Optional[bytes]:
+    def get_file(self, path: str, **kwargs) -> bytes | None:
         """파일 내용을 바이너리 바이트로 가져온다."""
 
     @abstractmethod
@@ -147,9 +149,9 @@ class StoragePort(ABC):
         """바이트 데이터를 파일로 저장한다."""
 
     @abstractmethod
-    def list_files_in_folder(self, folder_path: str, **kwargs) -> List[dict]:
+    def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
         """특정 폴더 내의 파일 목록을 조회한다.
-        
+
         Returns:
             List[dict]: [{'id': '...', 'name': '...'}, ...]
         """
@@ -165,10 +167,10 @@ class TickerSearchPort(ABC):
     @abstractmethod
     def search(self, query: str) -> list[dict[str, str]]:
         """검색어에 해당하는 종목 리스트를 반환한다.
-        
+
         Args:
             query: 검색어 (기업명 등)
-            
+
         Returns:
             list[dict[str, str]]: [{'name': '...', 'ticker': '...'}, ...]
         """
@@ -178,7 +180,7 @@ class NewsScraperPort(ABC):
     """뉴스 URL에서 메타데이터를 추출하기 위한 추상 포트."""
 
     @abstractmethod
-    async def scrape(self, url: str) -> Optional[ScrapedNews]:
+    async def scrape(self, url: str) -> ScrapedNews | None:
         """URL에서 뉴스 제목과 날짜를 추출한다."""
 
 

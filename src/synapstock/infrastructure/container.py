@@ -6,26 +6,37 @@
 
 import logging
 
-from synapstock.infrastructure.config import AppConfig
-
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
-from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
-from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
-from synapstock.infrastructure.adapters.financial.excel_adapter import ExcelFinancialDataAdapter
-from synapstock.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
-from synapstock.infrastructure.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
-from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
-from synapstock.infrastructure.adapters.local.file_storage import LocalFileStorageAdapter
-from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.command_service import BoardCommandService
 from synapstock.application.services.media_service import StockMediaService
-from synapstock.application.services.sync_service import BoardSyncService
+from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
-from synapstock.infrastructure.adapters.local.statistics_repo import (
-    LocalStatisticsRepository,
-    LocalCeilingRepository
+from synapstock.application.services.sync_service import BoardSyncService
+from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
+    DartDisclosureAdapter,
 )
+from synapstock.infrastructure.adapters.financial.excel_adapter import (
+    ExcelFinancialDataAdapter,
+)
+from synapstock.infrastructure.adapters.google.google_drive_adapter import (
+    GoogleDriveAdapter,
+)
+from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from synapstock.infrastructure.adapters.local.file_storage import (
+    LocalFileStorageAdapter,
+)
+from synapstock.infrastructure.adapters.local.statistics_repo import (
+    LocalCeilingRepository,
+    LocalStatisticsRepository,
+)
+from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
+from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
+    HttpxNewsScraperAdapter,
+)
+from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import (
+    NaverTickerSearchAdapter,
+)
+from synapstock.infrastructure.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +46,11 @@ class Container:
     def __init__(self):
         # 1. 설정 로드 (환경 변수 및 기본 경로)
         self.config = AppConfig.load()
-        
+
         # 2. 로컬 디렉토리 보장
         self.config.data_dir.mkdir(parents=True, exist_ok=True)
         self.config.secrets_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
         self._miro_adapter = MiroMindmapAdapter(self.config.miro_token)
@@ -49,17 +60,17 @@ class Container:
         )
         self._ticker_search_adapter = NaverTickerSearchAdapter()
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
-        
+
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
         self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
-        
+
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
-        
+
         # 5. 도메인 유즈케이스 서비스 싱글톤
         self._query_service = BoardQueryService(
             repository=self._repo,
@@ -83,7 +94,7 @@ class Container:
             query_service=self._query_service,
             ceiling_repository=self._ceiling_repo
         )
-        
+
         self._report_service = None
         self._init_report_service()
 
@@ -91,7 +102,7 @@ class Container:
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
         token_path = self.config.secrets_dir / "token.json"
         client_secret_path = self.config.secrets_dir / "client_secret.json"
-        
+
         if not token_path.exists():
             logger.warning("[Container] Google Drive token.json 파일이 없어 어댑터를 초기화하지 않습니다.")
             return

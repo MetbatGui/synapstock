@@ -4,8 +4,8 @@
 """
 import logging
 from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from synapstock.domain.statistics.models import MarketType, SupplySubject
@@ -25,7 +25,7 @@ async def get_daily_ranking(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         result = statistics_service.get_analyzed_ranking(date, market, subject)
         if not result:
             # 데이터가 없는 경우 404가 아닌 빈 결과 또는 메시지 반환 (UI 처리를 위해)
@@ -36,7 +36,7 @@ async def get_daily_ranking(
                 "items": [],
                 "message": "No data available for this date"
             }
-            
+
         return result
     except Exception as e:
         logger.error(f"Error in get_daily_ranking: {e}")
@@ -50,7 +50,7 @@ async def get_daily_summary(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         return statistics_service.get_daily_summary(date)
     except Exception as e:
         logger.error(f"Error in get_daily_summary: {e}")
@@ -64,16 +64,24 @@ async def get_monthly_summary(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         return {
             "month": month,
             "KOSPI": {
-                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.INSTITUTION)
+                "FOREIGN": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSPI, SupplySubject.FOREIGN
+                ),
+                "INSTITUTION": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSPI, SupplySubject.INSTITUTION
+                )
             },
             "KOSDAQ": {
-                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.INSTITUTION)
+                "FOREIGN": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSDAQ, SupplySubject.FOREIGN
+                ),
+                "INSTITUTION": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSDAQ, SupplySubject.INSTITUTION
+                )
             }
         }
     except Exception as e:
@@ -89,7 +97,7 @@ async def get_available_dates(
     try:
         if not statistics_service:
             return []
-            
+
         # StatisticsService에 repo 접근용 헬퍼가 없으면 직접 repo 호출 유도 (또는 서비스에 추가)
         # 여기서는 서비스에 위임하는 것이 좋음
         if hasattr(statistics_service, "_repository") and statistics_service._repository:
@@ -105,7 +113,7 @@ async def sync_statistics():
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         count = statistics_service.sync_recent_data(limit=5)
         return {
             "status": "success",
@@ -125,7 +133,7 @@ async def get_ceiling_report(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         result = statistics_service.get_ceiling_analysis(date, force_sync=force_sync)
         if not result:
             return {
@@ -133,7 +141,7 @@ async def get_ceiling_report(
                 "items": [],
                 "message": "No ceiling data available for this date"
             }
-            
+
         return result
     except Exception as e:
         logger.error(f"Error in get_ceiling_report: {e}")
@@ -145,7 +153,7 @@ async def get_ceiling_years():
     try:
         if not statistics_service:
             return [datetime.now().strftime("%Y")]
-            
+
         return statistics_service.list_available_ceiling_years()
     except Exception as e:
         logger.error(f"Error in get_ceiling_years: {e}")
@@ -153,13 +161,13 @@ async def get_ceiling_years():
 
 @router.get("/ceiling-dates")
 async def get_ceiling_dates(
-    year: Optional[str] = Query(None, description="조회할 연도 (YYYY)")
+    year: str | None = Query(None, description="조회할 연도 (YYYY)")
 ):
     """특정 연도의 상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
     try:
         if not statistics_service:
             return []
-            
+
         return statistics_service.list_available_ceiling_dates(year=year)
     except Exception as e:
         logger.error(f"Error in get_ceiling_dates: {e}")

@@ -1,8 +1,9 @@
 """Naver 주식 검색 API를 이용한 티커 검색 어댑터."""
 
-import requests
 import logging
-from typing import List, Dict
+
+import requests
+
 from synapstock.domain.ports import TickerSearchPort
 
 logger = logging.getLogger(__name__)
@@ -12,21 +13,25 @@ class NaverTickerSearchAdapter(TickerSearchPort):
 
     BASE_URL = "https://m.stock.naver.com/front-api/search/autoComplete"
 
-    def search(self, query: str) -> List[Dict[str, str]]:
+    def search(self, query: str) -> list[dict[str, str]]:
         """네이버 검색 결과를 가져와서 공통 형식(name, ticker)으로 반환합니다."""
         params = {
             "query": query,
             "target": "stock,index,marketindicator,coin,ipo"
         }
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/145.0.0.0 Safari/537.36"
+            ),
             "Referer": "https://m.stock.naver.com/search"
         }
         try:
             response = requests.get(self.BASE_URL, params=params, headers=headers, timeout=5)
             response.raise_for_status()
             data = response.json()
-            
+
             items = data.get("result", {}).get("items", [])
             results = []
             for item in items:

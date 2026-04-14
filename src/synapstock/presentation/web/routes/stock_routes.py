@@ -5,19 +5,20 @@ Naver Finance 자동완성, DART 공시, 재무 데이터, 뉴스 스크래핑 �
 """
 import re
 from datetime import datetime
+from typing import cast
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from synapstock.presentation.web.core.dependencies import query_service, media_service
+from synapstock.presentation.web.core.dependencies import media_service, query_service
 
 router = APIRouter()
 
 
 @router.get("/api/stock/info/{ticker}")
-async def get_stock_info(ticker: str) -> dict:
+async def get_stock_info(ticker: str) -> dict | JSONResponse:
     """티커 심볼로 종목 기본 정보(이름, 리포트, 뉴스)를 반환합니다.
 
     모든 보드를 순회하여 일치하는 종목을 탐색합니다.
@@ -37,7 +38,7 @@ async def get_stock_info(ticker: str) -> dict:
     """
     try:
         result = query_service.get_stock_by_ticker(ticker)
-        
+
         if result:
             stock_obj, b_name = result
             return {
@@ -55,7 +56,7 @@ async def get_stock_info(ticker: str) -> dict:
 
 
 @router.get("/api/stock/financials")
-async def get_financials(name: str) -> list:
+async def get_financials(name: str) -> list | JSONResponse:
     """특정 기업의 분기별 재무(매출) 데이터를 반환합니다.
 
     Args:
@@ -71,27 +72,23 @@ async def get_financials(name: str) -> list:
         if not name:
             return []
         financials = query_service.get_financial_data(name)
-        return financials
+        return cast(list, financials)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
 @router.get("/api/stock/search")
-async def search_stock(q: str) -> list:
-    """Naver Stock API 자동완성 프록시 엔드포인트.
-
-    Args:
-        q (str): 검색 쿼리 문자열 (종목명 또는 티커 앞부분).
-
-    Returns:
-        list[dict]: 자동완성 결과. 각 항목은 ``{"name": str, "ticker": str}`` 형태.
-    """
-    results = query_service.search_ticker(q)
-    return results
+async def search_stock(q: str = "") -> list | JSONResponse:
+    """종목명 또는 티커로 검색하여 결과를 반환합니다."""
+    try:
+        results = query_service.search_ticker(q)
+        return cast(list, results)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"message": str(e)})
 
 
 @router.get("/api/stocks/all")
-async def get_all_stocks_flat() -> list:
+async def get_all_stocks_flat() -> list | JSONResponse:
     """모든 보드의 종목을 평탄화된 목록으로 반환합니다.
 
     전체 검색 기능의 클라이언트 캐싱에 사용됩니다.
@@ -107,13 +104,14 @@ async def get_all_stocks_flat() -> list:
         JSONResponse (500): 조회 중 예외 발생 시.
     """
     try:
-        return query_service.get_all_stocks_flat()
+        results = query_service.get_all_stocks_flat()
+        return cast(list, results)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
 @router.get("/api/disclosure/{ticker}")
-async def get_disclosures(ticker: str) -> list:
+async def get_disclosures(ticker: str) -> list | JSONResponse:
     """특정 종목의 DART 공시 목록을 반환합니다.
 
     Args:
@@ -130,13 +128,13 @@ async def get_disclosures(ticker: str) -> list:
         if not ticker or ticker == "none":
             return []
         disclosures = query_service.get_disclosures(ticker)
-        return disclosures
+        return cast(list, disclosures)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
 @router.get("/api/news/scrape")
-async def scrape_news(url: str) -> dict:
+async def scrape_news(url: str) -> dict | JSONResponse:
     """뉴스 URL에서 제목과 날짜를 스크래핑하여 반환합니다.
 
     `og:title`, `<title>` 순으로 제목을 추출하고,
@@ -156,6 +154,9 @@ async def scrape_news(url: str) -> dict:
         JSONResponse (400): URL 접속에 실패한 경우 (HTTP 오류).
         JSONResponse (500): 스크래핑 중 예외 발생 시.
     """
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return JSONResponse(status_code=400, content={"message": "Invalid URL format"})
+
     try:
         headers = {
             "User-Agent": (
@@ -177,11 +178,11 @@ async def scrape_news(url: str) -> dict:
         # 1. 제목 추출
         title = ""
         og_title = soup.find("meta", property="og:title")
-        if og_title:
-            title = og_title.get("content", "")
+        if isinstance(og_title, Tag):
+            title = str(og_title.get("content", ""))
         if not title:
             title_tag = soup.find("title")
-            if title_tag:
+            if isinstance(title_tag, Tag):
                 title = title_tag.get_text().strip()
 
         # 2. 날짜 추출
@@ -194,8 +195,8 @@ async def scrape_news(url: str) -> dict:
         ]
         for tag_name, attrs in date_tags:
             tag = soup.find(tag_name, attrs)
-            if tag:
-                content = tag.get("content", "")
+            if isinstance(tag, Tag):
+                content = str(tag.get("content", ""))
                 if content:
                     date_match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", content)
                     if date_match:
@@ -215,7 +216,7 @@ async def scrape_news(url: str) -> dict:
 
 
 @router.post("/api/stock/news/add")
-async def add_stock_news(board: str, ticker: str, title: str, date: str, url: str) -> dict:
+async def add_stock_news(board: str, ticker: str, title: str, date: str, url: str) -> dict | JSONResponse:
     """종목에 뉴스 정보를 추가합니다.
 
     Args:
@@ -242,7 +243,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
 
 
 @router.delete("/api/stock/news/delete")
-async def delete_stock_news(board: str, ticker: str, url: str) -> dict:
+async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONResponse:
     """종목에서 특정 뉴스를 삭제합니다.
 
     Args:

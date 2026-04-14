@@ -1,6 +1,12 @@
 from pathlib import Path
-from typing import Optional, List
-from synapstock.domain.statistics.models import DailyMarketRanking, MarketType, SupplySubject, CeilingAnalysisReport
+
+from synapstock.domain.statistics.models import (
+    CeilingAnalysisReport,
+    DailyMarketRanking,
+    MarketType,
+    SupplySubject,
+)
+
 
 class LocalStatisticsRepository:
     """통계 데이터를 로컬 JSON 파일로 관리하는 저장소."""
@@ -20,19 +26,19 @@ class LocalStatisticsRepository:
             f.write(ranking.model_dump_json(indent=2))
 
     def load_ranking(
-        self, 
-        date: str, 
-        market: MarketType, 
+        self,
+        date: str,
+        market: MarketType,
         subject: SupplySubject
-    ) -> Optional[DailyMarketRanking]:
+    ) -> DailyMarketRanking | None:
         """특정 날짜의 순위를 불러온다."""
         market_val = market.value if hasattr(market, 'value') else str(market)
         subject_val = subject.value if hasattr(subject, 'value') else str(subject)
-        
+
         # 1. 정규 형식 시도 (*_KOSPI_FOREIGN.json)
         filename = f"{date}_{market_val}_{subject_val}.json"
         path = self.root / filename
-        
+
         # 2. 존재하지 않으면 유연한 검색 시도
         if not path.exists():
             pattern = f"{date}*{market_val}*{subject_val}*.json"
@@ -40,11 +46,11 @@ class LocalStatisticsRepository:
             if not files:
                 return None
             path = files[0]
-            
-        with open(path, "r", encoding="utf-8") as f:
+
+        with open(path, encoding="utf-8") as f:
             return DailyMarketRanking.model_validate_json(f.read())
 
-    def list_available_dates(self, market: MarketType, subject: SupplySubject) -> List[str]:
+    def list_available_dates(self, market: MarketType, subject: SupplySubject) -> list[str]:
         """데이터가 존재하는 날짜 목록을 반환한다."""
         market_val = market.value if hasattr(market, 'value') else str(market)
         subject_val = subject.value if hasattr(subject, 'value') else str(subject)
@@ -70,25 +76,25 @@ class LocalCeilingRepository:
         with open(path, "w", encoding="utf-8") as f:
             f.write(report.model_dump_json(indent=2))
 
-    def load_latest_report(self) -> Optional[CeilingAnalysisReport]:
+    def load_latest_report(self) -> CeilingAnalysisReport | None:
         """가장 최근 날짜의 리포트를 불러온다."""
         dates = self.list_available_dates()
         if not dates:
             return None
-        
+
         return self.load_report(dates[0])
 
-    def load_report(self, date: str) -> Optional[CeilingAnalysisReport]:
+    def load_report(self, date: str) -> CeilingAnalysisReport | None:
         """특정 날짜의 리포트를 불러온다. (YYYY-MM-DD)"""
         filename = f"ceiling_{date}.json"
         path = self.root / filename
         if not path.exists():
             return None
-            
-        with open(path, "r", encoding="utf-8") as f:
+
+        with open(path, encoding="utf-8") as f:
             return CeilingAnalysisReport.model_validate_json(f.read())
 
-    def list_available_dates(self) -> List[str]:
+    def list_available_dates(self) -> list[str]:
         """데이터가 존재하는 리포트 날짜 목록을 반환한다."""
         # ceiling_2026-01-15.json 형식의 파일들 탐색
         files = self.root.glob("ceiling_*.json")

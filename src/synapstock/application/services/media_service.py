@@ -1,6 +1,9 @@
 """종목 관련 미디어(리포트, 뉴스) 관리를 담당하는 유즈케이스 레이어."""
 
+from typing import cast
+
 from synapstock.domain.ports import BoardRepositoryPort, StoragePort
+
 
 class StockMediaService:
     """종목에 종속된 외부 미디어 리소스(PDF, 뉴스 URL)를 관리하는 서비스 클래스입니다. (UseCase - Media)"""
@@ -17,11 +20,11 @@ class StockMediaService:
         target_path = f"{self._pdf_dir}/{filename}"
         if not self._storage.put_file(target_path, file_content):
             return False
-            
+
         # 2. 보드 데이터 로드 및 업데이트
         board = self._repository.load(board_name)
         # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 탐색 및 추가)
-        success = board.root.find_and_add_report(ticker, target_path)
+        success = cast(bool, board.root.find_and_add_report(ticker, target_path))
         if success:
             self._repository.save(board)
         return success
@@ -29,7 +32,7 @@ class StockMediaService:
     def remove_stock_report(self, board_name: str, ticker: str, report_path: str) -> bool:
         """종목에서 리포트 파일 링크를 제거합니다. (물리 파일 삭제는 정책에 따라 별도로 처리 가능)"""
         board = self._repository.load(board_name)
-        success = board.root.find_and_remove_report(ticker, report_path)
+        success = cast(bool, board.root.find_and_remove_report(ticker, report_path))
         if success:
             self._repository.save(board)
         return success
@@ -38,8 +41,8 @@ class StockMediaService:
         """종목에 뉴스 링크 정보를 추가합니다."""
         board = self._repository.load(board_name)
         news_entry = {"title": title, "date": date, "url": url}
-        
-        success = board.root.find_and_add_news(ticker, news_entry)
+
+        success = cast(bool, board.root.find_and_add_news(ticker, news_entry))
         if success:
             self._repository.save(board)
         return success
@@ -47,7 +50,7 @@ class StockMediaService:
     def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
         """종목에서 특정 뉴스 링크를 제거합니다."""
         board = self._repository.load(board_name)
-        success = board.root.find_and_remove_news(ticker, url)
+        success = cast(bool, board.root.find_and_remove_news(ticker, url))
         if success:
             self._repository.save(board)
         return success

@@ -1,7 +1,7 @@
-from pathlib import Path
-from typing import Optional, List
-import shutil
 import logging
+import shutil
+from pathlib import Path
+
 from synapstock.domain.ports import StoragePort
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class LocalFileStorageAdapter(StoragePort):
             logger.error(f"Failed to create directory {path}: {e}")
             return False
 
-    def get_file(self, path: str, **kwargs) -> Optional[bytes]:
+    def get_file(self, path: str, **kwargs) -> bytes | None:
         """파일 내용을 읽어온다."""
         abs_path = self._get_abs_path(path)
         if not abs_path.is_file():
@@ -55,12 +55,12 @@ class LocalFileStorageAdapter(StoragePort):
             logger.error(f"Failed to write file {path}: {e}")
             return False
 
-    def list_files_in_folder(self, folder_path: str, **kwargs) -> List[dict]:
+    def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
         """폴더 내 파일 목록을 반환한다."""
         abs_path = self._get_abs_path(folder_path)
         if not abs_path.is_dir():
             return []
-        
+
         results = []
         for p in abs_path.iterdir():
             if p.is_file():
@@ -74,10 +74,10 @@ class LocalFileStorageAdapter(StoragePort):
         """파일을 복사한다 (로컬 어댑터에서는 copy와 유사)."""
         src = self._get_abs_path(filename)
         dest = Path(local_path)
-        
+
         if not src.exists():
             return False
-            
+
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)

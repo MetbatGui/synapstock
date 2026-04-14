@@ -7,9 +7,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from fastapi.responses import JSONResponse
-
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from synapstock.presentation.web.core.dependencies import report_service
 
@@ -22,7 +21,7 @@ async def get_local_reports(name: str):
     try:
         if not report_service:
             return []
-            
+
         reports = report_service.get_reports_by_stock(name)
         return [
             {
