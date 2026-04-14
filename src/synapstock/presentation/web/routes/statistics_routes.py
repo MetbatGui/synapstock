@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
 
-@router.get("/daily-ranking")
+@router.get("/daily-ranking", response_model=None)
 async def get_daily_ranking(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
     market: MarketType = Query(MarketType.KOSPI, description="시장 구분 (KOSPI/KOSDAQ)"),
@@ -42,7 +42,7 @@ async def get_daily_ranking(
         logger.error(f"Error in get_daily_ranking: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/daily-summary")
+@router.get("/daily-summary", response_model=None)
 async def get_daily_summary(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)")
 ):
@@ -56,7 +56,7 @@ async def get_daily_summary(
         logger.error(f"Error in get_daily_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/monthly-summary")
+@router.get("/monthly-summary", response_model=None)
 async def get_monthly_summary(
     month: str = Query(..., description="조회 월 (YYYY-MM)")
 ):
@@ -88,7 +88,7 @@ async def get_monthly_summary(
         logger.error(f"Error in get_monthly_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/available-dates")
+@router.get("/available-dates", response_model=None)
 async def get_available_dates(
     market: MarketType = Query(MarketType.KOSPI),
     subject: SupplySubject = Query(SupplySubject.FOREIGN)
@@ -107,7 +107,7 @@ async def get_available_dates(
         logger.error(f"Error in get_available_dates: {e}")
         return []
 
-@router.post("/sync")
+@router.post("/sync", response_model=None)
 async def sync_statistics():
     """구글 드라이브로부터 최신 수급 통계 데이터를 동기화합니다."""
     try:
@@ -124,7 +124,7 @@ async def sync_statistics():
         logger.error(f"Error in sync_statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/ceiling-report")
+@router.get("/ceiling-report", response_model=None)
 async def get_ceiling_report(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
     force_sync: bool = Query(False, description="강제 동기화 여부")
@@ -147,7 +147,7 @@ async def get_ceiling_report(
         logger.error(f"Error in get_ceiling_report: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/ceiling-years")
+@router.get("/ceiling-years", response_model=None)
 async def get_ceiling_years():
     """상한가 분석이 가능한 연도 목록을 반환합니다."""
     try:
@@ -159,7 +159,7 @@ async def get_ceiling_years():
         logger.error(f"Error in get_ceiling_years: {e}")
         return [datetime.now().strftime("%Y")]
 
-@router.get("/ceiling-dates")
+@router.get("/ceiling-dates", response_model=None)
 async def get_ceiling_dates(
     year: str | None = Query(None, description="조회할 연도 (YYYY)")
 ):

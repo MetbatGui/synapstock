@@ -21,7 +21,7 @@ from synapstock.presentation.web.core.websocket_manager import manager
 router = APIRouter()
 
 
-@router.get("/api/boards")
+@router.get("/api/boards", response_model=None)
 async def get_boards() -> list[dict] | JSONResponse:
     """사용 가능한 마인드맵 보드 메타 정보 목록을 반환합니다.
 
@@ -31,7 +31,7 @@ async def get_boards() -> list[dict] | JSONResponse:
     return cast(list[dict], query_service.get_boards_info())
 
 
-@router.get("/api/board")
+@router.get("/api/board", response_model=None)
 async def get_board_data(name: str) -> dict | JSONResponse:
     """특정 보드의 계층형 트리 데이터를 반환합니다.
 
@@ -62,7 +62,7 @@ async def get_board_data(name: str) -> dict | JSONResponse:
         return JSONResponse(status_code=404, content={"message": str(e)})
 
 
-@router.post("/api/sync")
+@router.post("/api/sync", response_model=None)
 async def trigger_sync(name: str) -> dict | JSONResponse:
     """백그라운드 스레드에서 Miro 동기화를 시작합니다.
 
@@ -98,7 +98,7 @@ async def trigger_sync(name: str) -> dict | JSONResponse:
     return {"status": "started"}
 
 
-@router.post("/api/node/add")
+@router.post("/api/node/add", response_model=None)
 async def add_node(board: str, parent: str, name: str) -> dict | JSONResponse:
     """지정된 부모 노드 아래에 새 폴더 노드를 추가합니다.
 
@@ -116,7 +116,7 @@ async def add_node(board: str, parent: str, name: str) -> dict | JSONResponse:
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
 
 
-@router.post("/api/node/delete")
+@router.post("/api/node/delete", response_model=None)
 async def delete_node(board: str, name: str) -> dict | JSONResponse:
     """노드를 삭제하고 하위 항목을 부모 노드로 흡수합니다.
 
@@ -138,7 +138,7 @@ async def delete_node(board: str, name: str) -> dict | JSONResponse:
     )
 
 
-@router.post("/api/stock/add")
+@router.post("/api/stock/add", response_model=None)
 async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict | JSONResponse:
     """지정된 부모 노드 아래에 새 종목을 추가합니다.
 
@@ -157,7 +157,7 @@ async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict | J
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
 
 
-@router.delete("/api/stock/delete")
+@router.delete("/api/stock/delete", response_model=None)
 async def delete_stock(board: str, ticker: str) -> dict | JSONResponse:
     """보드에서 특정 종목을 삭제합니다.
 
@@ -174,7 +174,7 @@ async def delete_stock(board: str, ticker: str) -> dict | JSONResponse:
     return JSONResponse(status_code=404, content={"message": "Stock not found in board"})
 
 
-@router.post("/api/stock/news/add")
+@router.post("/api/stock/news/add", response_model=None)
 async def add_stock_news(board: str, ticker: str, title: str, date: str, url: str) -> dict | JSONResponse:
     """지정된 종목에 새 뉴스를 추가합니다."""
     success = command_service.add_stock_news(board, ticker, title, date, url)
@@ -183,7 +183,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
     return JSONResponse(status_code=404, content={"message": "Stock not found"})
 
 
-@router.delete("/api/stock/news/delete")
+@router.delete("/api/stock/news/delete", response_model=None)
 async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONResponse:
     """보드에서 특정 뉴스를 삭제합니다."""
     success = command_service.delete_stock_news(board, ticker, url)
@@ -192,7 +192,7 @@ async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONRes
     return JSONResponse(status_code=404, content={"message": "Stock or news not found"})
 
 
-@router.post("/api/stock/report/upload")
+@router.post("/api/stock/report/upload", response_model=None)
 async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(...)) -> dict | JSONResponse:
     """종목에 PDF 리포트 파일을 업로드합니다.
 
@@ -222,7 +222,7 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.post("/api/stock/report/add_link")
+@router.post("/api/stock/report/add_link", response_model=None)
 async def add_stock_report_link(board: str, ticker: str, report_path: str) -> dict | JSONResponse:
     """종목에 리포트 링크를 추가합니다."""
     success = media_service.add_stock_report_link(board, ticker, report_path)
@@ -231,7 +231,7 @@ async def add_stock_report_link(board: str, ticker: str, report_path: str) -> di
     return JSONResponse(status_code=404, content={"message": "Stock not found"})
 
 
-@router.delete("/api/stock/report/delete")
+@router.delete("/api/stock/report/delete", response_model=None)
 async def delete_stock_report(board: str, ticker: str, report_path: str) -> dict | JSONResponse:
     """종목에서 리포트 링크를 제거합니다.
 

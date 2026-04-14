@@ -58,7 +58,9 @@ class Container:
         self._financial_adapter = ExcelFinancialDataAdapter(
             self.config.financial_dir / "financial_data.xlsx"
         )
-        self._ticker_search_adapter = NaverTickerSearchAdapter()
+        self._ticker_search_adapter = NaverTickerSearchAdapter(
+            cache_path=str(self.config.stock_cache_path)
+        )
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
 
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)

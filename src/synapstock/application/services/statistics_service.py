@@ -140,12 +140,39 @@ class StatisticsService:
 
         try:
             rankings = self._parser.parse_summary_table(content, sheet_name, date_str)
+            
+            # 종목명 정규화 (별칭 -> 정규 사명)
+            for ranking in rankings:
+                for item in ranking.items:
+                    self._normalize_item_name(item)
+
             self.save_rankings(rankings)
             logger.info(f"[StatisticsService] 구글 드라이브 동기화 및 캐싱 완료: {date_str}")
             return cast(list[DailyMarketRanking], rankings)
         except Exception as e:
             logger.error(f"[StatisticsService] 파싱 실패 ({filename}, 시트:{sheet_name}): {e}")
             return []
+
+    def _normalize_item_name(self, item: RankingItem) -> None:
+        """TickerSearchPort를 활용하여 종목명을 정규 사명으로 치환합니다."""
+        if not self._query_service:
+            return
+            
+        try:
+            # query_service.search_ticker는 내부적으로 정규화된 NaverTickerSearchAdapter를 사용함
+            search_results = self._query_service.search_ticker(item.name)
+            if search_results:
+                # 첫 번째 검색 결과(캐시 우선 일치 항목)의 사명으로 업데이트
+                best_match = search_results[0]
+                if item.name != best_match["name"]:
+                    logger.debug(f"[StatisticsService] 종목명 정규화: {item.name} -> {best_match['name']}")
+                    item.name = best_match["name"]
+                
+                # 티커 정보가 누락된 경우에도 보완
+                if not item.ticker:
+                    item.ticker = best_match["ticker"]
+        except Exception as e:
+            logger.warning(f"[StatisticsService] 종목명 정규화 실패 ({item.name}): {e}")
 
     def sync_recent_data(self, limit: int = 5) -> int:
         """클라우드 스토리지를 탐색하여 최신 통계 데이터를 일괄 동기화합니다.

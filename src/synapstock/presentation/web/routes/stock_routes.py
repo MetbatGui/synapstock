@@ -17,7 +17,7 @@ from synapstock.presentation.web.core.dependencies import media_service, query_s
 router = APIRouter()
 
 
-@router.get("/api/stock/info/{ticker}")
+@router.get("/api/stock/info/{ticker}", response_model=None)
 async def get_stock_info(ticker: str) -> dict | JSONResponse:
     """티커 심볼로 종목 기본 정보(이름, 리포트, 뉴스)를 반환합니다.
 
@@ -55,7 +55,7 @@ async def get_stock_info(ticker: str) -> dict | JSONResponse:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/api/stock/financials")
+@router.get("/api/stock/financials", response_model=None)
 async def get_financials(name: str) -> list | JSONResponse:
     """특정 기업의 분기별 재무(매출) 데이터를 반환합니다.
 
@@ -77,7 +77,7 @@ async def get_financials(name: str) -> list | JSONResponse:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/api/stock/search")
+@router.get("/api/stock/search", response_model=None)
 async def search_stock(q: str = "") -> list | JSONResponse:
     """종목명 또는 티커로 검색하여 결과를 반환합니다."""
     try:
@@ -87,7 +87,7 @@ async def search_stock(q: str = "") -> list | JSONResponse:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/api/stocks/all")
+@router.get("/api/stocks/all", response_model=None)
 async def get_all_stocks_flat() -> list | JSONResponse:
     """모든 보드의 종목을 평탄화된 목록으로 반환합니다.
 
@@ -110,7 +110,7 @@ async def get_all_stocks_flat() -> list | JSONResponse:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/api/disclosure/{ticker}")
+@router.get("/api/disclosure/{ticker}", response_model=None)
 async def get_disclosures(ticker: str) -> list | JSONResponse:
     """특정 종목의 DART 공시 목록을 반환합니다.
 
@@ -133,7 +133,7 @@ async def get_disclosures(ticker: str) -> list | JSONResponse:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/api/news/scrape")
+@router.get("/api/news/scrape", response_model=None)
 async def scrape_news(url: str) -> dict | JSONResponse:
     """뉴스 URL에서 제목과 날짜를 스크래핑하여 반환합니다.
 
@@ -215,7 +215,7 @@ async def scrape_news(url: str) -> dict | JSONResponse:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.post("/api/stock/news/add")
+@router.post("/api/stock/news/add", response_model=None)
 async def add_stock_news(board: str, ticker: str, title: str, date: str, url: str) -> dict | JSONResponse:
     """종목에 뉴스 정보를 추가합니다.
 
@@ -242,7 +242,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.delete("/api/stock/news/delete")
+@router.delete("/api/stock/news/delete", response_model=None)
 async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONResponse:
     """종목에서 특정 뉴스를 삭제합니다.
 

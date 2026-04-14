@@ -15,7 +15,7 @@ from synapstock.presentation.web.core.dependencies import report_service
 router = APIRouter()
 
 
-@router.get("/api/reports/local")
+@router.get("/api/reports/local", response_model=None)
 async def get_local_reports(name: str):
     """지정된 종목명이 포함된 리포트 목록을 반환합니다."""
     try:
@@ -37,7 +37,7 @@ async def get_local_reports(name: str):
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/api/reports/counts")
+@router.get("/api/reports/counts", response_model=None)
 async def get_report_counts():
     """전체 종목별 리포트 수량을 집계하여 반환합니다."""
     try:
@@ -49,7 +49,7 @@ async def get_report_counts():
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.post("/api/reports/sync")
+@router.post("/api/reports/sync", response_model=None)
 async def sync_reports_index():
     """Google Drive에서 최신 인덱스 파일을 강제로 동기화합니다."""
     if not report_service:
@@ -64,7 +64,7 @@ async def sync_reports_index():
         return JSONResponse(status_code=500, content={"message": str(e)})
 
 
-@router.get("/report_files/{filename}")
+@router.get("/report_files/{filename}", response_model=None)
 async def serve_report_file(filename: str):
     """PDF 리포트 파일을 서빙합니다 (로컬 없으면 클라우드 자동 다운로드)."""
     from fastapi.responses import FileResponse

@@ -29,6 +29,9 @@ class AppConfig(BaseModel):
     miro_token: str = ""
     telegram_token: str = ""
 
+    # 캐시 파일 경로
+    stock_cache_path: Path = Path("stock_cache.json")
+
     # Google Drive 폴더 ID (환경 변수)
     report_folder_id: str | None = None
     sd_folder_id: str | None = None
