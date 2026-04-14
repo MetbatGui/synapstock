@@ -13,10 +13,12 @@ class Stock(BaseModel):
     Attributes:
         name: 종목명.
         ticker: 종목 코드 (예: '005930').
+        aliases: 이전 사명 또는 기타 별칭 목록.
     """
 
     name: str
     ticker: str
+    aliases: list[str] = []
     reports: list[str] = []
     news: list[dict[str, str]] = [] # [{"title": "...", "date": "...", "url": "..."}]
 

@@ -3,11 +3,7 @@
 로컬 인덱스(``list.json``, ``reports.json``) 조회, Google Drive 강제 동기화,
 PDF 파일 온디맨드 다운로드 및 서빙 엔드포인트를 제공합니다.
 """
-import json
-import os
-import unicodedata
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

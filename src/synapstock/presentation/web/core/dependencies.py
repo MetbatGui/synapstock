@@ -4,12 +4,7 @@
 ``GoogleDriveAdapter`` 를 초기화합니다. 모듈 레벨에 제공되는
 ``service``와 ``drive_adapter`` 싱글톤은 모든 라우터에서 공유합니다.
 """
-import os
-import asyncio
-import time
-from pathlib import Path
 import logging
-from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 

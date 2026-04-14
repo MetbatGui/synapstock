@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import time
 import unicodedata
 from pathlib import Path

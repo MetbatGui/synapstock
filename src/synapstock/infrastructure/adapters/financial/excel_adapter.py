@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 class ExcelFinancialDataAdapter:
     def __init__(self, file_path: Path):

@@ -118,3 +118,22 @@ class TestBoardQueryService:
         assert results[0]["name"] == "삼성전자"
         assert "파운드리" in results[0]["path"]
         assert results[0]["board"] == "theme_a"
+
+    def test_find_stocks_by_alias_global(self, service, mock_repo):
+        """종목명이 아닌 별칭(aliases)으로도 검색이 가능해야 한다."""
+        # Arrange
+        mock_repo.list_boards.return_value = ["theme_a"]
+        board = Board(name="방산")
+        # 사명은 교체되었고 구 사명이 별칭에 있는 상황
+        stock = Stock(name="LIG디펜스앤에어로스페이스", ticker="079550", aliases=["LIG넥스원"])
+        board.root.add_child("미사일").stocks.append(stock)
+        mock_repo.load.return_value = board
+        
+        # Act: 구 사명으로 검색
+        results = service.find_stocks_by_name("넥스원")
+        
+        # Assert
+        assert len(results) == 1
+        assert results[0]["name"] == "LIG디펜스앤에어로스페이스"
+        assert results[0]["ticker"] == "079550"
+        assert "미사일" in results[0]["path"]

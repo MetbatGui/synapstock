@@ -66,8 +66,13 @@ class StatisticsService:
             for stock in all_stocks:
                 name = stock.get('name')
                 ticker = stock.get('ticker')
+                aliases = stock.get('aliases', [])
                 if name and ticker:
                     ticker_map[name] = ticker
+                    # 별칭들도 모두 동일한 티커로 매핑
+                    for alias in aliases:
+                        if alias:
+                            ticker_map[alias] = ticker
         except Exception as e:
             logger.error(f"[StatisticsService] 로컬 티커 맵 빌드 실패: {e}")
             

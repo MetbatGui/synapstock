@@ -1,6 +1,5 @@
 import logging
 import asyncio
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CommandHandler, CallbackQueryHandler, filters
 
@@ -14,7 +13,6 @@ WAITING_FOR_STOCK_SELECTION = 2
 WAITING_FOR_NEWS_URL = 3
 
 
-from typing import List, Dict, Any
 
 
 

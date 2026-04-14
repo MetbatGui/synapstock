@@ -32,6 +32,7 @@ class TestStock:
         assert data == {
             "name": "카카오",
             "ticker": "035720",
+            "aliases": [],
             "news": [],
             "reports": []
         }
@@ -41,6 +42,29 @@ class TestStock:
         s1 = Stock(name="NAVER", ticker="035420")
         s2 = Stock(name="NAVER", ticker="035420")
         assert s1 == s2
+
+    def test_stock_with_aliases(self):
+        """별칭(aliases)을 가진 Stock이 정상 생성되어야 한다."""
+        stock = Stock(name="사명변경후", ticker="123456", aliases=["옛날사명", "다른이름"])
+        assert "옛날사명" in stock.aliases
+        assert "다른이름" in stock.aliases
+        assert len(stock.aliases) == 2
+
+    def test_serialization_excludes_empty_aliases(self):
+        """별칭이 비어있는 경우 직렬화(JSON) 시 해당 필드가 제외되어야 한다 (exclude_defaults=True)."""
+        stock = Stock(name="삼성전자", ticker="005930")
+        # aliases 기본값은 [] 이므로 exclude_defaults=True 시 제외됨
+        data = stock.model_dump(exclude_defaults=True)
+        assert "aliases" not in data
+        assert "news" not in data
+        assert "reports" not in data
+        assert data["name"] == "삼성전자"
+
+        # 별칭이 있는 경우는 포함되어야 함
+        stock_with_alias = Stock(name="LIG디펜스앤에어로스페이스", ticker="079550", aliases=["LIG넥스원"])
+        data_with_alias = stock_with_alias.model_dump(exclude_defaults=True)
+        assert "aliases" in data_with_alias
+        assert data_with_alias["aliases"] == ["LIG넥스원"]
 
 
 class TestNode:

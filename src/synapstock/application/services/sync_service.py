@@ -26,13 +26,34 @@ class BoardSyncService:
         """보드 내의 모든 종목에 대해 티커 매칭 및 정규화를 시도합니다."""
         def normalize_node(n):
             for s in n.stocks:
-                # 티커가 부실한 경우(6자리 숫자가 아님) 검색 시도
-                if not s.ticker or not s.ticker.isdigit() or len(s.ticker) != 6:
-                    results = self._ticker_search.search(s.name)
-                    if results:
-                        s.ticker = results[0]["ticker"]
+                # 1. 티커가 부실한 경우 검색하여 채워줌
+                current_ticker_valid = s.ticker and s.ticker.isdigit() and len(s.ticker) == 6
+                
+                # 검색을 통한 티커 확인 및 사명 변경 감지
+                results = self._ticker_search.search(s.name)
+                if results:
+                    best_match = results[0]
+                    new_ticker = best_match["ticker"]
+                    new_name = best_match["name"]
+                    
+                    # 티커가 없었던 경우 업데이트
+                    if not current_ticker_valid:
+                        s.ticker = new_ticker
                         if progress_callback:
                             progress_callback(f"티커 매칭 완료: {s.name} -> {s.ticker}", 0.0)
+                    
+                    # 티커가 일치하는데 이름이 다른 경우 (사명 변경 감지)
+                    elif s.ticker == new_ticker and s.name != new_name:
+                        if progress_callback:
+                            progress_callback(f"사명 변경 감지: {s.name} -> {new_name}", 0.0)
+                        
+                        # 기존 이름을 별칭으로 격하
+                        if s.name not in s.aliases:
+                            s.aliases.append(s.name)
+                        
+                        # 신규 사명으로 교체
+                        s.name = new_name
+            
             for child in n.nodes:
                 normalize_node(child)
         
