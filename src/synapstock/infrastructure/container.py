@@ -27,6 +27,7 @@ from synapstock.infrastructure.adapters.local.file_storage import (
 )
 from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalCeilingRepository,
+    LocalCapitalIncreaseRepository,
     LocalStatisticsRepository,
 )
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
@@ -68,6 +69,7 @@ class Container:
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
         self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
+        self._capital_increase_repo = LocalCapitalIncreaseRepository(self.config.capital_increase_dir)
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -94,7 +96,8 @@ class Container:
             storage=self._drive_adapter,
             repository=self._statistics_repo,
             query_service=self._query_service,
-            ceiling_repository=self._ceiling_repo
+            ceiling_repository=self._ceiling_repo,
+            capital_increase_repository=self._capital_increase_repo
         )
 
         self._report_service = None
@@ -113,7 +116,8 @@ class Container:
             folders = {
                 "report": self.config.report_folder_id,
                 "sd": self.config.sd_folder_id,
-                "ceiling": self.config.ceiling_folder_id
+                "ceiling": self.config.ceiling_folder_id,
+                "capital_increase": self.config.capital_increase_folder_id
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
