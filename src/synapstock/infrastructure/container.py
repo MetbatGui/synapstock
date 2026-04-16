@@ -51,9 +51,14 @@ class Container:
         # 1. 설정 로드 (환경 변수 및 기본 경로)
         self.config = AppConfig.load()
 
-        # 2. 로컬 디렉토리 보장
+        # 2. 로컬 디렉토리 보장 (필수 경로들 자동 생성)
         self.config.data_dir.mkdir(parents=True, exist_ok=True)
         self.config.secrets_dir.mkdir(parents=True, exist_ok=True)
+        self.config.statistics_dir.mkdir(parents=True, exist_ok=True)
+        self.config.netbuy_dir.mkdir(parents=True, exist_ok=True)
+        self.config.ceiling_dir.mkdir(parents=True, exist_ok=True)
+        self.config.capital_increase_dir.mkdir(parents=True, exist_ok=True)
+        (self.config.data_dir / "market" / "raw").mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
@@ -97,20 +102,21 @@ class Container:
             mindmap=self._miro_adapter,
             ticker_search=self._ticker_search_adapter
         )
-        self._statistics_service = StatisticsService(
-            storage=self._drive_adapter,
-            repository=self._statistics_repo,
-            query_service=self._query_service,
-            ceiling_repository=self._ceiling_repo
-        )
-
-        self._report_service = None
-        self._init_report_service()
-
         self._market_data_service = MarketDataService(
             krx_adapter=self._krx_adapter,
             repository=self._market_data_repo
         )
+
+        self._statistics_service = StatisticsService(
+            storage=self._drive_adapter,
+            repository=self._statistics_repo,
+            query_service=self._query_service,
+            ceiling_repository=self._ceiling_repo,
+            market_data_service=self._market_data_service
+        )
+
+        self._report_service = None
+        self._init_report_service()
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
