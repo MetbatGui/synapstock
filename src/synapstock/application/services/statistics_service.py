@@ -36,7 +36,8 @@ class StatisticsService:
         storage: Any = None,
         repository: Any = None,
         query_service: Any = None,
-        ceiling_repository: Any = None
+        ceiling_repository: Any = None,
+        market_data_service: Any = None
     ):
         """StatisticsService 객체를 초기화합니다.
 
@@ -50,6 +51,7 @@ class StatisticsService:
         self._repository = repository
         self._query_service = query_service
         self._ceiling_repo = ceiling_repository
+        self._market_data_service = market_data_service
         self._parser = ExcelStatisticsParser()
 
     def _build_local_ticker_map(self) -> dict[str, str]:
@@ -218,6 +220,14 @@ class StatisticsService:
                     synced_count += 1
 
             logger.info(f"[StatisticsService] 총 {synced_count}개 일자 동기화 완료")
+            
+            # [추가] 구글 동기화 완료 후 KRX 데이터 연쇄 수집
+            if self._market_data_service:
+                logger.info("[StatisticsService] 연쇄 작업 시작: KRX 데이터 동기화 트리거")
+                # 최신 시트의 날짜가 있으면 해당 날짜로, 없으면 당일로 수집
+                latest_date = target_sheets[0].replace("-", "") if target_sheets else None
+                self._market_data_service.sync_daily_data(latest_date)
+
             return synced_count
         except Exception as e:
             logger.error(f"[StatisticsService] 일괄 동기화 실패: {e}", exc_info=True)

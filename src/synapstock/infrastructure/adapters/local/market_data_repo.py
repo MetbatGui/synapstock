@@ -23,6 +23,11 @@ class LocalMarketDataRepository:
             else:
                 f.write(str(data))
 
+    def exists(self, date_str: str, category: str) -> bool:
+        """특정 날짜와 카테고리의 데이터가 이미 존재하는지 확인한다."""
+        file_path = self.base_dir / date_str / f"{category}.json"
+        return file_path.exists()
+
     def load_raw_data(self, date_str: str, category: str) -> Optional[any]:
         """저장된 원천 데이터를 로드한다."""
         file_path = self.base_dir / date_str / f"{category}.json"

@@ -124,6 +124,10 @@ class MarketDataService:
                     if not self.repo.exists(curr_str, f"supply_{mkt}_FOREIGN"): is_all_exists = False; break
                     if not self.repo.exists(curr_str, f"supply_{mkt}_INSTITUTION"): is_all_exists = False; break
                 
+                # 신규 추가된 시장 요약 정보도 확인
+                if is_all_exists and not self.repo.exists(curr_str, "market_performance"):
+                    is_all_exists = False
+                
                 if is_all_exists:
                     logger.info(f"[MarketDataService] {curr_str} 데이터가 이미 존재하여 건너뜁니다.")
                 else:
