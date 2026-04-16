@@ -1747,4 +1747,212 @@ h2 {
 
 .font-bold {
     font-weight: 700;
-}
+}
+/* --- Capital Increase Detail (Accordion) Styles --- */
+.detail-row {
+    background: rgba(0, 0, 0, 0.2);
+    border-left: 3px solid var(--accent-blue);
+    display: none;
+}
+.detail-row.expanded {
+    display: table-row;
+    animation: slideDown 0.3s ease-out;
+}
+.ci-detail-container {
+    padding: 20px 30px;
+    color: #e5e7eb;
+}
+.ci-detail-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 30px;
+}
+.ci-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ci-card h4 {
+    color: var(--accent-blue);
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.fund-item {
+    margin-bottom: 10px;
+}
+.fund-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+}
+.fund-progress-bg {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.fund-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+}
+.timeline {
+    position: relative;
+    padding-left: 20px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.1);
+    margin-left: 10px;
+}
+.timeline-item {
+    position: relative;
+    margin-bottom: 15px;
+    font-size: 0.85rem;
+}
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+}
+.timeline-item.active::before {
+    background: var(--accent-blue);
+    box-shadow: 0 0 8px var(--accent-blue);
+}
+.timeline-label {
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+.timeline-date {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.ci-info-footer {
+    margin-top: 15px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+}
+.ci-btn-action {
+    font-size: 0.8rem;
+    padding: 6px 15px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: 0.2s;
+}
+.ci-btn-dart {
+    color: #facc15;
+    border: 1px solid rgba(250, 204, 21, 0.3);
+}
+.ci-btn-dart:hover {
+    background: rgba(250, 204, 21, 0.1);
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 유상증자 연도별 섹션 스타일 */
+.year-section {
+    margin-bottom: 2rem;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.year-section:hover {
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.year-header {
+    padding: 1rem 1.5rem;
+    background: rgba(51, 65, 85, 0.4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.year-header:hover {
+    background: rgba(71, 85, 105, 0.5);
+}
+
+.year-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.year-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.year-count {
+    font-size: 0.85rem;
+    background: rgba(96, 165, 250, 0.2);
+    color: #60a5fa;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.year-summary {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.summary-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.summary-value {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #facc15;
+}
+
+.year-toggle-icon {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    transition: transform 0.3s ease;
+}
+
+.year-section.collapsed .year-toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.year-content {
+    padding: 0;
+    transition: all 0.3s ease-in-out;
+}
+
+.year-section.collapsed .year-content {
+    display: none;
+}
+
+.year-section.collapsed {
+    margin-bottom: 0.75rem;
+}
