@@ -10,6 +10,7 @@ from synapstock.application.services.command_service import BoardCommandService
 from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
+from synapstock.application.services.market_data_service import MarketDataService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
@@ -26,9 +27,11 @@ from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
 from synapstock.infrastructure.adapters.local.statistics_repo import (
+    LocalCapitalIncreaseRepository,
     LocalCeilingRepository,
     LocalStatisticsRepository,
 )
+from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
@@ -36,6 +39,7 @@ from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
 from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
+from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from synapstock.infrastructure.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -62,12 +66,15 @@ class Container:
             cache_path=str(self.config.stock_cache_path)
         )
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
+        self._krx_adapter = NativeKrxAdapter()
 
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
         self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
+        self._capital_increase_repo = LocalCapitalIncreaseRepository(self.config.capital_increase_dir)
+        self._market_data_repo = LocalMarketDataRepository(self.config.data_dir / "market" / "raw")
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -99,6 +106,11 @@ class Container:
 
         self._report_service = None
         self._init_report_service()
+
+        self._market_data_service = MarketDataService(
+            krx_adapter=self._krx_adapter,
+            repository=self._market_data_repo
+        )
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
@@ -170,6 +182,14 @@ class Container:
     @property
     def statistics_service(self) -> StatisticsService:
         return self._statistics_service
+
+    @property
+    def market_data_service(self) -> MarketDataService:
+        return self._market_data_service
+
+    @property
+    def krx_adapter(self) -> NativeKrxAdapter:
+        return self._krx_adapter
 
 # 전역 컨테이너 인스턴스 생성
 container = Container()
