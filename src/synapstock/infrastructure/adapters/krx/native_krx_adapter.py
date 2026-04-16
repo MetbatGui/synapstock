@@ -95,8 +95,51 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
             logger.error(f"[KRX] 수급 데이터 수집 중 오류: {e}")
             return b""
 
+    def fetch_investor_trading_data(self, market: str, date_str: str) -> bytes:
+        """종목별 투자자 거래실적 수집 (MDCSTAT02201).
+        사용자 요청에 따라 시장 전체 투자자별 거래 합계를 수취함.
+        """
+        if not self.is_logged_in:
+            self._login()
+
+        otp_params = {
+            'bld': 'dbms/MDC/STAT/standard/MDCSTAT02201',
+            'locale': 'ko_KR',
+            'inqTpCd': '1', # 투자자별 합계
+            'trdVolVal': '2', # 거래대금 기반
+            'askBid': '3', # 순매수 기준
+            'mktId': market, # STK, KSQ
+            'etf': 'EF',
+            'etn': 'EN',
+            'elw': 'EW',
+            'strtDd': date_str,
+            'endDd': date_str,
+            'share': '1',
+            'money': '1',
+            'csvxls_isNo': 'false',
+            'name': 'fileDown',
+            'url': 'dbms/MDC/STAT/standard/MDCSTAT02201'
+        }
+
+        try:
+            otp_resp = self.session.post(self.otp_url, data=otp_params)
+            otp_code = otp_resp.text.strip()
+            
+            if len(otp_code) < 10:
+                logger.error(f"[KRX] OTP 발급 실패 (MDCSTAT02201-{market})")
+                return b""
+
+            down_resp = self.session.post(self.download_url, data={'code': otp_code})
+            return down_resp.content
+        except Exception as e:
+            logger.error(f"[KRX] 투자자 거래실적 수집 중 오류: {e}")
+            return b""
+
     def fetch_market_prices(self, market: str, date_str: str) -> list[dict]:
         """전종목 등락률/시세 조회 (MDCSTAT01501)."""
+        if not self.is_logged_in:
+            self._login()
+
         payload = {
             'bld': 'dbms/MDC/STAT/standard/MDCSTAT01501',
             'locale': 'ko_KR',
