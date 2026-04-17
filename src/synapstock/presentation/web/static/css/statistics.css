@@ -1,0 +1,149 @@
+/* Statistics View Styles */
+.stats-container {
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 2100px;
+    margin: 0 auto;
+}
+
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 20px 30px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stats-filters {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.stats-toggle-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stats-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.stats-toggle.active {
+    background: var(--accent-blue);
+    color: #000;
+    box-shadow: 0 4px 12px rgba(0, 210, 255, 0.3);
+}
+
+/* Sub-navigation for Statistics Page */
+.stats-page-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.stats-subnav {
+    display: flex;
+    gap: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 15px;
+    margin-bottom: 10px;
+}
+
+.stats-nav-item {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.stats-nav-item.active {
+    color: var(--accent-blue);
+    background: rgba(0, 210, 255, 0.1);
+}
+
+/* Tables in Statistics */
+.stats-table-wrapper {
+    flex: 1;
+    background: var(--card-bg);
+    border-radius: 24px;
+    border: 1px solid var(--border-color);
+    overflow: auto;
+    padding: 20px 10px;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stats-table th {
+    position: sticky;
+    top: 0;
+    background: #111827;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+    z-index: 10;
+    text-align: left;
+}
+
+.stats-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-size: 0.95rem;
+    vertical-align: middle;
+}
+
+.col-rank { width: 40px; font-weight: 700; color: var(--text-secondary); }
+.col-name { min-width: 160px; font-size: 1.05rem; }
+.col-amount { text-align: right; font-family: monospace; font-size: 1rem; }
+
+/* Badges for Ranking */
+.badge-new { background: #facc15; color: #000; padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; }
+.badge-mini { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+.badge-consecutive { background: rgba(0, 210, 255, 0.15); color: var(--accent-blue); border: 1px solid rgba(0, 210, 255, 0.3); }
+.badge-consecutive-hot { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
+
+/* Markets View */
+.stats-markets-wrapper {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.stats-market-block { flex: 1; display: flex; flex-direction: column; }
+.stats-market-title { text-align: center; color: var(--text-primary); font-size: 1.4rem; font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid var(--accent-blue); }
+
+/* Ceiling Analysis specific */
+.ceiling-tag {
+    display: inline-block;
+    width: 26px; height: 26px; line-height: 26px; text-align: center;
+    border-radius: 6px; font-weight: 900; font-size: 0.85rem;
+}
+.tag-ceiling { background: linear-gradient(135deg, #ef4444, #991b1b); color: white; }
+.tag-newhigh { background: linear-gradient(135deg, #fbbf24, #b45309); color: white; }
+
+.col-price-cell { text-align: center; font-weight: 600; padding: 12px 4px; border-left: 1px solid rgba(255, 255, 255, 0.03); min-width: 82px; }
+.col-price-cell.is-ceiling { background: rgba(239, 68, 68, 0.12) !important; color: #ff4d4d; }
+.col-price-cell.is-floor { background: rgba(59, 130, 246, 0.12) !important; color: #4da6ff; }
