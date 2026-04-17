@@ -1,0 +1,97 @@
+/* Capital Increase (유상증자) Detail Styles */
+.detail-row {
+    background: rgba(0, 0, 0, 0.2);
+    border-left: 3px solid var(--accent-blue);
+    display: table-row;
+    display: none;
+}
+
+.detail-row.expanded {
+    display: table-row;
+    animation: slideDown 0.3s ease-out;
+}
+
+.ci-detail-container {
+    padding: 20px 30px;
+    color: #e5e7eb;
+}
+
+.ci-detail-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 30px;
+}
+
+.ci-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.timeline {
+    position: relative;
+    padding-left: 20px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.1);
+    margin-left: 10px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 15px;
+    font-size: 0.85rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+}
+
+.timeline-item.active::before {
+    background: var(--accent-blue);
+    box-shadow: 0 0 8px var(--accent-blue);
+}
+
+/* Year Section Accordion */
+.year-section {
+    margin-bottom: 2rem;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.year-header {
+    padding: 1rem 1.5rem;
+    background: rgba(51, 65, 85, 0.4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.year-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.year-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.year-summary {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}

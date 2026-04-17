@@ -16,7 +16,8 @@ from synapstock.domain.statistics.models import (
     MonthlyMarketStats,
     RankingItem,
     SupplySubject,
-    PaidInCapitalIncrease
+    PaidInCapitalIncrease,
+    BonusIssue
 )
 from synapstock.infrastructure.parsers.excel_statistics_parser import (
     ExcelStatisticsParser,
@@ -39,6 +40,7 @@ class StatisticsService:
         query_service: Any = None,
         ceiling_repository: Any = None,
         capital_increase_repository: Any = None,
+        bonus_issue_repository: Any = None,
         market_data_service: Any = None,
     ):
         """StatisticsService 객체를 초기화합니다.
@@ -55,6 +57,7 @@ class StatisticsService:
         self._query_service = query_service
         self._ceiling_repo = ceiling_repository
         self._capital_increase_repo = capital_increase_repository
+        self._bonus_issue_repo = bonus_issue_repository
         self._market_data_service = market_data_service
         self._parser = ExcelStatisticsParser()
 
@@ -616,4 +619,54 @@ class StatisticsService:
             return items
         except Exception as e:
             logger.error(f"[StatisticsService] 유상증자 동기화 실패: {e}", exc_info=True)
+            return []
+
+    def get_bonus_issue_data(self, force_sync: bool = False) -> list[BonusIssue]:
+        """무상증자 공시 데이터를 가져옵니다 (캐시 우선)."""
+        if self._bonus_issue_repo and not force_sync:
+            cached = self._bonus_issue_repo.load_data()
+            if cached:
+                return cached
+
+        return self.sync_bonus_issue_data()
+
+    def sync_bonus_issue_data(self) -> list[BonusIssue]:
+        """구글 드라이브에서 무상증자 엑셀 파일을 다운로드하여 동기화합니다."""
+        if not self._storage or not self._bonus_issue_repo:
+            logger.warning("[StatisticsService] 무상증자 동기화를 위한 저장소 또는 어댑터가 설정되지 않았습니다.")
+            return []
+
+        try:
+            # 무상증자 폴더 내의 파일 목록 조회
+            files = self._storage.list_files_in_folder("", folder="bonus_issue")
+            xlsx_files = [f for f in files if f["name"].lower().endswith((".xlsx", ".xls"))]
+
+            if not xlsx_files:
+                logger.warning("[StatisticsService] 무상증자 폴더에 엑셀 파일이 없습니다.")
+                return []
+
+            # 가장 최근 파일 선택
+            xlsx_files.sort(key=lambda x: x["name"], reverse=True)
+            target_file = xlsx_files[0]["name"]
+
+            logger.info(f"[StatisticsService] 무상증자 데이터 동기화 시작: {target_file}")
+            content = self._storage.get_file(target_file, folder="bonus_issue")
+            if not content:
+                return []
+
+            items = self._parser.parse_bonus_issue(content)
+
+            # 티커 보강
+            ticker_map = self._build_local_ticker_map()
+            for item in items:
+                if not item.ticker and item.name in ticker_map:
+                    item.ticker = ticker_map[item.name]
+
+            # 저장
+            self._bonus_issue_repo.save_data(items)
+            logger.info(f"[StatisticsService] 무상증자 데이터 {len(items)}건 동기화 완료")
+
+            return items
+        except Exception as e:
+            logger.error(f"[StatisticsService] 무상증자 동기화 실패: {e}", exc_info=True)
             return []

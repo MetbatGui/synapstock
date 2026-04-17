@@ -25,6 +25,7 @@ class AppConfig(BaseModel):
     netbuy_dir: Path = Path("data/statistics/netbuy")
     ceiling_dir: Path = Path("data/statistics/ceiling")
     capital_increase_dir: Path = Path("data/statistics/capital_increase")
+    bonus_issue_dir: Path = Path("data/statistics/bonus_issue")
 
     # 외부 API 토큰 (환경 변수)
     miro_token: str = ""
@@ -38,6 +39,7 @@ class AppConfig(BaseModel):
     sd_folder_id: str | None = None
     ceiling_folder_id: str | None = None
     capital_increase_folder_id: str | None = None
+    bonus_issue_folder_id: str | None = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -60,10 +62,12 @@ class AppConfig(BaseModel):
             netbuy_dir=data_root / "statistics" / "netbuy",
             ceiling_dir=data_root / "statistics" / "ceiling",
             capital_increase_dir=data_root / "statistics" / "capital_increase",
+            bonus_issue_dir=data_root / "statistics" / "bonus_issue",
             miro_token=os.getenv("MIRO_ACCESS_TOKEN", ""),
             telegram_token=os.getenv("TELEGRAM_API_TOKEN", ""),
             report_folder_id=os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID"),
             sd_folder_id=os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID"),
             ceiling_folder_id=os.getenv("GOOGLE_DRIVE_CEILLING_FOLDER_ID"),
-            capital_increase_folder_id=os.getenv("GOOGLE_DRIVE_CAPITAL_INCREASE_FOLDER_ID")
+            capital_increase_folder_id=os.getenv("GOOGLE_DRIVE_CAPITAL_INCREASE_FOLDER_ID"),
+            bonus_issue_folder_id=os.getenv("GOOGLE_DRIVE_BONUS_SHARE_FOLDER_ID")
         )

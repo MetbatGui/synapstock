@@ -12,6 +12,7 @@ from synapstock.domain.statistics.models import (
     MarketType,
     MonthlyMarketStats,
     PaidInCapitalIncrease,
+    BonusIssue,
     RankingItem,
     SupplySubject,
 )
@@ -482,6 +483,78 @@ class ExcelStatisticsParser:
                     results.append(item)
                 except Exception as e:
                     logger.error(f"[ExcelParser] 유상증자 파싱 실패 (시트: {sheet_name}): {e}")
+                    continue
+
+        return results
+
+    @staticmethod
+    def parse_bonus_issue(content: bytes) -> list[BonusIssue]:
+        """무상증자 결정 엑셀 파일을 파싱하여 도메인 모델 리스트로 변환합니다.
+        엑셀 내의 모든 시트를 순회하며 파싱합니다.
+        
+        Args:
+            content (bytes): 엑셀 바이너리 데이터.
+
+        Returns:
+            list[BonusIssue]: 파싱된 무상증자 데이터 리스트.
+        """
+        sheets_dict = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
+        results: list[BonusIssue] = []
+
+        def to_int(val: Any) -> int:
+            if pd.isna(val) or val == "": return 0
+            if isinstance(val, (int, float)): return int(val)
+            cleaned = re.sub(r"[^0-9-]", "", str(val))
+            return int(cleaned) if cleaned else 0
+
+        def to_float(val: Any) -> float:
+            if pd.isna(val) or val == "": return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            cleaned = re.sub(r"[^0-9.-]", "", str(val))
+            return float(cleaned) if cleaned else 0.0
+
+        def to_str(val: Any) -> str:
+            if pd.isna(val): return ""
+            return str(val).strip()
+
+        for sheet_name, df in sheets_dict.items():
+            if df.empty: continue
+
+            # 1. 헤더 행 찾기
+            header_idx = -1
+            for i in range(min(15, len(df))):
+                row_values = [str(v).strip() for v in df.iloc[i].values if not pd.isna(v)]
+                if any("종목명" in v for v in row_values):
+                    header_idx = i
+                    break
+
+            if header_idx == -1: continue
+
+            new_df = df.iloc[header_idx + 1:].copy()
+            new_df.columns = [str(v).strip() for v in df.iloc[header_idx].values]
+
+            for _, row in new_df.iterrows():
+                try:
+                    name_raw = row.get("종목명")
+                    if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() == "종목명":
+                        continue
+
+                    item = BonusIssue(
+                        date=to_str(row.get("일자")),
+                        name=ExcelStatisticsParser._clean_stock_name(to_str(name_raw)),
+                        is_correction=str(row.get("기재정정여부")).strip() == "Y" or "정정" in str(row.get("기재정정여부")),
+                        disclosure_date=to_str(row.get("무상증자공시일") or row.get("공시일")),
+                        rcp_no=to_str(row.get("접수번호")),
+                        parent_rcp_no=to_str(row.get("상위접수번호")) if not pd.isna(row.get("상위접수번호")) else None,
+                        new_shares=to_int(row.get("신주발행주식수")),
+                        shares_per_old=to_float(row.get("1주당 신주배정주식수")),
+                        record_date=to_str(row.get("신주배정기준일")),
+                        listing_date=to_str(row.get("신주상장일")),
+                        capital_reserve=to_str(row.get("무상증자 재원") or row.get("재원") or "")
+                    )
+                    results.append(item)
+                except Exception as e:
+                    logger.error(f"[ExcelParser] 무상증자 파싱 실패 (시트: {sheet_name}): {e}")
                     continue
 
         return results

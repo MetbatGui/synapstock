@@ -1,4 +1,4 @@
-import { statisticsService } from '../services/statistics_service.js';
+import { statisticsService } from '../../services/statistics_service.js';
 
 /**
  * @typedef {Object} StreakConfig
@@ -224,7 +224,7 @@ export const statisticsView = {
             
             let html = `
                 <div class="stats-grid-item">
-                    <h3 class="stats-section-title">${title}</h3>
+                    <h3 class="stats-grid-item-title">${title}</h3>
                     <table class="stats-table">
                         <thead>
                             <tr>
@@ -289,21 +289,11 @@ export const statisticsView = {
         };
 
         const gridHtml = `
-            <div class="stats-markets-wrapper">
-                <div class="stats-market-block">
-                    <h2 class="stats-market-title">KOSPI</h2>
-                    <div class="stats-subject-grid">
-                        ${renderSubTable('외국인', data.KOSPI.FOREIGN, kospiDouble)}
-                        ${renderSubTable('기관', data.KOSPI.INSTITUTION, kospiDouble)}
-                    </div>
-                </div>
-                <div class="stats-market-block">
-                    <h2 class="stats-market-title">KOSDAQ</h2>
-                    <div class="stats-subject-grid">
-                        ${renderSubTable('외국인', data.KOSDAQ.FOREIGN, kosdaqDouble)}
-                        ${renderSubTable('기관', data.KOSDAQ.INSTITUTION, kosdaqDouble)}
-                    </div>
-                </div>
+            <div class="stats-markets-grid">
+                ${renderSubTable('<i class="fas fa-university"></i> KOSPI <span>외국인</span>', data.KOSPI.FOREIGN, kospiDouble)}
+                ${renderSubTable('<i class="fas fa-university"></i> KOSPI <span>기관</span>', data.KOSPI.INSTITUTION, kospiDouble)}
+                ${renderSubTable('<i class="fas fa-microchip"></i> KOSDAQ <span>외국인</span>', data.KOSDAQ.FOREIGN, kosdaqDouble)}
+                ${renderSubTable('<i class="fas fa-microchip"></i> KOSDAQ <span>기관</span>', data.KOSDAQ.INSTITUTION, kosdaqDouble)}
             </div>
         `;
         

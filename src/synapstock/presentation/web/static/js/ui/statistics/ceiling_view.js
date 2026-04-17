@@ -1,4 +1,4 @@
-import { statisticsService } from '../services/statistics_service.js';
+import { statisticsService } from '../../services/statistics_service.js';
 
 /**
  * 상한가 분석 뷰(Ceiling Analysis View) UI 모듈.
