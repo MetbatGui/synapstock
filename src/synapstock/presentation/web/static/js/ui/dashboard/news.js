@@ -3,7 +3,7 @@
  * @module ui/dashboard/news
  */
 import { addLogEntry } from '../tabs.js';
-import { openModal, closeModal } from '../modals.js';
+import { openModal, closeModal } from '../mindmap/modals.js';
 
 let CURRENT_NEWS_TICKER = '';
 let SCRAPED_NEWS_DATA = null;

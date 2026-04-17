@@ -16,10 +16,11 @@ import {
 import { initNewsEvents, triggerNewsAdd, fetchNews } from './ui/dashboard/news.js';
 import { uploadReport, triggerReportUpload } from './ui/dashboard/reports.js';
 import { initFinancialSidebar } from './ui/dashboard/financials.js';
-import { statisticsView } from './ui/statistics_view.js';
-import { statisticsMonthView } from './ui/statistics_month_view.js';
-import { ceilingView } from './ui/ceiling_view.js';
-import { capitalIncreaseView } from './ui/capital_increase_view.js';
+import { statisticsView } from './ui/statistics/statistics_view.js';
+import { statisticsMonthView } from './ui/statistics/statistics_month_view.js';
+import { ceilingView } from './ui/statistics/ceiling_view.js';
+import { capitalIncreaseView } from './ui/statistics/capital_increase_view.js';
+import { bonusIssueView } from './ui/statistics/bonus_issue_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -29,18 +30,18 @@ window._globalStockCache = [];
 window._findStockByTicker = findStockByTicker;
 
 /**
- * 전역 유틸리티 함수 노출 (HTML onclick 대응)
+ * 전역 유틸리티 함수 노출 (HTML onclick 및 외부 연동 대응)
  */
-window.closeModal = closeModal;
 window.openModal = openModal;
+window.closeModal = closeModal;
 window.showAddNodeModal = showAddNodeModal;
 window.showAddStockModal = showAddStockModal;
 window.triggerReportUpload = triggerReportUpload;
 window.triggerNewsAdd = triggerNewsAdd;
 
-// 인자 필요 함수 래핑
-window.deleteStock = (ticker) => deleteStock(ticker, loadBoardData);
+// 인자(loadBoardData) 주입이 필요한 함수 래핑
 window.deleteNode = (nodeName) => deleteNode(nodeName, loadBoardData);
+window.deleteStock = (ticker) => deleteStock(ticker, loadBoardData);
 
 /**
  * 종목 기본 정보 조회 (통합용)
@@ -136,6 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ceilingView.init(statsContainer);
             } else if (path.includes('capital-increase')) {
                 capitalIncreaseView.render(statsContainer);
+            } else if (path.includes('bonus-issue')) {
+                bonusIssueView.render(statsContainer);
             }
         }
     }

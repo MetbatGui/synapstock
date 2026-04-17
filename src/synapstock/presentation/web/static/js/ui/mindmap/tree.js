@@ -149,3 +149,39 @@ export async function jumpToStock(ticker, boardName, path, loadBoardData) {
         }
     }, 100);
 }
+
+/**
+ * 마인드맵 트리 초기화 (보드 목록 로드 및 이벤트 바인딩)
+ * @param {Function} loadBoardData - 보드 데이터를 로드하는 콜백 함수
+ */
+export async function initTree(loadBoardData) {
+    const boardSelect = document.getElementById('board-select');
+    const loadBtn = document.getElementById('load-board-btn');
+
+    if (!boardSelect || !loadBtn) return;
+
+    try {
+        // 1. 가용 보드 목록 가져오기
+        const response = await fetch('/api/boards');
+        const boards = await response.json();
+
+        if (boards && boards.length > 0) {
+            boardSelect.innerHTML = boards.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+            
+            // 초기 보드 로드 (첫 번째 항목의 ID 사용)
+            const firstBoardId = boards[0].id;
+            window._currentBoardName = firstBoardId;
+            loadBoardData(firstBoardId);
+        }
+
+        // 2. 불러오기 버튼 이벤트
+        loadBtn.onclick = () => {
+            const selected = boardSelect.value;
+            window._currentBoardName = selected;
+            loadBoardData(selected);
+        };
+
+    } catch (err) {
+        console.error('Failed to initialize tree boards:', err);
+    }
+}

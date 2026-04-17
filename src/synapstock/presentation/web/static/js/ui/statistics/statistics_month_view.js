@@ -2,7 +2,7 @@
  * 월간 통계 뷰(Monthly Statistics View) UI 모듈.
  * 월간 누적 수급 순위표 및 필터 렌더링을 담당합니다.
  */
-import { statisticsService } from '../services/statistics_service.js';
+import { statisticsService } from '../../services/statistics_service.js';
 
 /**
  * 뷰 구동에 필요한 설정 상수 객체
@@ -132,7 +132,7 @@ export const statisticsMonthView = {
             if (!rankingData || !rankingData.items || rankingData.items.length === 0) {
                 return `
                     <div class="stats-grid-item">
-                        <h3 class="stats-section-title">${title}</h3>
+                        <h3 class="stats-grid-item-title">${title}</h3>
                         <div style="text-align:center;padding:20px;color:#6b7280;">해당 월 데이터 없음</div>
                     </div>
                 `;
@@ -140,7 +140,7 @@ export const statisticsMonthView = {
             
             let html = `
                 <div class="stats-grid-item">
-                    <h3 class="stats-section-title">${title}</h3>
+                    <h3 class="stats-grid-item-title">${title}</h3>
                     <table class="stats-table">
                         <thead>
                             <tr>
@@ -172,21 +172,11 @@ export const statisticsMonthView = {
         };
 
         const gridHtml = `
-            <div class="stats-markets-wrapper">
-                <div class="stats-market-block">
-                    <h2 class="stats-market-title">KOSPI</h2>
-                    <div class="stats-subject-grid">
-                        ${renderSubTable('외국인 (누적)', data.KOSPI.FOREIGN)}
-                        ${renderSubTable('기관 (누적)', data.KOSPI.INSTITUTION)}
-                    </div>
-                </div>
-                <div class="stats-market-block">
-                    <h2 class="stats-market-title">KOSDAQ</h2>
-                    <div class="stats-subject-grid">
-                        ${renderSubTable('외국인 (누적)', data.KOSDAQ.FOREIGN)}
-                        ${renderSubTable('기관 (누적)', data.KOSDAQ.INSTITUTION)}
-                    </div>
-                </div>
+            <div class="stats-markets-grid">
+                ${renderSubTable('<i class="fas fa-university"></i> KOSPI <span>외국인(누적)</span>', data.KOSPI.FOREIGN)}
+                ${renderSubTable('<i class="fas fa-university"></i> KOSPI <span>기관(누적)</span>', data.KOSPI.INSTITUTION)}
+                ${renderSubTable('<i class="fas fa-microchip"></i> KOSDAQ <span>외국인(누적)</span>', data.KOSDAQ.FOREIGN)}
+                ${renderSubTable('<i class="fas fa-microchip"></i> KOSDAQ <span>기관(누적)</span>', data.KOSDAQ.INSTITUTION)}
             </div>
         `;
         
