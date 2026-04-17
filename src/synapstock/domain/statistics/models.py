@@ -219,3 +219,19 @@ class PaidInCapitalIncrease(BaseModel):
         (시설 + 운영 + 타법인 + 기타)
         """
         return self.fund_facility + self.fund_operation + self.fund_acquisition + self.fund_etc
+
+
+class BonusIssue(BaseModel):
+    """무상증자 결정 공시 데이터 도메인 모델."""
+    date: str  # 일자 (YYYY-MM-DD)
+    name: str  # 종목명
+    is_correction: bool = False  # 기재정정여부
+    disclosure_date: str  # 무상증자공시일
+    rcp_no: str  # 접수번호
+    parent_rcp_no: str | None = None  # 상위접수번호
+    new_shares: int = 0  # 신주발행주식수
+    shares_per_old: float = 0.0  # 1주당 신주배정주식수
+    record_date: str | None = None  # 신주배정기준일
+    listing_date: str | None = None  # 신주상장일
+    capital_reserve: str = ""  # 무상증자 재원 (주식발행초과금 등)
+    ticker: str | None = None  # 시스템 연결용 티커

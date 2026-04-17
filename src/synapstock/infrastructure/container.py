@@ -28,9 +28,9 @@ from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
 from synapstock.infrastructure.adapters.local.statistics_repo import (
-    LocalCapitalIncreaseRepository,
     LocalCeilingRepository,
     LocalCapitalIncreaseRepository,
+    LocalBonusIssueRepository,
     LocalStatisticsRepository,
 )
 from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
@@ -60,6 +60,7 @@ class Container:
         self.config.netbuy_dir.mkdir(parents=True, exist_ok=True)
         self.config.ceiling_dir.mkdir(parents=True, exist_ok=True)
         self.config.capital_increase_dir.mkdir(parents=True, exist_ok=True)
+        self.config.bonus_issue_dir.mkdir(parents=True, exist_ok=True)
         (self.config.data_dir / "market" / "raw").mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
@@ -81,6 +82,7 @@ class Container:
         self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
         self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
         self._capital_increase_repo = LocalCapitalIncreaseRepository(self.config.capital_increase_dir)
+        self._bonus_issue_repo = LocalBonusIssueRepository(self.config.bonus_issue_dir)
         self._market_data_repo = LocalMarketDataRepository(self.config.data_dir / "market" / "raw")
 
         # 4. 조건부 어댑터 (Google Drive)
@@ -119,6 +121,7 @@ class Container:
             query_service=self._query_service,
             ceiling_repository=self._ceiling_repo,
             capital_increase_repository=self._capital_increase_repo,
+            bonus_issue_repository=self._bonus_issue_repo,
             market_data_service=self._market_data_service
         )
 
@@ -139,7 +142,8 @@ class Container:
                 "report": self.config.report_folder_id,
                 "sd": self.config.sd_folder_id,
                 "ceiling": self.config.ceiling_folder_id,
-                "capital_increase": self.config.capital_increase_folder_id
+                "capital_increase": self.config.capital_increase_folder_id,
+                "bonus_issue": self.config.bonus_issue_folder_id
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
