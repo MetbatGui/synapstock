@@ -636,17 +636,23 @@ function loadStockDashboard(ticker, name = null) {
         return;
     }
 
-    // 이름이 없을 경우 백엔드 API에서 조회 시도
-    if (!name) {
-        // 즉시 UI를 그리고 나중에 이름을 업데이트하기 위해 별도 비동기 처리
-        fetchStockInfo(ticker).then(info => {
-            if (info && info.name) {
+    // 항상 서버에서 최신 정보(정합성 확인된 사명 및 계층 경로)를 가져와 보완합니다.
+    fetchStockInfo(ticker).then(info => {
+        if (info) {
+            if (info.name) {
                 const titleEl = document.querySelector('.dashboard-header h1');
                 if (titleEl) titleEl.innerText = `${info.name} (${ticker})`;
-                addLogEntry(`[UI] 종목명 확인: ${info.name} `, 'success');
             }
-        });
-    }
+            
+            // 경로 정보 업데이트 (Breadcrumb)
+            const pathEl = document.querySelector('.dashboard-header p');
+            if (pathEl && info.path && info.path.length > 0) {
+                pathEl.innerText = info.path.join(' > ');
+            }
+            
+            if (info.name) addLogEntry(`[UI] 종목 정보 동기화 완료: ${info.name}`, 'success');
+        }
+    });
 
     const displayTitle = name ? `${name} (${ticker})` : ticker;
 
@@ -662,7 +668,7 @@ function loadStockDashboard(ticker, name = null) {
                     <h1 style="font-size: 2.8rem; font-weight: 700; background: linear-gradient(90deg, #00d2ff, #9d50bb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
                         ${displayTitle}
                     </h1>
-                    <p style="color: #9ca3af; margin: 8px 0 0 0; font-size: 1rem;">Data Source: Naver Finance & DART</p>
+                    <p style="color: #9ca3af; margin: 8px 0 0 0; font-size: 1rem;">Loading path information...</p>
                 </div>
                 <div style="text-align: right">
                     <span class="ticker-badge" style="background: rgba(0, 210, 255, 0.1); border: 1px solid #00d2ff; padding: 8px 20px; border-radius: 20px; color: #00d2ff; font-weight: 700; font-size: 1.1rem;">

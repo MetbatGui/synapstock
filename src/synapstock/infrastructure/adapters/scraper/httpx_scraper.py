@@ -1,17 +1,16 @@
 """HTTPX 기반 뉴스 스크래퍼 어댑터."""
 
+import logging
 import re
 from datetime import datetime
-import logging
-from typing import Optional
 
 import httpx
-
-logger = logging.getLogger(__name__)
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from synapstock.domain.models import ScrapedNews
 from synapstock.domain.ports import NewsScraperPort
+
+logger = logging.getLogger(__name__)
 
 
 class HttpxNewsScraperAdapter(NewsScraperPort):
@@ -31,7 +30,7 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
             )
         }
 
-    async def scrape(self, url: str) -> Optional[ScrapedNews]:
+    async def scrape(self, url: str) -> ScrapedNews | None:
         """URL에서 뉴스 제목과 날짜를 추출한다.
 
         Args:
@@ -43,7 +42,7 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
         try:
             async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout, follow_redirects=True) as client:
                 response = await client.get(url)
-                
+
                 if response.status_code != 200:
                     return None
 
@@ -54,8 +53,8 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
                 # 1. 제목 추출
                 title = ""
                 og_title = soup.find("meta", property="og:title")
-                if og_title:
-                    title = og_title.get("content", "")
+                if isinstance(og_title, Tag):
+                    title = str(og_title.get("content", ""))
                 if not title:
                     title_tag = soup.find("title")
                     if title_tag:
@@ -69,11 +68,11 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
                     ("meta", {"name": "pubdate"}),
                     ("meta", {"name": "date"}),
                 ]
-                
+
                 for tag_name, attrs in date_tags:
                     tag = soup.find(tag_name, attrs)
-                    if tag:
-                        content = tag.get("content", "")
+                    if isinstance(tag, Tag):
+                        content = str(tag.get("content", ""))
                         if content:
                             date_match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", content)
                             if date_match:

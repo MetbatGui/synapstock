@@ -1,8 +1,9 @@
 from __future__ import annotations
+
+import unicodedata
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, List, Optional
-import unicodedata
+from typing import Any
 
 from pydantic import BaseModel, model_validator
 
@@ -231,8 +232,8 @@ class Board(BaseModel):
         """노드를 삭제하고 하위 요소를 부모로 흡수한다. (루트 제외)"""
         if self.root.name == node_name:
             return False
-            
-        def find_and_remove(parent, target_name):
+
+        def find_and_remove(parent: Node, target_name: str) -> bool:
             for i, child in enumerate(parent.nodes):
                 if child.name == target_name:
                     parent.remove_child(target_name, absorb=True)
@@ -240,7 +241,7 @@ class Board(BaseModel):
                 if find_and_remove(child, target_name):
                     return True
             return False
-            
+
         return find_and_remove(self.root, node_name)
 
     def __repr__(self) -> str:
@@ -271,14 +272,14 @@ class SearchResultType(Enum):
 @dataclass
 class SearchResult:
     """검색 결과를 담는 값 객체.
-    
+
     종목(STOCK) 또는 섹터(SECTOR) 정보를 모두 포함할 수 있음.
     """
     type: SearchResultType
     name: str
     board_name: str
-    node_path: List[str]  # ["조선", "재료", ...]
-    ticker: Optional[str] = None  # SECTOR일 경우 None
+    node_path: list[str]  # ["조선", "재료", ...]
+    ticker: str | None = None  # SECTOR일 경우 None
 
 
 class Report(BaseModel):
@@ -288,7 +289,7 @@ class Report(BaseModel):
     title: str
     date: str  # YYYY-MM-DD
     provider: str
-    url: Optional[str] = None
+    url: str | None = None
 
     @property
     def stock_nfc(self) -> str:

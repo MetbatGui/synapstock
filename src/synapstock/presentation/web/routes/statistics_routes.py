@@ -4,8 +4,8 @@
 """
 import logging
 from datetime import datetime
-from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from synapstock.domain.statistics.models import MarketType, SupplySubject
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
 
-@router.get("/daily-ranking")
+@router.get("/daily-ranking", response_model=None)
 async def get_daily_ranking(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
     market: MarketType = Query(MarketType.KOSPI, description="시장 구분 (KOSPI/KOSDAQ)"),
@@ -25,7 +25,7 @@ async def get_daily_ranking(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         result = statistics_service.get_analyzed_ranking(date, market, subject)
         if not result:
             # 데이터가 없는 경우 404가 아닌 빈 결과 또는 메시지 반환 (UI 처리를 위해)
@@ -36,13 +36,13 @@ async def get_daily_ranking(
                 "items": [],
                 "message": "No data available for this date"
             }
-            
+
         return result
     except Exception as e:
         logger.error(f"Error in get_daily_ranking: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/daily-summary")
+@router.get("/daily-summary", response_model=None)
 async def get_daily_summary(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)")
 ):
@@ -50,13 +50,13 @@ async def get_daily_summary(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         return statistics_service.get_daily_summary(date)
     except Exception as e:
         logger.error(f"Error in get_daily_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/monthly-summary")
+@router.get("/monthly-summary", response_model=None)
 async def get_monthly_summary(
     month: str = Query(..., description="조회 월 (YYYY-MM)")
 ):
@@ -64,23 +64,31 @@ async def get_monthly_summary(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         return {
             "month": month,
             "KOSPI": {
-                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.INSTITUTION)
+                "FOREIGN": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSPI, SupplySubject.FOREIGN
+                ),
+                "INSTITUTION": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSPI, SupplySubject.INSTITUTION
+                )
             },
             "KOSDAQ": {
-                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.INSTITUTION)
+                "FOREIGN": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSDAQ, SupplySubject.FOREIGN
+                ),
+                "INSTITUTION": statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSDAQ, SupplySubject.INSTITUTION
+                )
             }
         }
     except Exception as e:
         logger.error(f"Error in get_monthly_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/available-dates")
+@router.get("/available-dates", response_model=None)
 async def get_available_dates(
     market: MarketType = Query(MarketType.KOSPI),
     subject: SupplySubject = Query(SupplySubject.FOREIGN)
@@ -89,7 +97,7 @@ async def get_available_dates(
     try:
         if not statistics_service:
             return []
-            
+
         # StatisticsService에 repo 접근용 헬퍼가 없으면 직접 repo 호출 유도 (또는 서비스에 추가)
         # 여기서는 서비스에 위임하는 것이 좋음
         if hasattr(statistics_service, "_repository") and statistics_service._repository:
@@ -99,13 +107,13 @@ async def get_available_dates(
         logger.error(f"Error in get_available_dates: {e}")
         return []
 
-@router.post("/sync")
+@router.post("/sync", response_model=None)
 async def sync_statistics():
     """구글 드라이브로부터 최신 수급 통계 데이터를 동기화합니다."""
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         count = statistics_service.sync_recent_data(limit=5)
         return {
             "status": "success",
@@ -116,7 +124,7 @@ async def sync_statistics():
         logger.error(f"Error in sync_statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/ceiling-report")
+@router.get("/ceiling-report", response_model=None)
 async def get_ceiling_report(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
     force_sync: bool = Query(False, description="강제 동기화 여부")
@@ -125,7 +133,7 @@ async def get_ceiling_report(
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-            
+
         result = statistics_service.get_ceiling_analysis(date, force_sync=force_sync)
         if not result:
             return {
@@ -133,33 +141,33 @@ async def get_ceiling_report(
                 "items": [],
                 "message": "No ceiling data available for this date"
             }
-            
+
         return result
     except Exception as e:
         logger.error(f"Error in get_ceiling_report: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
 
-@router.get("/ceiling-years")
+@router.get("/ceiling-years", response_model=None)
 async def get_ceiling_years():
     """상한가 분석이 가능한 연도 목록을 반환합니다."""
     try:
         if not statistics_service:
             return [datetime.now().strftime("%Y")]
-            
+
         return statistics_service.list_available_ceiling_years()
     except Exception as e:
         logger.error(f"Error in get_ceiling_years: {e}")
         return [datetime.now().strftime("%Y")]
 
-@router.get("/ceiling-dates")
+@router.get("/ceiling-dates", response_model=None)
 async def get_ceiling_dates(
-    year: Optional[str] = Query(None, description="조회할 연도 (YYYY)")
+    year: str | None = Query(None, description="조회할 연도 (YYYY)")
 ):
     """특정 연도의 상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
     try:
         if not statistics_service:
             return []
-            
+
         return statistics_service.list_available_ceiling_dates(year=year)
     except Exception as e:
         logger.error(f"Error in get_ceiling_dates: {e}")

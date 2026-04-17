@@ -968,8 +968,8 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    max-width: 2100px;
-    /* 이전 1900px에서 약 10% 가량 추가 확장 */
+    max-width: 2500px;
+    /* 이전 2100px에서 추가 확장하여 가로 공간 확보 */
     margin: 0 auto;
 }
 
@@ -1158,6 +1158,8 @@ h2 {
 
 .stats-table {
     width: 100%;
+    min-width: 550px;
+    /* 테이블이 너무 쪼그라들지 않도록 최소 너비 설정 */
     border-collapse: collapse;
     text-align: left;
 }
@@ -1208,18 +1210,21 @@ h2 {
 }
 
 .col-name {
-    min-width: 140px;
+    min-width: 180px;
     /* 종목명 최소 너비 보장 */
     font-size: 1.05rem;
-    /* 글씨 크기를 좀 더 키움 */
+    font-weight: 600;
 }
 
 .col-amount {
     text-align: right;
-    font-family: monospace;
+    font-family: 'JetBrains Mono', 'Space Mono', monospace;
     font-size: 1rem;
-    /* 폰트 약간 상향 */
+    min-width: 110px;
+    /* 순매수 금액 공간 추가 확보 */
 }
+
+
 
 .col-highprice {
     text-align: center;

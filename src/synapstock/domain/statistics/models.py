@@ -1,10 +1,11 @@
-from enum import Enum
-from typing import List, Optional
+from enum import StrEnum
+
 from pydantic import BaseModel, computed_field
 
-class MarketType(str, Enum):
+
+class MarketType(StrEnum):
     """주식 시장 유형.
-    
+
     Attributes:
         KOSPI: 유가증권시장.
         KOSDAQ: 코스닥시장.
@@ -12,9 +13,9 @@ class MarketType(str, Enum):
     KOSPI = "KOSPI"
     KOSDAQ = "KOSDAQ"
 
-class SupplySubject(str, Enum):
+class SupplySubject(StrEnum):
     """수급 주체 유형.
-    
+
     Attributes:
         FOREIGN: 외국인 투자자.
         INSTITUTION: 기관 투자자.
@@ -35,8 +36,8 @@ class RankingItem(BaseModel):
     rank: int
     name: str
     amount: int
-    ticker: Optional[str] = None
-    high_price_type: Optional[str] = None
+    ticker: str | None = None
+    high_price_type: str | None = None
 
 class DailyMarketRanking(BaseModel):
     """특정 마켓 및 주체의 일별 수급 TOP 30 리포트 모델.
@@ -50,7 +51,7 @@ class DailyMarketRanking(BaseModel):
     date: str
     market: MarketType
     subject: SupplySubject
-    items: List[RankingItem]
+    items: list[RankingItem]
 
 class MonthlyMarketStats(BaseModel):
     """월간 누적 수급 통계 모델.
@@ -64,7 +65,7 @@ class MonthlyMarketStats(BaseModel):
     month: str
     market: MarketType
     subject: SupplySubject
-    items: List[RankingItem]
+    items: list[RankingItem]
 
 # --- Analysis DTOs ---
 
@@ -75,14 +76,13 @@ class AnalyzedRankingItem(RankingItem):
         prev_rank (Optional[int]): 이전 거래일의 순위.
         consecutive_days (int): 연속 상위권 등장 횟수 (기본값 1).
     """
-    prev_rank: Optional[int] = None
+    prev_rank: int | None = None
     consecutive_days: int = 1
 
     @computed_field
-    @property
-    def rank_change(self) -> Optional[int]:
+    def rank_change(self) -> int | None:
         """순위 변동폭 (이전 순위 - 현재 순위).
-        
+
         Returns:
             Optional[int]: 변동폭. 이전 순위가 없으면 None.
         """
@@ -91,10 +91,9 @@ class AnalyzedRankingItem(RankingItem):
         return self.prev_rank - self.rank
 
     @computed_field
-    @property
     def is_new(self) -> bool:
         """신규 진입 여부 판단.
-        
+
         Returns:
             bool: 이전 순위 정보가 없으면 True.
         """
@@ -113,8 +112,8 @@ class DailyMarketRankingAnalysis(BaseModel):
     date: str
     market: MarketType
     subject: SupplySubject
-    items: List[AnalyzedRankingItem]
-    previous_date: Optional[str] = None
+    items: list[AnalyzedRankingItem]
+    previous_date: str | None = None
 
 # --- Ceiling Analysis Models ---
 
@@ -129,16 +128,15 @@ class CeilingItem(BaseModel):
     """
     name: str
     entry_tag: str
-    closing_prices: List[int]
-    ticker: Optional[str] = None
+    closing_prices: list[int]
+    ticker: str | None = None
 
     @computed_field
-    @property
     def change_rate(self) -> float:
         """기준일 대비 최종 수익률 (%) 계산.
-        
+
         공식: ((현재가 - 진입가) / 진입가) * 100
-        
+
         Returns:
             float: 소수점 둘째 자리까지 반올림된 수익률.
         """
@@ -151,10 +149,9 @@ class CeilingItem(BaseModel):
         return round(((last - first) / first) * 100, 2)
 
     @computed_field
-    @property
     def is_completed(self) -> bool:
         """10거래일 데이터 수집 완료 여부 판단.
-        
+
         Returns:
             bool: 가격 리스트 크기가 10 이상이면 True.
         """
@@ -173,14 +170,13 @@ class CeilingAnalysisReport(BaseModel):
     title: str
     start_date: str
     end_date: str
-    dates: List[str] = []
-    items: List[CeilingItem]
+    dates: list[str] = []
+    items: list[CeilingItem]
 
     @computed_field
-    @property
     def is_fully_collected(self) -> bool:
         """리포트 내 모든 종속 항목의 수집 완결 여부 확인.
-        
+
         Returns:
             bool: 모든 item의 is_completed가 True인 경우 True.
         """

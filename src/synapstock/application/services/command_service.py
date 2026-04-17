@@ -1,7 +1,10 @@
 """보드 구조 변경 및 명령 서비스를 담당하는 유즈케이스 레이어."""
 
+from typing import cast
+
 from synapstock.domain.models import Stock
 from synapstock.domain.ports import BoardRepositoryPort
+
 
 class BoardCommandService:
     """보드의 구조적 변경(추가/삭제) 작업을 수행하는 서비스 클래스입니다. (CQRS - Command)"""
@@ -14,7 +17,7 @@ class BoardCommandService:
         """특정 부모 노드 아래에 하위 노드를 추가합니다."""
         board = self._repository.load(board_name)
         # Board 도메인 모델의 비즈니스 로직 호출
-        success = board.add_node(parent_name, new_node_name)
+        success = cast(bool, board.add_node(parent_name, new_node_name))
         if success:
             self._repository.save(board)
         return success
@@ -23,7 +26,7 @@ class BoardCommandService:
         """특정 부모 노드 아래에 새 종목을 추가합니다."""
         board = self._repository.load(board_name)
         # Board 도메인 모델의 비즈니스 로직 호출
-        success = board.add_stock_to_node(parent_name, Stock(name=stock_name, ticker=ticker))
+        success = cast(bool, board.add_stock_to_node(parent_name, Stock(name=stock_name, ticker=ticker)))
         if success:
             self._repository.save(board)
         return success
@@ -32,7 +35,7 @@ class BoardCommandService:
         """특정 노드를 삭제하고 구조를 재조립합니다."""
         board = self._repository.load(board_name)
         # Board 도메인 모델의 비즈니스 로직 호출
-        success = board.delete_node(node_name)
+        success = cast(bool, board.delete_node(node_name))
         if success:
             self._repository.save(board)
         return success
@@ -41,7 +44,7 @@ class BoardCommandService:
         """보드 내에서 특정 종목(티커 기준)을 찾아 삭제합니다."""
         board = self._repository.load(board_name)
         # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 삭제)
-        success = board.root.find_and_remove_stock(ticker)
+        success = cast(bool, board.root.find_and_remove_stock(ticker))
         if success:
             self._repository.save(board)
         return success

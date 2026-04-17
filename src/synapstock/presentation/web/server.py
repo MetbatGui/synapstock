@@ -16,7 +16,12 @@ from fastapi.templating import Jinja2Templates
 
 from synapstock.presentation.web.core.dependencies import sync_indices_if_needed
 from synapstock.presentation.web.core.websocket_manager import manager
-from synapstock.presentation.web.routes import board_routes, report_routes, stock_routes, statistics_routes
+from synapstock.presentation.web.routes import (
+    board_routes,
+    report_routes,
+    statistics_routes,
+    stock_routes,
+)
 
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -79,7 +84,14 @@ async def get_statistics_page(request: Request):
 @app.get("/statistics/{subpath:path}", response_class=HTMLResponse)
 async def get_statistics_subpage(request: Request, subpath: str):
     """수급 분석 서브 라우트(netbuy/ranking 등)를 위해 SPA 템플릿을 서빙합니다."""
-    return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": f"statistics-{subpath.replace('/', '-')}"})
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "ticker": None,
+            "mode": f"statistics-{subpath.replace('/', '-')}"
+        }
+    )
 
 # ── WebSocket ────────────────────────────────────────────────────────────────
 @app.websocket("/ws/logs")
@@ -107,11 +119,11 @@ async def startup_event():
     import logging
     logger = logging.getLogger(__name__)
     logger.info("[Startup] SynapStock 서버 시작 중...")
-    
+
     # 리포트 인덱스 동기화 (Background)
     logger.info("[Startup] 리포트 인덱스 동기화 태스크 시작 (Google Drive)")
     asyncio.create_task(sync_indices_if_needed(force=True))
-    
+
     logger.info("[Startup] 서버 초기화 완료.")
 
 

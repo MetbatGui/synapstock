@@ -17,6 +17,7 @@ import { fetchNews } from './services/news_service.js';
 import { statisticsView } from './ui/statistics_view.js';
 import { statisticsMonthView } from './ui/statistics_month_view.js';
 import { ceilingView } from './ui/ceiling_view.js';
+import { capitalIncreaseView } from './ui/capital_increase_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -170,15 +171,23 @@ function loadStockDashboard(ticker, name = null) {
         return;
     }
 
-    if (!name) {
-        fetchStockInfo(ticker).then(info => {
-            if (info && info.name) {
+    // 항상 서버에서 최신 정보(정합성 확인된 사명 및 계층 경로)를 가져와 보완합니다.
+    fetchStockInfo(ticker).then(info => {
+        if (info) {
+            if (info.name) {
                 const titleEl = document.querySelector('.dashboard-header h1');
                 if (titleEl) titleEl.innerText = `${info.name} (${ticker})`;
-                addLogEntry(`[UI] 종목명 확인: ${info.name}`, 'success');
             }
-        });
-    }
+            
+            // 경로 정보 업데이트 (Breadcrumb)
+            const pathEl = document.querySelector('.dashboard-header p');
+            if (pathEl && info.path && info.path.length > 0) {
+                pathEl.innerText = info.path.join(' > ');
+            }
+            
+            if (info.name) addLogEntry(`[UI] 종목 정보 동기화 완료: ${info.name}`, 'success');
+        }
+    });
 
     const displayTitle = name ? `${name} (${ticker})` : ticker;
     placeholder.style.display = 'none';
@@ -190,7 +199,7 @@ function loadStockDashboard(ticker, name = null) {
             <div class="dashboard-header" style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:25px;">
                 <div>
                     <h1 style="font-size:2.8rem;font-weight:700;background:linear-gradient(90deg,#00d2ff,#9d50bb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;">${displayTitle}</h1>
-                    <p style="color:#9ca3af;margin:8px 0 0 0;font-size:1rem;">Data Source: Naver Finance & DART</p>
+                    <p style="color:#9ca3af;margin:8px 0 0 0;font-size:1rem;">Loading path information...</p>
                 </div>
                 <div style="text-align:right">
                     <span class="ticker-badge" style="background:rgba(0,210,255,0.1);border:1px solid #00d2ff;padding:8px 20px;border-radius:20px;color:#00d2ff;font-weight:700;font-size:1.1rem;">${ticker}</span>
@@ -341,6 +350,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 statisticsMonthView.init(statsContainer);
             } else if (path.includes('ceiling')) {
                 ceilingView.init(statsContainer);
+            } else if (path.includes('capital-increase')) {
+                capitalIncreaseView.init(statsContainer);
             } else {
                 statsContainer.innerHTML = '<div class="stats-empty">존재하지 않는 페이지입니다.</div>';
             }
