@@ -38,21 +38,24 @@ class StatisticsService:
         repository: Any = None,
         query_service: Any = None,
         ceiling_repository: Any = None,
-        capital_increase_repository: Any = None
+        capital_increase_repository: Any = None,
+        market_data_service: Any = None,
     ):
         """StatisticsService 객체를 초기화합니다.
 
         Args:
-            storage (Any, optional): 외부 스토리지(예: GoogleDriveAdapter) 어댑터 인스턴스. Defaults to None.
-            repository (Any, optional): 통계 데이터를 저장/조회할 저장소 구현체. Defaults to None.
-            query_service (Any, optional): 종목 정보 조회를 위한 서비스. Defaults to None.
-            ceiling_repository (Any, optional): 상한가 분석 저장소 구현체. Defaults to None.
+            storage: 원격 저장소 (Google Drive 등).
+            repository: 일별 수급 순위 로컬/DB 저장소.
+            query_service: 종목(티커) 쿼리용 서비스 (옵션).
+            ceiling_repository: 상한가 관리용 로컬 저장소.
+            market_data_service: 시장 데이터 수집기 서비스.
         """
         self._storage = storage
         self._repository = repository
         self._query_service = query_service
         self._ceiling_repo = ceiling_repository
         self._capital_increase_repo = capital_increase_repository
+        self._market_data_service = market_data_service
         self._parser = ExcelStatisticsParser()
 
     def _build_local_ticker_map(self) -> dict[str, str]:
@@ -93,6 +96,7 @@ class StatisticsService:
             return
         for ranking in rankings:
             self._repository.save_daily_ranking(ranking)
+
 
     def get_daily_ranking(
         self,
@@ -221,6 +225,14 @@ class StatisticsService:
                     synced_count += 1
 
             logger.info(f"[StatisticsService] 총 {synced_count}개 일자 동기화 완료")
+            
+            # [추가] 구글 동기화 완료 후 KRX 데이터 연쇄 수집
+            if self._market_data_service:
+                logger.info("[StatisticsService] 연쇄 작업 시작: KRX 데이터 동기화 트리거")
+                # 최신 시트의 날짜가 있으면 해당 날짜로, 없으면 당일로 수집
+                latest_date = target_sheets[0].replace("-", "") if target_sheets else None
+                self._market_data_service.sync_daily_data(latest_date)
+
             return synced_count
         except Exception as e:
             logger.error(f"[StatisticsService] 일괄 동기화 실패: {e}", exc_info=True)
