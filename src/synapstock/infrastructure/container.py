@@ -13,6 +13,7 @@ from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.market_data_service import MarketDataService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
+from synapstock.application.services.analytics_service import AnalyticsService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
     DartDisclosureAdapter,
 )
@@ -106,6 +107,10 @@ class Container:
             krx_adapter=self._krx_adapter,
             repository=self._market_data_repo
         )
+        
+        self._analytics_service = AnalyticsService(
+            market_data_repo=self._market_data_repo
+        )
 
         self._statistics_service = StatisticsService(
             storage=self._drive_adapter,
@@ -188,6 +193,10 @@ class Container:
     @property
     def statistics_service(self) -> StatisticsService:
         return self._statistics_service
+
+    @property
+    def analytics_service(self) -> AnalyticsService:
+        return self._analytics_service
 
     @property
     def market_data_service(self) -> MarketDataService:
