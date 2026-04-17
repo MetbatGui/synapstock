@@ -107,3 +107,27 @@ class LocalCeilingRepository:
             except Exception:
                 continue
         return sorted(dates, reverse=True)
+
+
+class LocalCapitalIncreaseRepository:
+    """유상증자 분석 데이터를 로컬 JSON 파일로 관리하는 저장소."""
+
+    def __init__(self, data_root: str = "data/statistics/capital_increase"):
+        self.root = Path(data_root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_items(self, items: list):
+        """유상증자 아이템 목록을 JSON 파일로 저장한다."""
+        import json
+        path = self.root / "capital_increase_data.json"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(items, f, ensure_ascii=False, indent=2)
+
+    def load_items(self) -> list:
+        """가장 최근에 저장된 유상증자 아이템들을 불러온다."""
+        import json
+        path = self.root / "capital_increase_data.json"
+        if not path.exists():
+            return []
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)

@@ -228,11 +228,11 @@ export const statisticsView = {
                     <table class="stats-table">
                         <thead>
                             <tr>
-                                <th class="col-rank">순위</th>
-                                <th class="col-change">변동</th>
-                                <th class="col-name">종목명</th>
-                                <th class="col-amount">순매수금액(백만)</th>
-                                <th class="col-highprice">신고가</th>
+                                <th class="col-rank" style="width: 5%;">순위</th>
+                                <th class="col-change" style="width: 7%;">변동</th>
+                                <th class="col-name" style="width: 35%;">종목명</th>
+                                <th class="col-amount" style="width: 25%;">순매수(백만)</th>
+                                <th class="col-highprice" style="width: 10%;">신고가</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -262,6 +262,8 @@ export const statisticsView = {
                 const highPriceHtml = item.high_price_type
                     ? `<span class="${highPriceClass}">${item.high_price_type}</span>`
                     : '<span style="color: rgba(255,255,255,0.1)">-</span>';
+                    
+                    
                     
                 html += `
                     <tr class="${item.is_new ? 'row-new' : ''}">

@@ -184,3 +184,20 @@ class NewsScraperPort(ABC):
         """URL에서 뉴스 제목과 날짜를 추출한다."""
 
 
+class KrxDataPort(ABC):
+    """KRX 원천 데이터 수집을 위한 추상 포트."""
+
+    @abstractmethod
+    def fetch_net_purchase_data(self, market: str, investor: str, date_str: str) -> bytes:
+        """특정 날짜의 투자자별 순매수 데이터(엑셀 바이너리)를 가져온다."""
+
+    @abstractmethod
+    def fetch_market_prices(self, market: str, date_str: str) -> list[dict]:
+        """특정 날짜의 전종목 시세/대금 데이터를 가져온다."""
+
+class PriceDataPort(ABC):
+    """가격 및 신고가 지표 조회를 위한 추상 포트."""
+
+    @abstractmethod
+    def get_price_info(self, ticker: str, date_str: str) -> dict | None:
+        """특정 종목의 가격 및 신고가 정보를 가져온다."""
