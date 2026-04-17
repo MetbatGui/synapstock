@@ -100,7 +100,7 @@ export const capitalIncreaseView = {
                 return dateB.localeCompare(dateA);
             });
 
-            this.cachedItems = items;
+            this.cachedItems = this.calculateCorrectionOrders(items);
 
             // 연도 드롭다운 업데이트
             this.updateYearOptions(items);
@@ -179,12 +179,13 @@ export const capitalIncreaseView = {
             // 메인 행 (Basic Info)
             const tr = document.createElement('tr');
             tr.className = 'ci-row';
+            tr.dataset.rcpNo = item.rcp_no; // 식별자 추가
             tr.style.cursor = 'pointer';
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.disclosure_date || item.date}</td>
                 <td style="font-weight:600; color:#e5e7eb;">
                     ${item.ticker ? `<a href="/stock/${item.ticker}" onclick="event.stopPropagation(); event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
-                    ${item.is_correction ? '<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정</span>' : ''}
+                    ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정${item.correction_count > 0 ? ` (${item.correction_count}차)` : ''}</span>` : ''}
                 </td>
                 <td style="color:#60a5fa;">${item.method}</td>
                 <td style="text-align:right; font-weight:600; color:#facc15;">${this.formatUnit(total)}</td>
@@ -224,7 +225,8 @@ export const capitalIncreaseView = {
 
                     // 펼칠 때 내용이 없으면 그때 생성 (성능 최적화)
                     if (container.innerHTML.trim().length < 50) {
-                        container.innerHTML = this.generateDetailHtml(item, total);
+                        const history = this.getHistoryChain(item.rcp_no);
+                        container.innerHTML = this.generateDetailHtml(item, total, history);
                     }
                     detailTr.style.display = 'table-row';
                     if (icon) icon.style.transform = 'rotate(180deg)';
@@ -239,12 +241,35 @@ export const capitalIncreaseView = {
     /**
      * 상세 보기를 위한 HTML 조각을 생성합니다.
      */
-    generateDetailHtml: function (item, totalAmount) {
+    generateDetailHtml: function (item, totalAmount, history = []) {
         const p = (val) => totalAmount > 0 ? (val / totalAmount * 100).toFixed(1) : 0;
+        
+        // 히스토리 드롭다운 옵션 생성
+        let historyOptions = '';
+        if (history.length > 1) {
+            historyOptions = `
+                <div class="ci-history-nav" style="margin-top:20px; padding-top:15px; border-top:1px dashed rgba(255,255,255,0.1); display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:0.85rem; color:#9ca3af;"><i class="fas fa-history"></i> 공시 이력:</span>
+                    <select class="stats-select" onchange="window._jumpToCiHistory(this.value)" style="flex:1; max-width:400px; font-size:0.85rem; height:32px;">
+                        <option value="">이전/정정 공시로 이동...</option>
+                        ${history.map(h => `
+                            <option value="${h.rcp_no}" ${h.rcp_no === item.rcp_no ? 'selected disabled' : ''}>
+                                ${h.disclosure_date || h.date} - ${h.correction_count === 0 ? '최초공시' : h.correction_count + '차정정'} ${h.rcp_no === item.rcp_no ? '(현재)' : ''}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            `;
+
+            // 전역 핸들러 등록 (HTML 문자열 onclick/onchange 대응용)
+            window._jumpToCiHistory = (rcpNo) => {
+                if (rcpNo) this.jumpToDisclosure(rcpNo);
+            };
+        }
 
         return `
             <div class="ci-detail-container">
-                <div class="ci-detail-grid">
+                <div class="ci-detail-grid" style="grid-template-columns: 1.2fr 1fr 1fr;">
                     <!-- 자금 조달 목적 분석 -->
                     <div class="ci-card">
                         <h4><i class="fas fa-chart-pie"></i> 자금 조달 목적 비중</h4>
@@ -286,6 +311,37 @@ export const capitalIncreaseView = {
                         </div>
                     </div>
 
+                    <!-- 신주 발행 및 가격 정보 -->
+                    <div class="ci-card">
+                        <h4><i class="fas fa-coins"></i> 신주 및 가격 정보</h4>
+                        <div class="fund-item" style="margin-bottom: 20px;">
+                            <div class="fund-label-row">
+                                <span style="color:#9ca3af;">신주발행주식수</span>
+                            </div>
+                            <div style="font-size: 1.3rem; font-weight: 700; color: #e5e7eb; margin-top: 5px;">
+                                ${item.new_shares ? item.new_shares.toLocaleString() : '-'} <span style="font-size: 0.85rem; color: #9ca3af; font-weight: 400;">주</span>
+                            </div>
+                        </div>
+                        <div class="fund-item" style="margin-bottom: 20px;">
+                            <div class="fund-label-row">
+                                <span style="color:#9ca3af;">신주발행가액</span>
+                            </div>
+                            <div style="font-size: 1.3rem; font-weight: 700; color: #facc15; margin-top: 5px;">
+                                ${item.issue_price ? item.issue_price.toLocaleString() : '-'} <span style="font-size: 0.85rem; color: #9ca3af; font-weight: 400;">원</span>
+                            </div>
+                        </div>
+                        ${item.confirmed_price ? `
+                        <div class="fund-item">
+                            <div class="fund-label-row">
+                                <span style="color:#9ca3af;">확정발행가액</span>
+                            </div>
+                            <div style="font-size: 1.1rem; font-weight: 600; color: #4ade80; margin-top: 5px;">
+                                ${item.confirmed_price.toLocaleString()} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">원</span>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+
                     <!-- 주요 일정 타임라인 -->
                     <div class="ci-card">
                         <h4><i class="fas fa-calendar-alt"></i> 주요 일정</h4>
@@ -316,13 +372,13 @@ export const capitalIncreaseView = {
 
                 <div class="ci-info-footer">
                     <div style="margin-right: auto; font-size: 0.85rem; color: #9ca3af;">
-                        <span style="margin-right: 15px;">신주발행: <b>${item.new_shares ? item.new_shares.toLocaleString() : '-'}</b> 주</span>
-                        <span>발행가: <b>${item.issue_price ? item.issue_price.toLocaleString() : '-'}</b> 원</span>
+                        <span>증자후 발행주식총수: <b>${(item.pre_issued_shares + (item.new_shares || 0)).toLocaleString()}</b> 주</span>
                     </div>
                     <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="ci-btn-action ci-btn-dart">
                         DART 공시 원문 보기 <i class="fas fa-external-link-alt"></i>
                     </a>
                 </div>
+                ${historyOptions}
             </div>
         `;
     },
@@ -338,6 +394,116 @@ export const capitalIncreaseView = {
             return `${(value / 10000).toFixed(0)}만`;
         }
         return value.toLocaleString();
+    },
+
+    /**
+     * 모든 공시 항목의 기재정정 차수를 계산합니다.
+     * @param {Array} items - 유상증자 공시 항목 리스트
+     * @returns {Array} 차수 정보가 추가된 항목 리스트
+     */
+    calculateCorrectionOrders: function (items) {
+        if (!items || items.length === 0) return [];
+
+        // 1. 빠른 조회를 위한 맵 생성 (rcp_no -> item)
+        const itemMap = {};
+        items.forEach(item => {
+            if (item.rcp_no) itemMap[item.rcp_no] = item;
+        });
+
+        // 2. 각 항목의 차수 계산
+        return items.map(item => {
+            let count = 0;
+            let current = item;
+
+            // 상위 공시(parent_rcp_no)가 있고, 그 공시가 실제 데이터에 존재하는 동안 추적
+            while (current && current.parent_rcp_no && itemMap[current.parent_rcp_no]) {
+                count++;
+                current = itemMap[current.parent_rcp_no];
+                
+                // 무한 루프 방지 (자기 참조 방지)
+                if (current.rcp_no === item.rcp_no) break;
+            }
+
+            return { ...item, correction_count: count };
+        });
+    },
+
+    /**
+     * 특정 공시와 연관된 모든 전후 공시 이력을 찾아 계보를 만듭니다.
+     * @param {string} rcpNo - 기준 공시 번호
+     * @returns {Array} 시간 순서대로 정렬된 히스토리 아이템 배열
+     */
+    getHistoryChain: function (rcpNo) {
+        const currentItem = this.cachedItems.find(it => it.rcp_no === rcpNo);
+        if (!currentItem) return [];
+
+        // 1. 모든 아이템을 rcp_no 맵과 종목별 그룹으로 분리
+        const allItemsOfStock = this.cachedItems.filter(it => it.name === currentItem.name);
+        
+        // 2. 부모/자식 포인터를 따라가지 않고, 같은 종목 내에서 연관된 이력을 모두 수집
+        // (실제 데이터상 rcp_no 체인이 연결되어 있지 않더라도 같은 종목의 유상증자 이력을 보여주는 것이 유용함)
+        // 여기서는 엄격한 '정정' 관계만 보여주기 위해 parent_rcp_no를 추적하여 루트를 찾고 다시 내려오는 방식 권장
+        
+        let root = currentItem;
+        const itemMap = {};
+        this.cachedItems.forEach(it => { if(it.rcp_no) itemMap[it.rcp_no] = it; });
+
+        // 루트(최초공시) 찾기
+        while (root && root.parent_rcp_no && itemMap[root.parent_rcp_no]) {
+            root = itemMap[root.parent_rcp_no];
+        }
+
+        // 해당 루트로부터 파생된 모든 가지 수집 (정렬된 일일 수급 리스트이므로 날짜순 탐색이 유리)
+        const chain = allItemsOfStock.filter(it => {
+            let temp = it;
+            while(temp && temp.parent_rcp_no) {
+                if(temp.rcp_no === root.rcp_no || temp.parent_rcp_no === root.rcp_no) return true;
+                temp = itemMap[temp.parent_rcp_no];
+            }
+            return it.rcp_no === root.rcp_no;
+        });
+
+        return chain.sort((a, b) => {
+            const da = a.disclosure_date || a.date || "";
+            const db = b.disclosure_date || b.date || "";
+            return da.localeCompare(db);
+        });
+    },
+
+    /**
+     * 특정 공시 번호로 화면을 이동하고 상세 내용을 펼칩니다.
+     * @param {string} rcpNo - 이동할 타겟 공시 번호
+     */
+    jumpToDisclosure: async function (rcpNo) {
+        const target = this.cachedItems.find(it => it.rcp_no === rcpNo);
+        if (!target) return;
+
+        const year = (target.disclosure_date || target.date || "").substring(0, 4);
+        const yearSelect = document.getElementById('ci-year-select');
+        
+        // 1. 연도 필터 변경 및 재렌더링
+        if (yearSelect && yearSelect.value !== year) {
+            yearSelect.value = year;
+            this.renderTable(this.cachedItems, year);
+        }
+
+        // 2. DOM에서 해당 행 찾기 (렌더링 직후이므로 약간의 지연 필요할 수 있음)
+        setTimeout(() => {
+            const targetRow = document.querySelector(`.ci-row[data-rcp-no="${rcpNo}"]`);
+            if (targetRow) {
+                // 부드럽게 스크롤
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // 강조 및 자동 클릭
+                targetRow.style.outline = '2px solid var(--accent-blue)';
+                setTimeout(() => targetRow.style.outline = 'none', 2000);
+                
+                const detailRow = targetRow.nextElementSibling;
+                if (detailRow && detailRow.style.display === 'none') {
+                    targetRow.click();
+                }
+            }
+        }, 100);
     }
 };
 
