@@ -5,8 +5,7 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    max-width: 2100px;
-    margin: 0 auto;
+    margin: 0;
 }
 
 .stats-header {
@@ -56,6 +55,9 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+    max-width: 2420px;
+    width: 100%;
+    margin: 0 auto;
 }
 
 .stats-subnav {
@@ -125,15 +127,82 @@
 .badge-consecutive { background: rgba(0, 210, 255, 0.15); color: var(--accent-blue); border: 1px solid rgba(0, 210, 255, 0.3); }
 .badge-consecutive-hot { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
 
-/* Markets View */
-.stats-markets-wrapper {
+.name-badge-wrapper {
     display: flex;
-    gap: 20px;
-    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
 }
 
-.stats-market-block { flex: 1; display: flex; flex-direction: column; }
-.stats-market-title { text-align: center; color: var(--text-primary); font-size: 1.4rem; font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid var(--accent-blue); }
+.stock-name-text {
+    flex-shrink: 0;
+}
+
+.badge-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.badge-double { background: #1e1b4b; color: #a5b4fc; border: 1px solid #3730a3; }
+
+.badge-highprice {
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.hp-red { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
+.hp-orange { background: #7c2d12; color: #fed7aa; border: 1px solid #9a3412; }
+.hp-yellow { background: #713f12; color: #fef08a; border: 1px solid #854d0e; }
+.hp-lightgreen { background: #14532d; color: #bbf7d0; border: 1px solid #166534; }
+
+.change-up { color: #f87171; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 2px; }
+.change-down { color: #60a5fa; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 2px; }
+.change-none { color: var(--text-secondary); opacity: 0.4; }
+
+/* Markets View */
+.stats-markets-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.stats-grid-item {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 15px;
+}
+
+.row-new {
+    background: rgba(250, 204, 21, 0.05);
+}
+
+.row-new td {
+    border-bottom: 1px solid rgba(250, 204, 21, 0.2) !important;
+}
+
+.stats-grid-item-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 210, 255, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stats-grid-item-title span {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    font-weight: 400;
+}
 
 /* Ceiling Analysis specific */
 .ceiling-tag {

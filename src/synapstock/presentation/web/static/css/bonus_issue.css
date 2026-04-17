@@ -1,0 +1,102 @@
+/* Bonus Issue Analysis Styles */
+.bonus-issue-container {
+    padding: 20px;
+}
+
+.bonus-issue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.bonus-issue-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.bonus-issue-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.bonus-issue-table th {
+    padding: 15px;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.bonus-issue-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.bonus-issue-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.bonus-issue-table tr.correction-row td {
+    color: #ff9800;
+}
+
+.bonus-issue-table .badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge-correction {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+}
+
+.bonus-issue-table .stock-name {
+    font-weight: 600;
+    color: var(--accent-primary);
+    cursor: pointer;
+}
+
+.bonus-issue-table .stock-name:hover {
+    text-decoration: underline;
+}
+
+.bonus-issue-table .ratio-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: #4caf50;
+}
+
+/* Timeline/Schedule styling */
+.schedule-group {
+    display: flex;
+    gap: 10px;
+    font-size: 12px;
+}
+
+.schedule-item {
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+}
+
+.schedule-label {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.schedule-date {
+    font-weight: 600;
+}
