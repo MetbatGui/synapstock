@@ -4,6 +4,7 @@ from synapstock.domain.statistics.models import (
     CeilingAnalysisReport,
     DailyMarketRanking,
     MarketType,
+    PaidInCapitalIncrease,
     SupplySubject,
 )
 
@@ -116,18 +117,21 @@ class LocalCapitalIncreaseRepository:
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def save_items(self, items: list):
-        """유상증자 아이템 목록을 JSON 파일로 저장한다."""
-        import json
+    def save_data(self, items: list[PaidInCapitalIncrease]):
+        """유상증자 데이터 리스트를 로컬 전용 파일에 저장합니다."""
         path = self.root / "capital_increase_data.json"
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(items, f, ensure_ascii=False, indent=2)
-
-    def load_items(self) -> list:
-        """가장 최근에 저장된 유상증자 아이템들을 불러온다."""
         import json
+        with open(path, "w", encoding="utf-8") as f:
+            data = [item.model_dump() for item in items]
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def load_data(self) -> list[PaidInCapitalIncrease]:
+        """로컬에 저장된 유상증자 데이터 리스트를 불러옵니다."""
         path = self.root / "capital_increase_data.json"
         if not path.exists():
             return []
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+
+        import json
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+            return [PaidInCapitalIncrease.model_validate(item) for item in data]

@@ -30,6 +30,7 @@ from synapstock.infrastructure.adapters.local.file_storage import (
 from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalCapitalIncreaseRepository,
     LocalCeilingRepository,
+    LocalCapitalIncreaseRepository,
     LocalStatisticsRepository,
 )
 from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
@@ -117,6 +118,7 @@ class Container:
             repository=self._statistics_repo,
             query_service=self._query_service,
             ceiling_repository=self._ceiling_repo,
+            capital_increase_repository=self._capital_increase_repo,
             market_data_service=self._market_data_service
         )
 
@@ -136,7 +138,8 @@ class Container:
             folders = {
                 "report": self.config.report_folder_id,
                 "sd": self.config.sd_folder_id,
-                "ceiling": self.config.ceiling_folder_id
+                "ceiling": self.config.ceiling_folder_id,
+                "capital_increase": self.config.capital_increase_folder_id
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),

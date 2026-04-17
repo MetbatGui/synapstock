@@ -11,6 +11,7 @@ from synapstock.domain.statistics.models import (
     DailyMarketRanking,
     MarketType,
     MonthlyMarketStats,
+    PaidInCapitalIncrease,
     RankingItem,
     SupplySubject,
 )
@@ -391,3 +392,96 @@ class ExcelStatisticsParser:
             name=ExcelStatisticsParser._clean_stock_name(str(name_raw)),
             amount=amount
         )
+
+    @staticmethod
+    def parse_paid_in_capital_increase(content: bytes) -> list[PaidInCapitalIncrease]:
+        """유상증자 결정 엑셀 파일을 파싱하여 도메인 모델 리스트로 변환합니다.
+        엑셀 내의 모든 시트(연도별 등)를 순회하며 파싱합니다.
+        맨 윗줄이 비어있거나 헤더 위치가 다른 경우를 자동으로 감지합니다.
+
+        Args:
+            content (bytes): 엑셀 바이너리 데이터.
+
+        Returns:
+            list[PaidInCapitalIncrease]: 파싱된 유상증자 데이터 리스트.
+        """
+        # 엑셀 헤더가 1행이 아닐 수 있으므로 header=None으로 먼저 읽음
+        sheets_dict = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
+        results: list[PaidInCapitalIncrease] = []
+
+        # 재사용할 정제 함수 정의
+        def to_int(val: Any) -> int:
+            if pd.isna(val) or val == "": return 0
+            if isinstance(val, (int, float)): return int(val)
+            cleaned = re.sub(r"[^0-9-]", "", str(val))
+            return int(cleaned) if cleaned else 0
+
+        def to_float(val: Any) -> float:
+            if pd.isna(val) or val == "": return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            cleaned = re.sub(r"[^0-9.-]", "", str(val))
+            return float(cleaned) if cleaned else 0.0
+
+        def to_str(val: Any) -> str:
+            if pd.isna(val): return ""
+            return str(val).strip()
+
+        for sheet_name, df in sheets_dict.items():
+            if df.empty:
+                continue
+
+            # 1. 헤더 행 찾기 (상단 10줄 이내에서 '종목명' 텍스트 검색)
+            header_idx = -1
+            for i in range(min(10, len(df))):
+                row_values = [str(v).strip() for v in df.iloc[i].values if not pd.isna(v)]
+                if any("종목명" in v for v in row_values):
+                    header_idx = i
+                    break
+
+            if header_idx == -1:
+                logger.warning(f"[ExcelParser] '{sheet_name}' 시트에서 '종목명' 헤더를 찾지 못했습니다. 건너뜁니다.")
+                continue
+
+            # 2. 헤더 재설정 및 데이터 가동
+            new_df = df.iloc[header_idx + 1:].copy()
+            new_df.columns = [str(v).strip() for v in df.iloc[header_idx].values]
+            
+            logger.info(f"[ExcelParser] '{sheet_name}' 시트 파싱 중 (헤더 인덱스: {header_idx})")
+
+            for _, row in new_df.iterrows():
+                try:
+                    name_raw = row.get("종목명")
+                    if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() == "종목명":
+                        continue
+
+                    item = PaidInCapitalIncrease(
+                        date=to_str(row.get("일자")),
+                        name=ExcelStatisticsParser._clean_stock_name(to_str(name_raw)),
+                        is_correction=str(row.get("기재정정여부")).strip() == "Y" or "정정" in str(row.get("기재정정여부")),
+                        disclosure_date=to_str(row.get("유상증자공시일")),
+                        rcp_no=to_str(row.get("접수번호")),
+                        parent_rcp_no=to_str(row.get("상위접수번호")) if not pd.isna(row.get("상위접수번호")) else None,
+                        new_shares=to_int(row.get("신주발행주식수")),
+                        face_value=to_int(row.get("1주당 액면가")),
+                        pre_issued_shares=to_int(row.get("증자전 발행주식총수")),
+                        fund_facility=to_int(row.get("시설자금")),
+                        fund_operation=to_int(row.get("운영자금")),
+                        fund_acquisition=to_int(row.get("타법인증권")),
+                        fund_etc=to_int(row.get("기타자금")),
+                        method=to_str(row.get("증자방식")),
+                        issue_price=to_int(row.get("신주의 발행가액")),
+                        confirmed_price=to_int(row.get("발행확정가액")) if not pd.isna(row.get("발행확정가액")) else None,
+                        record_date=to_str(row.get("신주배정기준일")),
+                        shares_per_old=to_float(row.get("1주당 신주배정주식수")),
+                        subscription_date=to_str(row.get("청약예정일")),
+                        payment_date=to_str(row.get("납입일")),
+                        listing_date=to_str(row.get("신주상장일")),
+                        board_resolution_date=to_str(row.get("이사회결의일")),
+                        initial_disclosure_date=to_str(row.get("최초공시일"))
+                    )
+                    results.append(item)
+                except Exception as e:
+                    logger.error(f"[ExcelParser] 유상증자 파싱 실패 (시트: {sheet_name}): {e}")
+                    continue
+
+        return results

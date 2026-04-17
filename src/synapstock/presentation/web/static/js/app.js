@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (path.includes('ceiling')) {
                 ceilingView.init(statsContainer);
             } else if (path.includes('capital-increase')) {
-                capitalIncreaseView.init(statsContainer);
+                capitalIncreaseView.render(statsContainer);
             } else {
                 statsContainer.innerHTML = '<div class="stats-empty">존재하지 않는 페이지입니다.</div>';
             }

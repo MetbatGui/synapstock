@@ -16,6 +16,7 @@ from synapstock.domain.statistics.models import (
     MonthlyMarketStats,
     RankingItem,
     SupplySubject,
+    PaidInCapitalIncrease
 )
 from synapstock.infrastructure.parsers.excel_statistics_parser import (
     ExcelStatisticsParser,
@@ -37,6 +38,7 @@ class StatisticsService:
         repository: Any = None,
         query_service: Any = None,
         ceiling_repository: Any = None,
+        capital_increase_repository: Any = None,
         market_data_service: Any = None,
     ):
         """StatisticsService 객체를 초기화합니다.
@@ -52,6 +54,7 @@ class StatisticsService:
         self._repository = repository
         self._query_service = query_service
         self._ceiling_repo = ceiling_repository
+        self._capital_increase_repo = capital_increase_repository
         self._market_data_service = market_data_service
         self._parser = ExcelStatisticsParser()
 
@@ -562,4 +565,55 @@ class StatisticsService:
                 logger.warning(f"[StatisticsService] {target_year}년 드라이브 가용 날짜 조회 실패: {e}")
 
         # 3. 병합 및 정렬 (최신순)
+        # 3. 병합 및 정렬 (최신순)
         return sorted(list(local_dates | drive_dates), reverse=True)
+
+    def get_capital_increase_data(self, force_sync: bool = False) -> list[PaidInCapitalIncrease]:
+        """유상증자 공시 데이터를 가져옵니다 (캐시 우선)."""
+        if self._capital_increase_repo and not force_sync:
+            cached = self._capital_increase_repo.load_data()
+            if cached:
+                return cached
+
+        return self.sync_capital_increase_data()
+
+    def sync_capital_increase_data(self) -> list[PaidInCapitalIncrease]:
+        """구글 드라이브에서 유상증자 엑셀 파일을 다운로드하여 동기화합니다."""
+        if not self._storage or not self._capital_increase_repo:
+            logger.warning("[StatisticsService] 유상증자 동기화를 위한 저장소 또는 어댑터가 설정되지 않았습니다.")
+            return []
+
+        try:
+            # 유상증자 폴더 내의 파일 목록 조회
+            files = self._storage.list_files_in_folder("", folder="capital_increase")
+            xlsx_files = [f for f in files if f["name"].lower().endswith((".xlsx", ".xls"))]
+
+            if not xlsx_files:
+                logger.warning("[StatisticsService] 유상증자 폴더에 엑셀 파일이 없습니다.")
+                return []
+
+            # 가장 최근 파일(이름 기준 내림차순) 선택
+            xlsx_files.sort(key=lambda x: x["name"], reverse=True)
+            target_file = xlsx_files[0]["name"]
+
+            logger.info(f"[StatisticsService] 유상증자 데이터 동기화 시작: {target_file}")
+            content = self._storage.get_file(target_file, folder="capital_increase")
+            if not content:
+                return []
+
+            items = self._parser.parse_paid_in_capital_increase(content)
+
+            # 로컬 티커 맵을 활용한 정보 보강
+            ticker_map = self._build_local_ticker_map()
+            for item in items:
+                if not item.ticker and item.name in ticker_map:
+                    item.ticker = ticker_map[item.name]
+
+            # 로컬 저장소에 저장
+            self._capital_increase_repo.save_data(items)
+            logger.info(f"[StatisticsService] 유상증자 데이터 {len(items)}건 동기화 완료")
+
+            return items
+        except Exception as e:
+            logger.error(f"[StatisticsService] 유상증자 동기화 실패: {e}", exc_info=True)
+            return []

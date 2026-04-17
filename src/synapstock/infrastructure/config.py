@@ -37,6 +37,7 @@ class AppConfig(BaseModel):
     report_folder_id: str | None = None
     sd_folder_id: str | None = None
     ceiling_folder_id: str | None = None
+    capital_increase_folder_id: str | None = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -63,5 +64,6 @@ class AppConfig(BaseModel):
             telegram_token=os.getenv("TELEGRAM_API_TOKEN", ""),
             report_folder_id=os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID"),
             sd_folder_id=os.getenv("GOOGLE_DRIVE_SUPPLY_DEMAND_FOLDER_ID"),
-            ceiling_folder_id=os.getenv("GOOGLE_DRIVE_CEILLING_FOLDER_ID")
+            ceiling_folder_id=os.getenv("GOOGLE_DRIVE_CEILLING_FOLDER_ID"),
+            capital_increase_folder_id=os.getenv("GOOGLE_DRIVE_CAPITAL_INCREASE_FOLDER_ID")
         )
