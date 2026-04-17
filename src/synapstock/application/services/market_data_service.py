@@ -77,15 +77,19 @@ class MarketDataService:
                     # Row 4: 외국인, Row 7: 기관합계, Row 9: 전체 합계
                     # Col 6: 순매수대금, Col 5: 거래대금(매수)
                     
-                    # 1. 외국인 순매수
+                    # 1. 외국인 수급
                     foreign_row = df_perf.iloc[4] if len(df_perf) > 4 else None
                     if foreign_row is not None:
                         summary["ForeignNetBuy"] = int(foreign_row.iloc[6])
+                        summary["ForeignBuy"] = int(foreign_row.iloc[5])
+                        summary["ForeignSell"] = int(foreign_row.iloc[4])
 
-                    # 2. 기관합계 순매수
+                    # 2. 기관합계 수급
                     inst_row = df_perf.iloc[7] if len(df_perf) > 7 else None
                     if inst_row is not None:
                         summary["InstitutionalNetBuy"] = int(inst_row.iloc[6])
+                        summary["InstitutionalBuy"] = int(inst_row.iloc[5])
+                        summary["InstitutionalSell"] = int(inst_row.iloc[4])
 
                     # 3. 전체 거래대금 (합계 행의 매수거래대금 활용)
                     total_row = df_perf.iloc[df_perf.index[-1]] # 마지막 행이 보통 전체 합계
