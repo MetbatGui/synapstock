@@ -37,15 +37,16 @@ class StatisticsService:
         repository: Any = None,
         query_service: Any = None,
         ceiling_repository: Any = None,
-        market_data_service: Any = None
+        market_data_service: Any = None,
     ):
         """StatisticsService 객체를 초기화합니다.
 
         Args:
-            storage (Any, optional): 외부 스토리지(예: GoogleDriveAdapter) 어댑터 인스턴스. Defaults to None.
-            repository (Any, optional): 통계 데이터를 저장/조회할 저장소 구현체. Defaults to None.
-            query_service (Any, optional): 종목 정보 조회를 위한 서비스. Defaults to None.
-            ceiling_repository (Any, optional): 상한가 분석 저장소 구현체. Defaults to None.
+            storage: 원격 저장소 (Google Drive 등).
+            repository: 일별 수급 순위 로컬/DB 저장소.
+            query_service: 종목(티커) 쿼리용 서비스 (옵션).
+            ceiling_repository: 상한가 관리용 로컬 저장소.
+            market_data_service: 시장 데이터 수집기 서비스.
         """
         self._storage = storage
         self._repository = repository
@@ -92,6 +93,7 @@ class StatisticsService:
             return
         for ranking in rankings:
             self._repository.save_daily_ranking(ranking)
+
 
     def get_daily_ranking(
         self,

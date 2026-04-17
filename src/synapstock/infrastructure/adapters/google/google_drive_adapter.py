@@ -117,16 +117,31 @@ class GoogleDriveAdapter(StoragePort):
         target_root_id = root_id or self._get_root_id(folder)
         current_parent_id = target_root_id
 
+        import unicodedata
+        
         for part in parts:
             if not part:
                 continue
-            query = f"name = '{part}' and '{current_parent_id}' in parents and trashed = false"
-            results = self.drive_service.files().list(q=query, fields="files(id, mimeType)").execute()
+            
+            # 한글 유니코드 정규화(NFC/NFD) 문제 대응을 위해 하위 목록 전체 조회 후 비교
+            results = self.drive_service.files().list(
+                q=f"'{current_parent_id}' in parents and trashed = false",
+                fields="files(id, name, mimeType)"
+            ).execute()
             files = results.get('files', [])
-
-            if not files:
+            
+            # 정확히 일치하거나 NFC 정규화 시 일치하는 항목 검색
+            part_nfc = unicodedata.normalize('NFC', part)
+            matched_file = None
+            for f in files:
+                name_nfc = unicodedata.normalize('NFC', f['name'])
+                if name_nfc == part_nfc:
+                    matched_file = f
+                    break
+            
+            if not matched_file:
                 return None
-            current_parent_id = files[0]['id']
+            current_parent_id = matched_file['id']
 
         return current_parent_id
 
