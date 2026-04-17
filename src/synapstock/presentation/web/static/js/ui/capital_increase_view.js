@@ -314,29 +314,43 @@ export const capitalIncreaseView = {
                     <!-- 신주 발행 및 가격 정보 -->
                     <div class="ci-card">
                         <h4><i class="fas fa-coins"></i> 신주 및 가격 정보</h4>
-                        <div class="fund-item" style="margin-bottom: 20px;">
-                            <div class="fund-label-row">
-                                <span style="color:#9ca3af;">신주발행주식수</span>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="fund-item">
+                                <div class="fund-label-row"><span style="color:#9ca3af;">신주발행주식수</span></div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #e5e7eb; margin-top: 4px;">
+                                    ${item.new_shares ? item.new_shares.toLocaleString() : '-'} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">주</span>
+                                </div>
                             </div>
-                            <div style="font-size: 1.3rem; font-weight: 700; color: #e5e7eb; margin-top: 5px;">
-                                ${item.new_shares ? item.new_shares.toLocaleString() : '-'} <span style="font-size: 0.85rem; color: #9ca3af; font-weight: 400;">주</span>
+                            <div class="fund-item">
+                                <div class="fund-label-row"><span style="color:#9ca3af;">신주발행가액</span></div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #facc15; margin-top: 4px;">
+                                    ${item.issue_price ? item.issue_price.toLocaleString() : '-'} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">원</span>
+                                </div>
                             </div>
-                        </div>
-                        <div class="fund-item" style="margin-bottom: 20px;">
-                            <div class="fund-label-row">
-                                <span style="color:#9ca3af;">신주발행가액</span>
+                            <div class="fund-item">
+                                <div class="fund-label-row"><span style="color:#9ca3af;">1주당 배정비율</span></div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #60a5fa; margin-top: 4px;">
+                                    ${item.shares_per_old ? item.shares_per_old.toFixed(4) : '-'}
+                                </div>
                             </div>
-                            <div style="font-size: 1.3rem; font-weight: 700; color: #facc15; margin-top: 5px;">
-                                ${item.issue_price ? item.issue_price.toLocaleString() : '-'} <span style="font-size: 0.85rem; color: #9ca3af; font-weight: 400;">원</span>
+                            <div class="fund-item">
+                                <div class="fund-label-row"><span style="color:#9ca3af;">액면가</span></div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #e5e7eb; margin-top: 4px;">
+                                    ${item.face_value ? item.face_value.toLocaleString() : '-'} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">원</span>
+                                </div>
+                            </div>
+                            <div class="fund-item" style="grid-column: span 2;">
+                                <div class="fund-label-row"><span style="color:#9ca3af;">증자 전 발행주식총수</span></div>
+                                <div style="font-size: 1.0rem; font-weight: 600; color: #9ca3af; margin-top: 4px;">
+                                    ${item.pre_issued_shares ? item.pre_issued_shares.toLocaleString() : '-'} <span style="font-size: 0.8rem; font-weight: 400;">주</span>
+                                </div>
                             </div>
                         </div>
                         ${item.confirmed_price ? `
-                        <div class="fund-item">
-                            <div class="fund-label-row">
-                                <span style="color:#9ca3af;">확정발행가액</span>
-                            </div>
-                            <div style="font-size: 1.1rem; font-weight: 600; color: #4ade80; margin-top: 5px;">
-                                ${item.confirmed_price.toLocaleString()} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">원</span>
+                        <div class="fund-item" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                            <div class="fund-label-row"><span style="color:#4ade80;">확정발행가액</span></div>
+                            <div style="font-size: 1.1rem; font-weight: 700; color: #4ade80; margin-top: 4px;">
+                                ${item.confirmed_price.toLocaleString()} <span style="font-size: 0.8rem; font-weight: 400;">원</span>
                             </div>
                         </div>
                         ` : ''}
