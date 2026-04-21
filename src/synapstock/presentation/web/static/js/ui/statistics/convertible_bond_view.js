@@ -162,14 +162,24 @@ export const convertibleBondView = {
                 const isHidden = detailTr.style.display === 'none';
 
                 if (isHidden) {
+                    // 다른 열려있는 상세 행 닫기
+                    const tbody = tr.parentElement;
+                    tbody.querySelectorAll('.detail-row').forEach(row => {
+                        row.style.display = 'none';
+                        row.classList.remove('expanded');
+                    });
+                    tbody.querySelectorAll('.expand-icon').forEach(ic => ic.style.transform = 'rotate(0deg)');
+
                     if (container.innerHTML.trim().length < 50) {
                         const history = this.getHistoryChain(item.rcp_no);
                         container.innerHTML = this.generateDetailHtml(item, history);
                     }
                     detailTr.style.display = 'table-row';
+                    detailTr.classList.add('expanded');
                     if (icon) icon.style.transform = 'rotate(180deg)';
                 } else {
                     detailTr.style.display = 'none';
+                    detailTr.classList.remove('expanded');
                     if (icon) icon.style.transform = 'rotate(0deg)';
                 }
             };
@@ -332,10 +342,13 @@ export const convertibleBondView = {
                 
                 const detailRow = targetRow.nextElementSibling;
                 if (detailRow && detailRow.style.display === 'none') {
+                    // 강제 오픈
                     targetRow.click();
+                } else if (detailRow && detailRow.classList.contains('expanded')) {
+                    // 이미 열려있다면 유지
                 }
             }
-        }, 100);
+        }, 150);
     },
 
     calculateCorrectionOrders: function (items) {

@@ -494,16 +494,19 @@ export const capitalIncreaseView = {
                 // 부드럽게 스크롤
                 targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 
-                // 강조 및 자동 클릭
+                // 강조 표시
                 targetRow.style.outline = '2px solid var(--accent-blue)';
                 setTimeout(() => targetRow.style.outline = 'none', 2000);
                 
                 const detailRow = targetRow.nextElementSibling;
                 if (detailRow && detailRow.style.display === 'none') {
+                    // 강제 오픈
                     targetRow.click();
+                } else if (detailRow && detailRow.classList.contains('expanded')) {
+                    // 이미 열려있다면 유지
                 }
             }
-        }, 100);
+        }, 150);
     }
 };
 

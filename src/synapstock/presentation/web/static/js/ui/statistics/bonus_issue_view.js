@@ -378,9 +378,12 @@ export const bonusIssueView = {
                 
                 const detailRow = targetRow.nextElementSibling;
                 if (detailRow && detailRow.style.display === 'none') {
+                    // 강제 오픈
                     targetRow.click();
+                } else if (detailRow && detailRow.classList.contains('expanded')) {
+                    // 이미 열려있다면 유지
                 }
             }
-        }, 100);
+        }, 150);
     }
 };

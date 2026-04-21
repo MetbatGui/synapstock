@@ -136,7 +136,7 @@ export const bondWithWarrantsView = {
         tbody.innerHTML = '';
         filteredItems.forEach(item => {
             const tr = document.createElement('tr');
-            tr.className = 'cb-row'; // 동일 스타일 사용
+            tr.className = 'bw-row'; 
             tr.style.cursor = 'pointer';
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.date}</td>
@@ -166,14 +166,24 @@ export const bondWithWarrantsView = {
                 const isHidden = detailTr.style.display === 'none';
 
                 if (isHidden) {
+                    // 다른 열려있는 상세 행 닫기
+                    const tbody = tr.parentElement;
+                    tbody.querySelectorAll('.detail-row').forEach(row => {
+                        row.style.display = 'none';
+                        row.classList.remove('expanded');
+                    });
+                    tbody.querySelectorAll('.expand-icon').forEach(ic => ic.style.transform = 'rotate(0deg)');
+
                     if (container.innerHTML.trim().length < 50) {
                         const history = this.getHistoryChain(item.rcp_no);
                         container.innerHTML = this.generateDetailHtml(item, history);
                     }
                     detailTr.style.display = 'table-row';
+                    detailTr.classList.add('expanded');
                     if (icon) icon.style.transform = 'rotate(180deg)';
                 } else {
                     detailTr.style.display = 'none';
+                    detailTr.classList.remove('expanded');
                     if (icon) icon.style.transform = 'rotate(0deg)';
                 }
             };
@@ -328,7 +338,7 @@ export const bondWithWarrantsView = {
         }
 
         setTimeout(() => {
-            const targetRow = document.querySelector(`.cb-row[data-rcp-no="${rcpNo}"]`);
+            const targetRow = document.querySelector(`.bw-row[data-rcp-no="${rcpNo}"]`);
             if (targetRow) {
                 targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 targetRow.style.outline = '2px solid var(--accent-blue)';
@@ -336,10 +346,13 @@ export const bondWithWarrantsView = {
                 
                 const detailRow = targetRow.nextElementSibling;
                 if (detailRow && detailRow.style.display === 'none') {
+                    // 강제 오픈
                     targetRow.click();
+                } else if (detailRow && detailRow.classList.contains('expanded')) {
+                    // 이미 열려있다면 유지
                 }
             }
-        }, 100);
+        }, 150);
     },
 
     calculateCorrectionOrders: function (items) {
