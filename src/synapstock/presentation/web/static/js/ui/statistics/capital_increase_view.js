@@ -33,10 +33,10 @@ export const capitalIncreaseView = {
                             <tr>
                                 <th style="width: 140px;">공시일</th>
                                 <th>종목명</th>
-                                <th style="width: 240px;">증자방식</th>
-                                <th style="width: 110px; text-align:right;">조달금액</th>
-                                <th style="width: 110px; text-align:right;">발행가액</th>
-                                <th style="width: 140px; text-align:right;">납입일</th>
+                                <th style="width: 200px;">증자방식</th>
+                                <th style="width: 100px; text-align:right;">조달금액</th>
+                                <th style="width: 120px; text-align:right;">배정비율</th>
+                                <th style="width: 130px; text-align:right;">납입일</th>
                                 <th style="width: 70px; text-align:center;">이동</th>
                             </tr>
                         </thead>
@@ -176,6 +176,9 @@ export const capitalIncreaseView = {
         filteredItems.forEach((item, idx) => {
             const total = (item.fund_facility || 0) + (item.fund_operation || 0) + (item.fund_acquisition || 0) + (item.fund_etc || 0);
             
+            const ratioVal = (item.shares_per_old && item.shares_per_old > 0) ? item.shares_per_old.toFixed(2) : '-';
+            const ratioPercent = (item.shares_per_old && item.shares_per_old > 0) ? (item.shares_per_old * 100).toFixed(2) : '-';
+
             // 메인 행 (Basic Info)
             const tr = document.createElement('tr');
             tr.className = 'ci-row';
@@ -189,7 +192,7 @@ export const capitalIncreaseView = {
                 </td>
                 <td style="color:#60a5fa;">${item.method}</td>
                 <td style="text-align:right; font-weight:600; color:#facc15;">${this.formatUnit(total)}</td>
-                <td style="text-align:right; color:#e5e7eb;">${item.issue_price ? item.issue_price.toLocaleString() : '-'}</td>
+                <td style="text-align:right; color:#4ade80; font-weight:600;">1 : ${ratioVal} ${ratioPercent !== '-' ? `(${ratioPercent}%)` : ''}</td>
                 <td style="text-align:right; color:#9ca3af;">${item.payment_date || '-'}</td>
                 <td style="text-align:center;">
                     <span class="expand-icon" style="color:var(--accent-blue); display: inline-block; transition: transform 0.2s;">▼</span>
@@ -215,19 +218,16 @@ export const capitalIncreaseView = {
                 const isHidden = detailTr.style.display === 'none';
 
                 if (isHidden) {
-                    // [추가] 다른 열린 상세 행들을 모두 닫음 (Focus Mode)
-                    tbody.querySelectorAll('.detail-row').forEach(row => {
-                        row.style.display = 'none';
-                    });
-                    tbody.querySelectorAll('.expand-icon').forEach(ic => {
-                        ic.style.transform = 'rotate(0deg)';
-                    });
-
-                    // 펼칠 때 내용이 없으면 그때 생성 (성능 최적화)
+                    // 다른 열려있는 상세 행 닫기
+                    tbody.querySelectorAll('.detail-row').forEach(row => row.classList.remove('expanded'));
+                    tbody.querySelectorAll('.expand-icon').forEach(ic => ic.style.transform = 'rotate(0deg)');
+                    
+                    // 데이터 생성 및 표시
                     if (container.innerHTML.trim().length < 50) {
                         const history = this.getHistoryChain(item.rcp_no);
-                        container.innerHTML = this.generateDetailHtml(item, total, history);
+                        container.innerHTML = this.generateDetailHtml(item, history);
                     }
+                    detailTr.classList.add('expanded');
                     detailTr.style.display = 'table-row';
                     if (icon) icon.style.transform = 'rotate(180deg)';
                 } else {
@@ -241,17 +241,40 @@ export const capitalIncreaseView = {
     /**
      * 상세 보기를 위한 HTML 조각을 생성합니다.
      */
-    generateDetailHtml: function (item, totalAmount, history = []) {
-        const p = (val) => totalAmount > 0 ? (val / totalAmount * 100).toFixed(1) : 0;
-        
-        // 히스토리 드롭다운 옵션 생성
-        let historyOptions = '';
-        if (history.length > 1) {
-            historyOptions = `
-                <div class="ci-history-nav" style="margin-top:20px; padding-top:15px; border-top:1px dashed rgba(255,255,255,0.1); display:flex; align-items:center; gap:12px;">
+    generateDetailHtml: function (item, history) {
+        // 자금조달 세부 내역 계산
+        const total = (item.fund_facility || 0) + (item.fund_operation || 0) + (item.fund_acquisition || 0) + (item.fund_etc || 0);
+        const segments = [
+            { label: '시설자금', amount: item.fund_facility, class: 'segment-facility' },
+            { label: '운영자금', amount: item.fund_operation, class: 'segment-operation' },
+            { label: '타법인 취득', amount: item.fund_acquisition, class: 'segment-acquisition' },
+            { label: '기타자금', amount: item.fund_etc, class: 'segment-etc' }
+        ].filter(s => s.amount > 0);
+
+        const stackedBarHtml = segments.map(s => {
+            const pct = ((s.amount / total) * 100).toFixed(1);
+            return `<div class="fund-segment ${s.class}" style="width: ${pct}%" title="${s.label}: ${this.formatUnit(s.amount)} (${pct}%)"></div>`;
+        }).join('');
+
+        const legendHtml = segments.map(s => `
+            <div class="fund-legend-item">
+                <div class="legend-dot ${s.class}"></div>
+                <span class="fund-label-row">
+                    <span class="fund-amount-text">${s.label}: <b>${this.formatUnit(s.amount)}</b></span>
+                    <span class="fund-pct-text">(${( (s.amount / total) * 100).toFixed(1)}%)</span>
+                </span>
+            </div>
+        `).join('');
+
+        const ratioVal = (item.shares_per_old && item.shares_per_old > 0) ? item.shares_per_old.toFixed(2) : '-';
+        const ratioPercent = (item.shares_per_old && item.shares_per_old > 0) ? (item.shares_per_old * 100).toFixed(2) : '-';
+
+        const historyOptions = history.length > 1 ? `
+            <div style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:0.85rem; color:#9ca3af;"><i class="fas fa-history"></i> 공시 이력:</span>
-                    <select class="stats-select" onchange="window._jumpToCiHistory(this.value)" style="flex:1; max-width:400px; font-size:0.85rem; height:32px;">
-                        <option value="">이전/정정 공시로 이동...</option>
+                    <select class="stats-select" style="padding: 4px 8px; font-size: 0.8rem;" onchange="capitalIncreaseView.jumpToHistory(this.value)">
+                        <option value="">이이전/정정 공시로 이동...</option>
                         ${history.map(h => `
                             <option value="${h.rcp_no}" ${h.rcp_no === item.rcp_no ? 'selected disabled' : ''}>
                                 ${h.disclosure_date || h.date} - ${h.correction_count === 0 ? '최초공시' : h.correction_count + '차정정'} ${h.rcp_no === item.rcp_no ? '(현재)' : ''}
@@ -259,159 +282,99 @@ export const capitalIncreaseView = {
                         `).join('')}
                     </select>
                 </div>
-            `;
-
-            // 전역 핸들러 등록 (HTML 문자열 onclick/onchange 대응용)
-            window._jumpToCiHistory = (rcpNo) => {
-                if (rcpNo) this.jumpToDisclosure(rcpNo);
-            };
-        }
+            </div>
+        ` : '';
 
         return `
-            <div class="ci-detail-container">
-                <div class="ci-detail-grid" style="grid-template-columns: 1.2fr 1fr 1fr;">
-                    <!-- 자금 조달 목적 분석 -->
-                    <div class="ci-card">
-                        <h4><i class="fas fa-chart-pie"></i> 자금 조달 목적 비중</h4>
+            <div class="stats-detail-container animate-fade-in">
+                <div class="stats-detail-grid" style="grid-template-columns: 1fr 1fr 1.2fr;">
+                    <!-- 카드 1: 자금조달 목적 및 현황 -->
+                    <div class="stats-card">
+                        <h4 style="margin-top:0; color:var(--accent-blue); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 15px;">
+                            <i class="fas fa-coins"></i> 자금조달 목적 및 규모
+                        </h4>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px;">
+                            <span style="color: #9ca3af; font-size: 0.9rem;">총 조달 금액</span>
+                            <span style="font-size: 1.4rem; font-weight: 700; color: #facc15;">${this.formatUnit(total)}</span>
+                        </div>
+                        
                         <div class="fund-stacked-container">
                             <div class="fund-stacked-bar">
-                                ${item.fund_facility > 0 ? `<div class="fund-segment segment-facility" style="width: ${p(item.fund_facility)}%;" title="시설 자금: ${this.formatUnit(item.fund_facility)} (${p(item.fund_facility)}%)"></div>` : ''}
-                                ${item.fund_operation > 0 ? `<div class="fund-segment segment-operation" style="width: ${p(item.fund_operation)}%;" title="운영 자금: ${this.formatUnit(item.fund_operation)} (${p(item.fund_operation)}%)"></div>` : ''}
-                                ${item.fund_acquisition > 0 ? `<div class="fund-segment segment-acquisition" style="width: ${p(item.fund_acquisition)}%;" title="타법인 증권 취득: ${this.formatUnit(item.fund_acquisition)} (${p(item.fund_acquisition)}%)"></div>` : ''}
-                                ${item.fund_etc > 0 ? `<div class="fund-segment segment-etc" style="width: ${p(item.fund_etc)}%;" title="기타 자금: ${this.formatUnit(item.fund_etc)} (${p(item.fund_etc)}%)"></div>` : ''}
-                                ${totalAmount === 0 ? `<div class="fund-segment" style="width: 100%; background: rgba(255,255,255,0.05);"></div>` : ''}
+                                ${stackedBarHtml}
                             </div>
-                            
                             <div class="fund-legend">
-                                <div class="fund-legend-item">
-                                    <div class="legend-dot segment-facility"></div>
-                                    <div style="flex:1;">
-                                        <div class="fund-label-row">
-                                            <span>시설</span>
-                                            <span class="fund-amount-text">${this.formatUnit(item.fund_facility)}</span>
-                                        </div>
-                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_facility)}%</div>
-                                    </div>
-                                </div>
-                                <div class="fund-legend-item">
-                                    <div class="legend-dot segment-operation"></div>
-                                    <div style="flex:1;">
-                                        <div class="fund-label-row">
-                                            <span>운영</span>
-                                            <span class="fund-amount-text">${this.formatUnit(item.fund_operation)}</span>
-                                        </div>
-                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_operation)}%</div>
-                                    </div>
-                                </div>
-                                <div class="fund-legend-item">
-                                    <div class="legend-dot segment-acquisition"></div>
-                                    <div style="flex:1;">
-                                        <div class="fund-label-row">
-                                            <span>취득</span>
-                                            <span class="fund-amount-text">${this.formatUnit(item.fund_acquisition)}</span>
-                                        </div>
-                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_acquisition)}%</div>
-                                    </div>
-                                </div>
-                                <div class="fund-legend-item">
-                                    <div class="legend-dot segment-etc"></div>
-                                    <div style="flex:1;">
-                                        <div class="fund-label-row">
-                                            <span>기타</span>
-                                            <span class="fund-amount-text">${this.formatUnit(item.fund_etc)}</span>
-                                        </div>
-                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_etc)}%</div>
-                                    </div>
-                                </div>
+                                ${legendHtml}
                             </div>
                         </div>
                     </div>
 
-                    <!-- 신주 발행 및 가격 정보 -->
-                    <div class="ci-card">
-                        <h4><i class="fas fa-coins"></i> 신주 및 가격 정보</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div class="fund-item">
-                                <div class="fund-label-row"><span style="color:#9ca3af;">신주발행주식수</span></div>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #e5e7eb; margin-top: 4px;">
-                                    ${item.new_shares ? item.new_shares.toLocaleString() : '-'} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">주</span>
-                                </div>
+                    <!-- 카드 2: 상세 발행 정보 -->
+                    <div class="stats-card">
+                        <h4 style="margin-top:0; color:var(--accent-blue); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 15px;">
+                            <i class="fas fa-file-invoice-dollar"></i> 상세 발행 정보
+                        </h4>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px;">
+                                <span style="color: #9ca3af;">증자방식</span>
+                                <span style="font-weight: 600; color: #60a5fa;">${item.method || '-'}</span>
                             </div>
-                            <div class="fund-item">
-                                <div class="fund-label-row"><span style="color:#9ca3af;">신주발행가액</span></div>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #facc15; margin-top: 4px;">
-                                    ${item.issue_price ? item.issue_price.toLocaleString() : '-'} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">원</span>
-                                </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px;">
+                                <span style="color: #9ca3af;">발행가액</span>
+                                <span style="font-weight: 600;">${item.issue_price ? item.issue_price.toLocaleString() : '-'} 원</span>
                             </div>
-                            <div class="fund-item">
-                                <div class="fund-label-row"><span style="color:#9ca3af;">1주당 배정비율</span></div>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #60a5fa; margin-top: 4px;">
-                                    ${item.shares_per_old ? item.shares_per_old.toFixed(4) : '-'}
-                                </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px;">
+                                <span style="color: #9ca3af;">신주배정비율</span>
+                                <span style="font-weight: 600; color: #4ade80;">1 : ${ratioVal} ${ratioPercent !== '-' ? `(${ratioPercent}%)` : ''}</span>
                             </div>
-                            <div class="fund-item">
-                                <div class="fund-label-row"><span style="color:#9ca3af;">액면가</span></div>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #e5e7eb; margin-top: 4px;">
-                                    ${item.face_value ? item.face_value.toLocaleString() : '-'} <span style="font-size: 0.8rem; color: #9ca3af; font-weight: 400;">원</span>
-                                </div>
+                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px;">
+                                <span style="color: #9ca3af;">신주발행주식수</span>
+                                <span style="font-weight: 600;">${item.new_shares ? item.new_shares.toLocaleString() : '-'} 주</span>
                             </div>
-                            <div class="fund-item" style="grid-column: span 2;">
-                                <div class="fund-label-row"><span style="color:#9ca3af;">증자 전 발행주식총수</span></div>
-                                <div style="font-size: 1.0rem; font-weight: 600; color: #9ca3af; margin-top: 4px;">
-                                    ${item.pre_issued_shares ? item.pre_issued_shares.toLocaleString() : '-'} <span style="font-size: 0.8rem; font-weight: 400;">주</span>
-                                </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #9ca3af;">액면가 / 전주식수</span>
+                                <span style="font-weight: 600; color: #9ca3af;">${item.face_value || '-'} / ${item.pre_issued_shares ? item.pre_issued_shares.toLocaleString() : '-'}</span>
                             </div>
                         </div>
-                        ${item.confirmed_price ? `
-                        <div class="fund-item" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
-                            <div class="fund-label-row"><span style="color:#4ade80;">확정발행가액</span></div>
-                            <div style="font-size: 1.1rem; font-weight: 700; color: #4ade80; margin-top: 4px;">
-                                ${item.confirmed_price.toLocaleString()} <span style="font-size: 0.8rem; font-weight: 400;">원</span>
-                            </div>
-                        </div>
-                        ` : ''}
                     </div>
 
-                    <!-- 주요 일정 타임라인 -->
-                    <div class="ci-card">
-                        <h4><i class="fas fa-calendar-alt"></i> 주요 일정</h4>
-                        <div class="timeline">
-                            <div class="timeline-item ${item.disclosure_date ? 'active' : ''}">
-                                <div class="timeline-label">공시일</div>
-                                <div class="timeline-date">${item.disclosure_date || '-'}</div>
+                    <!-- 카드 3: 주요 일정 -->
+                    <div class="stats-card">
+                        <h4 style="margin-top:0; color:var(--accent-blue); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 15px;">
+                            <i class="fas fa-calendar-alt"></i> 주요 일정
+                        </h4>
+                        <div class="stats-timeline">
+                            <div class="stats-timeline-item">
+                                <div style="color: #9ca3af;">배정기준일</div>
+                                <div class="stats-timeline-date">${item.record_date || '-'}</div>
                             </div>
-                            <div class="timeline-item ${item.record_date ? 'active' : ''}">
-                                <div class="timeline-label">신주배정기준일</div>
-                                <div class="timeline-date">${item.record_date || '-'}</div>
+                            <div class="stats-timeline-item active">
+                                <div style="color: #9ca3af;">청약 / 납입일</div>
+                                <div class="stats-timeline-date" style="color: #fff;">${item.subscription_date ? item.subscription_date + ' / ' : ''}${item.payment_date || '-'}</div>
                             </div>
-                            <div class="timeline-item ${item.subscription_date ? 'active' : ''}">
-                                <div class="timeline-label">청약예정일</div>
-                                <div class="timeline-date">${item.subscription_date || '-'}</div>
+                            <div class="stats-timeline-item">
+                                <div style="color: #9ca3af;">상장예정일</div>
+                                <div class="stats-timeline-date" style="color: #facc15;">${item.listing_date || '-'}</div>
                             </div>
-                            <div class="timeline-item ${item.payment_date ? 'active' : ''}">
-                                <div class="timeline-label">납입일</div>
-                                <div class="timeline-date">${item.payment_date || '-'}</div>
-                            </div>
-                            <div class="timeline-item ${item.listing_date ? 'active' : ''}">
-                                <div class="timeline-label">신주상장일</div>
-                                <div class="timeline-date">${item.listing_date || '-'}</div>
-                            </div>
+                        </div>
+                        <div style="margin-top: 20px; font-size: 0.8rem; color: #64748b; font-style: italic;">
+                            <i class="fas fa-info-circle"></i> 최초 공시: ${item.initial_disclosure_date || '-'} / 이사회결의: ${item.board_resolution_date || '-'}
                         </div>
                     </div>
                 </div>
 
-                <div class="ci-info-footer">
+                <!-- 하단 정보 및 액션 버튼 -->
+                <div class="stats-info-footer">
                     <div style="margin-right: auto; font-size: 0.85rem; color: #9ca3af;">
-                        <span>증자후 발행주식총수: <b>${(item.pre_issued_shares + (item.new_shares || 0)).toLocaleString()}</b> 주</span>
+                         <i class="fas fa-chart-pie" style="margin-right: 5px;"></i> 증자후 예상 발행주식총수: <b style="color: #e5e7eb;">${(item.pre_issued_shares + (item.new_shares || 0)).toLocaleString()}</b> 주
                     </div>
                     <div style="display: flex; gap: 10px;">
                         ${item.ticker ? `
-                        <a href="/stock/${item.ticker}" onclick="event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" class="ci-btn-action ci-btn-stock">
-                             <i class="fas fa-search-dollar"></i> 종목 분석 페이지 이동
+                        <a href="/stock/${item.ticker}" onclick="event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" class="stats-btn-action stats-btn-stock">
+                             <i class="fas fa-search-dollar"></i> 종목 분석
                         </a>
                         ` : ''}
-                        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="ci-btn-action ci-btn-dart">
-                            DART 공시 원문 보기 <i class="fas fa-external-link-alt"></i>
+                        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="stats-btn-action stats-btn-dart">
+                            DART 원문 <i class="fas fa-external-link-alt"></i>
                         </a>
                     </div>
                 </div>

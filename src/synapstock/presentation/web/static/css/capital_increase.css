@@ -1,64 +1,10 @@
-/* Capital Increase (유상증자) Detail Styles */
-.detail-row {
-    background: rgba(0, 0, 0, 0.2);
-    border-left: 3px solid var(--accent-blue);
-    display: table-row;
-    display: none;
+/* Funding Section Stacked Bar Styles */
+.fund-stacked-container {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
-
-.detail-row.expanded {
-    display: table-row;
-    animation: slideDown 0.3s ease-out;
-}
-
-.ci-detail-container {
-    padding: 20px 30px;
-    color: #e5e7eb;
-}
-
-.ci-detail-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 30px;
-}
-
-.ci-card {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 12px;
-    padding: 15px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.timeline {
-    position: relative;
-    padding-left: 20px;
-    border-left: 1px dashed rgba(255, 255, 255, 0.1);
-    margin-left: 10px;
-}
-
-.timeline-item {
-    position: relative;
-    margin-bottom: 15px;
-    font-size: 0.85rem;
-}
-
-.timeline-item::before {
-    content: '';
-    position: absolute;
-    left: -24px;
-    top: 4px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--text-secondary);
-}
-
-.timeline-item.active::before {
-    background: var(--accent-blue);
-    box-shadow: 0 0 8px var(--accent-blue);
-}
-
-/* Year Section Accordion */
 .year-section {
     margin-bottom: 2rem;
     border-radius: 12px;
@@ -170,56 +116,10 @@
     margin-left: 4px;
 }
 
-/* Footer and Action Buttons */
-.ci-info-footer {
-    margin-top: 25px;
-    padding-top: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px;
-}
-
-.ci-btn-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.ci-btn-dart {
-    background: var(--accent-blue);
-    color: #111827;
-    box-shadow: 0 4px 12px rgba(0, 210, 255, 0.2);
-}
-
-.ci-btn-dart:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0, 210, 255, 0.4);
-    filter: brightness(1.1);
-}
-
-.ci-btn-stock {
-    background: var(--accent-purple);
-    color: white;
-    box-shadow: 0 4px 12px rgba(157, 80, 187, 0.2);
-}
-
-.ci-btn-stock:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(157, 80, 187, 0.4);
-    filter: brightness(1.1);
-}
-
-.ci-btn-dart i, .ci-btn-stock i {
-    font-size: 0.8rem;
+.fund-pct-text {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-left: 4px;
 }
 
 /* Timeline update */
