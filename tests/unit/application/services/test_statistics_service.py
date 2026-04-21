@@ -16,6 +16,7 @@ def service(mock_query_service):
         capital_increase_repository=MagicMock(),
         bonus_issue_repository=MagicMock(),
         convertible_bond_repository=MagicMock(),
+        bw_repository=MagicMock(),
         market_data_service=MagicMock()
     )
 
@@ -158,3 +159,53 @@ class TestStatisticsService:
         
         assert result == sync_result
         service.sync_convertible_bond_data.assert_called_once()
+
+    def test_sync_bw_data_success(self, service, mock_query_service):
+        """BW 데이터를 구글 드라이브에서 가져와 티커를 보강하고 저장해야 한다."""
+        from synapstock.domain.statistics.models import BondWithWarrants
+
+        # Arrange
+        mock_storage = service._storage
+        mock_repo = service._bw_repo
+        
+        mock_storage.list_files_in_folder.return_value = [{"name": "2026_BW_Analysis.xlsx"}]
+        mock_storage.get_file.return_value = b"fake_excel_content"
+
+        mock_items = [
+            BondWithWarrants(date="2026-01-05", name="오텍", rcp_no="bw1", bond_amount=20000000000),
+        ]
+        service._parser.parse_bond_with_warrants = MagicMock(return_value=mock_items)
+
+        mock_query_service.get_all_stocks_flat.return_value = [
+            {"name": "오텍", "ticker": "067170", "aliases": []}
+        ]
+
+        # Act
+        result = service.sync_bw_data()
+
+        # Assert
+        assert len(result) == 1
+        assert result[0].ticker == "067170"
+        mock_repo.save_data.assert_called_once_with(result)
+        mock_storage.get_file.assert_called_once_with("2026_BW_Analysis.xlsx", folder="bw")
+
+    def test_get_bw_data_caching(self, service):
+        """BW 데이터 요청 시 캐시가 있으면 반환하고, 없으면 동기화해야 한다."""
+        from synapstock.domain.statistics.models import BondWithWarrants
+        mock_repo = service._bw_repo
+        
+        # 1. 캐시 히트
+        cached = [BondWithWarrants(date="2026-01-05", name="캐시BW", rcp_no="c1")]
+        mock_repo.load_data.return_value = cached
+        service.sync_bw_data = MagicMock()
+        
+        assert service.get_bw_data() == cached
+        service.sync_bw_data.assert_not_called()
+
+        # 2. 캐시 미스
+        mock_repo.load_data.return_value = []
+        sync_val = [BondWithWarrants(date="2026-01-05", name="동기BW", rcp_no="s1")]
+        service.sync_bw_data.return_value = sync_val
+        
+        assert service.get_bw_data() == sync_val
+        service.sync_bw_data.assert_called_once()
