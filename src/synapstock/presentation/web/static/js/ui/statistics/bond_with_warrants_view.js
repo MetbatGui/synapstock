@@ -1,44 +1,44 @@
 /**
- * @fileoverview 전환사채(Convertible Bond) 분석 뷰 모듈.
+ * @fileoverview 신주인수권부사채(Bond with Warrants) 분석 뷰 모듈.
  * 
- * 구글 드라이브에서 동기화된 전환사채 발행 결정 공시 데이터를 시각화합니다.
+ * 구글 드라이브에서 동기화된 BW 발행 결정 공시 데이터를 시각화합니다.
  */
 
-export const convertibleBondView = {
+export const bondWithWarrantsView = {
     /**
-     * 전환사채 분석 뷰를 렌더링합니다.
+     * 신주인수권부사채 분석 뷰를 렌더링합니다.
      */
     render: async function (container) {
         this.mainContainer = container;
         container.innerHTML = `
             <div class="stats-container stats-narrow animate-fade-in">
                 <div class="stats-header">
-                    <h2><i class="fas fa-file-contract"></i> 전환사채(CB) 발행 결정 분석</h2>
+                    <h2><i class="fas fa-file-invoice-dollar"></i> 신주인수권부사채(BW) 발행 결정 분석</h2>
                     <div class="stats-filters">
-                        <select id="cb-year-select" class="stats-select" title="연도 선택">
+                        <select id="bw-year-select" class="stats-select" title="연도 선택">
                             <option value="2026">2026년</option>
                             <option value="all">전체 연도</option>
                         </select>
-                        <button id="sync-convertible-bond-btn" class="stats-btn-refresh" title="최신 데이터 동기화">
+                        <button id="sync-bw-btn" class="stats-btn-refresh" title="최신 데이터 동기화">
                             <i class="fas fa-sync-alt"></i>
                         </button>
                     </div>
                 </div>
                 
                 <div class="stats-table-wrapper">
-                    <table class="stats-table" id="convertible-bond-table">
+                    <table class="stats-table" id="bw-table">
                         <thead>
                             <tr>
                                 <th style="width: 120px;">공시일</th>
                                 <th>상호 (종목명)</th>
                                 <th style="width: 80px;">회차</th>
                                 <th style="width: 100px; text-align:right;">권면총액</th>
-                                <th style="width: 100px; text-align:right;">전환가액</th>
+                                <th style="width: 100px; text-align:right;">행사가액</th>
                                 <th style="width: 120px; text-align:right;">납입일</th>
                                 <th style="width: 70px; text-align:center;">상세</th>
                             </tr>
                         </thead>
-                        <tbody id="convertible-bond-tbody">
+                        <tbody id="bw-tbody">
                             <tr><td colspan="7" class="stats-loader">데이터를 불러오는 중...</td></tr>
                         </tbody>
                     </table>
@@ -51,7 +51,7 @@ export const convertibleBondView = {
     },
 
     initEventListeners: function () {
-        const syncBtn = document.getElementById('sync-convertible-bond-btn');
+        const syncBtn = document.getElementById('sync-bw-btn');
         if (syncBtn) {
             syncBtn.onclick = async () => {
                 const icon = syncBtn.querySelector('i');
@@ -63,7 +63,7 @@ export const convertibleBondView = {
             };
         }
 
-        const yearSelect = document.getElementById('cb-year-select');
+        const yearSelect = document.getElementById('bw-year-select');
         if (yearSelect) {
             yearSelect.onchange = () => {
                 this.renderTable(this.cachedItems, yearSelect.value);
@@ -75,32 +75,36 @@ export const convertibleBondView = {
 
     loadData: async function (forceSync = false) {
         try {
-            const response = await fetch(`/api/statistics/convertible-bond?force_sync=${forceSync}`);
+            const baseUrl = '/api/statistics/bond-with-warrants';
+            const url = forceSync ? `${baseUrl}/sync` : baseUrl;
+            const method = forceSync ? 'POST' : 'GET';
+            
+            const response = await fetch(url, { method });
             const data = await response.json();
-            const items = data.items || [];
+            const items = data.items || data || [];
 
             items.sort((a, b) => b.date.localeCompare(a.date));
             this.cachedItems = this.calculateCorrectionOrders(items);
 
             this.updateYearOptions(items);
-            const yearSelect = document.getElementById('cb-year-select');
+            const yearSelect = document.getElementById('bw-year-select');
             this.renderTable(this.cachedItems, yearSelect ? yearSelect.value : 'all');
 
         } catch (err) {
-            console.error('Failed to load CB data:', err);
-            const tbody = document.getElementById('convertible-bond-tbody');
+            console.error('Failed to load BW data:', err);
+            const tbody = document.getElementById('bw-tbody');
             if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="stats-error">로드 실패: ${err.message}</td></tr>`;
         }
     },
 
     updateYearOptions: function (items) {
-        const yearSelect = document.getElementById('cb-year-select');
+        const yearSelect = document.getElementById('bw-year-select');
         if (!yearSelect) return;
 
         const currentValue = yearSelect.value;
         yearSelect.innerHTML = '<option value="all">전체 연도</option>';
 
-        const years = [...new Set(items.map(item => item.date.substring(0, 4)))]
+        const years = [...new Set(items.map(item => item.date ? item.date.substring(0, 4) : "")) ]
             .filter(y => y && y.length === 4)
             .sort((a, b) => b.localeCompare(a));
 
@@ -116,12 +120,12 @@ export const convertibleBondView = {
     },
 
     renderTable: function (items, selectedYear) {
-        const tbody = document.getElementById('convertible-bond-tbody');
+        const tbody = document.getElementById('bw-tbody');
         if (!tbody) return;
 
         let filteredItems = items;
         if (selectedYear && selectedYear !== "all") {
-            filteredItems = items.filter(item => item.date.startsWith(selectedYear));
+            filteredItems = items.filter(item => item.date && item.date.startsWith(selectedYear));
         }
 
         if (filteredItems.length === 0) {
@@ -132,7 +136,7 @@ export const convertibleBondView = {
         tbody.innerHTML = '';
         filteredItems.forEach(item => {
             const tr = document.createElement('tr');
-            tr.className = 'cb-row';
+            tr.className = 'cb-row'; // 동일 스타일 사용
             tr.style.cursor = 'pointer';
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.date}</td>
@@ -142,7 +146,7 @@ export const convertibleBondView = {
                 </td>
                 <td style="text-align:center; color:#60a5fa;">${item.bond_round}</td>
                 <td style="text-align:right; font-weight:600; color:#facc15;">${this.formatUnit(item.bond_amount)}</td>
-                <td style="text-align:right; color:#4ade80;">${item.conversion_price ? item.conversion_price.toLocaleString() : '-'}</td>
+                <td style="text-align:right; color:#4ade80;">${item.exercise_price ? item.exercise_price.toLocaleString() : '-'}</td>
                 <td style="text-align:right; color:#9ca3af;">${item.payment_date || '-'}</td>
                 <td style="text-align:center;"><span class="expand-icon">▼</span></td>
             `;
@@ -231,12 +235,12 @@ export const convertibleBondView = {
                                 <span class="value highlight">${item.issue_method}</span>
                             </div>
                             <div class="info-item">
-                                <span class="label">전환가액</span>
-                                <span class="value highlight">${item.conversion_price ? item.conversion_price.toLocaleString() + ' 원' : '-'}</span>
+                                <span class="label">행사가액</span>
+                                <span class="value highlight">${item.exercise_price ? item.exercise_price.toLocaleString() + ' 원' : '-'}</span>
                             </div>
                             <div class="info-item">
-                                <span class="label">전환비율</span>
-                                <span class="value">${item.conversion_ratio}%</span>
+                                <span class="label">신주인수권 비율</span>
+                                <span class="value">${item.warrant_ratio}%</span>
                             </div>
                             <div class="info-item">
                                 <span class="label">발행주식수</span>
@@ -258,7 +262,7 @@ export const convertibleBondView = {
                                 <div class="stats-timeline-date">${item.subscription_date ? item.subscription_date + ' / ' : ''}${item.payment_date || '-'}</div>
                             </div>
                             <div class="stats-timeline-item active">
-                                <div class="label">전환청구기간</div>
+                                <div class="label">권리행사기간</div>
                                 <div class="stats-timeline-date" style="font-size:0.85rem;">
                                     ${item.exercise_start_date || '-'} ~<br/>${item.exercise_end_date || '-'}
                                 </div>
@@ -287,16 +291,16 @@ export const convertibleBondView = {
                         </a>
                         ` : ''}
                         <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="stats-btn-action stats-btn-dart">
-                             DART 원문 <i class="fas fa-external-link-alt"></i>
+                            DART 원문 <i class="fas fa-external-link-alt"></i>
                         </a>
                     </div>
                 </div>
-                
+
                 ${history.length > 1 ? `
                 <div style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span style="font-size:0.85rem; color:#9ca3af;"><i class="fas fa-history"></i> 공시 이력:</span>
-                        <select class="stats-select" style="padding: 4px 8px; font-size: 0.8rem;" onchange="convertibleBondView.jumpToHistory(this.value)">
+                        <select class="stats-select" style="padding: 4px 8px; font-size: 0.8rem;" onchange="bondWithWarrantsView.jumpToHistory(this.value)">
                             <option value="">이전/정정 공시로 이동...</option>
                             ${history.map(h => `
                                 <option value="${h.rcp_no}" ${h.rcp_no === item.rcp_no ? 'selected disabled' : ''}>
@@ -316,7 +320,7 @@ export const convertibleBondView = {
         if (!target) return;
 
         const year = (target.date || "").substring(0, 4);
-        const yearSelect = document.getElementById('cb-year-select');
+        const yearSelect = document.getElementById('bw-year-select');
         
         if (yearSelect && yearSelect.value !== year) {
             yearSelect.value = year;
