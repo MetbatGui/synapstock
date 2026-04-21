@@ -17,7 +17,8 @@ from synapstock.domain.statistics.models import (
     RankingItem,
     SupplySubject,
     PaidInCapitalIncrease,
-    BonusIssue
+    BonusIssue,
+    ConvertibleBond
 )
 from synapstock.infrastructure.parsers.excel_statistics_parser import (
     ExcelStatisticsParser,
@@ -41,6 +42,7 @@ class StatisticsService:
         ceiling_repository: Any = None,
         capital_increase_repository: Any = None,
         bonus_issue_repository: Any = None,
+        convertible_bond_repository: Any = None,
         market_data_service: Any = None,
     ):
         """StatisticsService 객체를 초기화합니다.
@@ -58,6 +60,7 @@ class StatisticsService:
         self._ceiling_repo = ceiling_repository
         self._capital_increase_repo = capital_increase_repository
         self._bonus_issue_repo = bonus_issue_repository
+        self._convertible_bond_repo = convertible_bond_repository
         self._market_data_service = market_data_service
         self._parser = ExcelStatisticsParser()
 
@@ -669,4 +672,54 @@ class StatisticsService:
             return items
         except Exception as e:
             logger.error(f"[StatisticsService] 무상증자 동기화 실패: {e}", exc_info=True)
+            return []
+
+    def get_convertible_bond_data(self, force_sync: bool = False) -> list[ConvertibleBond]:
+        """전환사채 공시 데이터를 가져옵니다 (캐시 우선)."""
+        if self._convertible_bond_repo and not force_sync:
+            cached = self._convertible_bond_repo.load_data()
+            if cached:
+                return cached
+
+        return self.sync_convertible_bond_data()
+
+    def sync_convertible_bond_data(self) -> list[ConvertibleBond]:
+        """구글 드라이브에서 전환사채 엑셀 파일을 다운로드하여 동기화합니다."""
+        if not self._storage or not self._convertible_bond_repo:
+            logger.warning("[StatisticsService] 전환사채 동기화를 위한 저장소 또는 어댑터가 설정되지 않았습니다.")
+            return []
+
+        try:
+            # 전환사채 폴더 내의 파일 목록 조회
+            files = self._storage.list_files_in_folder("", folder="convertible_bond")
+            xlsx_files = [f for f in files if f["name"].lower().endswith((".xlsx", ".xls"))]
+
+            if not xlsx_files:
+                logger.warning("[StatisticsService] 전환사채 폴더에 엑셀 파일이 없습니다.")
+                return []
+
+            # 가장 최근 파일 선택
+            xlsx_files.sort(key=lambda x: x["name"], reverse=True)
+            target_file = xlsx_files[0]["name"]
+
+            logger.info(f"[StatisticsService] 전환사채 데이터 동기화 시작: {target_file}")
+            content = self._storage.get_file(target_file, folder="convertible_bond")
+            if not content:
+                return []
+
+            items = self._parser.parse_convertible_bond(content)
+
+            # 티커 보강
+            ticker_map = self._build_local_ticker_map()
+            for item in items:
+                if not item.ticker and item.name in ticker_map:
+                    item.ticker = ticker_map[item.name]
+
+            # 저장
+            self._convertible_bond_repo.save_data(items)
+            logger.info(f"[StatisticsService] 전환사채 데이터 {len(items)}건 동기화 완료")
+
+            return items
+        except Exception as e:
+            logger.error(f"[StatisticsService] 전환사채 동기화 실패: {e}", exc_info=True)
             return []
