@@ -6,6 +6,7 @@ from synapstock.domain.statistics.models import (
     MarketType,
     PaidInCapitalIncrease,
     BonusIssue,
+    ConvertibleBond,
     SupplySubject,
 )
 
@@ -162,3 +163,30 @@ class LocalBonusIssueRepository:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
             return [BonusIssue.model_validate(item) for item in data]
+
+
+class LocalConvertibleBondRepository:
+    """전환사채(CB) 분석 데이터를 로컬 JSON 파일로 관리하는 저장소."""
+
+    def __init__(self, data_root: str = "data/statistics/convertible_bond"):
+        self.root = Path(data_root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_data(self, items: list[ConvertibleBond]):
+        """전환사채 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        path = self.root / "convertible_bond_data.json"
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            data = [item.model_dump() for item in items]
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def load_data(self) -> list[ConvertibleBond]:
+        """로컬에 저장된 전환사채 데이터 리스트를 불러옵니다."""
+        path = self.root / "convertible_bond_data.json"
+        if not path.exists():
+            return []
+
+        import json
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+            return [ConvertibleBond.model_validate(item) for item in data]
