@@ -137,7 +137,7 @@ export const convertibleBondView = {
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.date}</td>
                 <td style="font-weight:600; color:#e5e7eb;">
-                    ${item.ticker ? `<a href="/stock/${item.ticker}" onclick="event.stopPropagation(); event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
+                    ${item.name}
                     ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정 ${item.correction_count > 0 ? `+${item.correction_count}` : ''}</span>` : ''}
                 </td>
                 <td style="text-align:center; color:#60a5fa;">${item.bond_round}</td>
@@ -220,7 +220,7 @@ export const convertibleBondView = {
                                         <div class="legend-dot ${s.class}"></div>
                                         <span class="fund-label-row">
                                             <span class="fund-amount-text">${s.label}: <b>${this.formatUnit(s.amount)}</b></span>
-                                            <span class="fund-pct-text">(${( (s.amount / total) * 100).toFixed(1)}%)</span>
+                                            <span class="fund-pct-text">(${((s.amount / total) * 100).toFixed(1)}%)</span>
                                         </span>
                                     </div>
                                 `).join('')}
@@ -324,7 +324,7 @@ export const convertibleBondView = {
     jumpToHistory: function (rcpNo) {
         // 1. 현재 필터에서 이미 보이는 행인지 확인
         let targetRow = document.querySelector(`.cb-row[data-rcp-no="${rcpNo}"]`);
-        
+
         // 2. 안 보인다면 필터 변경 및 재렌더링
         if (!targetRow) {
             const year = (target.date || "").substring(0, 4);
@@ -346,7 +346,7 @@ export const convertibleBondView = {
                     targetRow.style.outline = 'none';
                     targetRow.style.boxShadow = 'none';
                 }, 2000);
-                
+
                 const detailRow = targetRow.nextElementSibling;
                 if (detailRow && detailRow.style.display === 'none') {
                     targetRow.click();

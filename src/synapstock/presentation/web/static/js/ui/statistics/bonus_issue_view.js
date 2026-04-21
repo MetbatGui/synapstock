@@ -166,7 +166,7 @@ export const bonusIssueView = {
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.disclosure_date || item.date}</td>
                 <td style="font-weight:600; color:#e5e7eb;">
-                    ${item.ticker ? `<a href="/stock/${item.ticker}" onclick="event.stopPropagation(); event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
+                    ${item.name}
                     ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정 ${item.correction_count > 0 ? `+${item.correction_count}` : ''}</span>` : ''}
                 </td>
                 <td style="text-align:right; font-weight:700; color:#4ade80;">1 : ${ratioVal} ${ratioPercent !== '-' ? `(${ratioPercent}%)` : ''}</td>
@@ -195,7 +195,10 @@ export const bonusIssueView = {
 
                 if (isHidden) {
                     // 다른 열려있는 상세 행 닫기
-                    tbody.querySelectorAll('.detail-row').forEach(row => row.classList.remove('expanded'));
+                    tbody.querySelectorAll('.detail-row').forEach(row => {
+                        row.style.display = 'none';
+                        row.classList.remove('expanded');
+                    });
                     tbody.querySelectorAll('.expand-icon').forEach(ic => ic.style.transform = 'rotate(0deg)');
 
                     if (container.innerHTML.trim().length < 50) {

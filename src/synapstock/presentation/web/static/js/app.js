@@ -41,6 +41,12 @@ window.showAddStockModal = showAddStockModal;
 window.triggerReportUpload = triggerReportUpload;
 window.triggerNewsAdd = triggerNewsAdd;
 
+// 통계 뷰 객체 전역 노출 (인라인 이벤트 핸들러 대응)
+window.capitalIncreaseView = capitalIncreaseView;
+window.bonusIssueView = bonusIssueView;
+window.convertibleBondView = convertibleBondView;
+window.bondWithWarrantsView = bondWithWarrantsView;
+
 /**
  * 종목 상세 페이지로 즉시 이동하는 전역 함수
  * @param {string} ticker - 종목 티커

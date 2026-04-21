@@ -141,7 +141,7 @@ export const bondWithWarrantsView = {
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.date}</td>
                 <td style="font-weight:600; color:#e5e7eb;">
-                    ${item.ticker ? `<a href="/stock/${item.ticker}" onclick="event.stopPropagation(); event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
+                    ${item.name}
                     ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정 ${item.correction_count > 0 ? `+${item.correction_count}` : ''}</span>` : ''}
                 </td>
                 <td style="text-align:center; color:#60a5fa;">${item.bond_round}</td>
