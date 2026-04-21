@@ -427,58 +427,67 @@ class ExcelStatisticsParser:
             if pd.isna(val): return ""
             return str(val).strip()
 
+        # 컬럼 매핑 헬퍼 (유연한 헤더 매칭)
+        def get_val(row: pd.Series, *keys: str) -> Any:
+            """여러 개의 키 중 가장 먼저 매칭되는 컬럼의 값을 반환합니다."""
+            for key in keys:
+                cleaned_key = re.sub(r"\s+", "", key)
+                for col in row.index:
+                    cleaned_col = re.sub(r"\s+", "", str(col))
+                    if cleaned_key == cleaned_col:
+                        return row.get(col)
+            return None
+
         for sheet_name, df in sheets_dict.items():
             if df.empty:
                 continue
 
-            # 1. 헤더 행 찾기 (상단 10줄 이내에서 '종목명' 텍스트 검색)
+            # 1. 헤더 행 찾기 (상단 15줄 이내에서 '종목명' 텍스트 검색)
             header_idx = -1
-            for i in range(min(10, len(df))):
+            for i in range(min(15, len(df))):
                 row_values = [str(v).strip() for v in df.iloc[i].values if not pd.isna(v)]
                 if any("종목명" in v for v in row_values):
                     header_idx = i
                     break
 
             if header_idx == -1:
-                logger.warning(f"[ExcelParser] '{sheet_name}' 시트에서 '종목명' 헤더를 찾지 못했습니다. 건너뜁니다.")
+                logger.warning(f"[ExcelParser] '{sheet_name}' 시트에서 '종목명' 헤더를 찾지 못했습니다. 건너뜜.")
                 continue
 
             # 2. 헤더 재설정 및 데이터 가동
             new_df = df.iloc[header_idx + 1:].copy()
             new_df.columns = [str(v).strip() for v in df.iloc[header_idx].values]
-            
-            logger.info(f"[ExcelParser] '{sheet_name}' 시트 파싱 중 (헤더 인덱스: {header_idx})")
 
             for _, row in new_df.iterrows():
                 try:
-                    name_raw = row.get("종목명")
+                    name_raw = get_val(row, "종목명", "종목")
                     if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() == "종목명":
                         continue
 
                     item = PaidInCapitalIncrease(
-                        date=to_str(row.get("일자")),
+                        date=to_str(get_val(row, "일자", "일 시")),
                         name=ExcelStatisticsParser._clean_stock_name(to_str(name_raw)),
-                        is_correction=str(row.get("기재정정여부")).strip() == "Y" or "정정" in str(row.get("기재정정여부")),
-                        disclosure_date=to_str(row.get("유상증자공시일")),
-                        rcp_no=to_str(row.get("접수번호")),
-                        parent_rcp_no=to_str(row.get("상위접수번호")) if not pd.isna(row.get("상위접수번호")) else None,
-                        new_shares=to_int(row.get("신주발행주식수")),
-                        face_value=to_int(row.get("1주당 액면가")),
-                        pre_issued_shares=to_int(row.get("증자전 발행주식총수")),
-                        fund_facility=to_int(row.get("시설자금")),
-                        fund_operation=to_int(row.get("운영자금")),
-                        fund_acquisition=to_int(row.get("타법인증권")),
-                        fund_etc=to_int(row.get("기타자금")),
-                        method=to_str(row.get("증자방식")),
-                        issue_price=to_int(row.get("신주의 발행가액")),
-                        confirmed_price=to_int(row.get("발행확정가액")) if not pd.isna(row.get("발행확정가액")) else None,
-                        record_date=to_str(row.get("신주배정기준일")),
-                        shares_per_old=to_float(row.get("1주당 신주배정주식수")),
-                        subscription_date=to_str(row.get("청약예정일")),
-                        payment_date=to_str(row.get("납입일")),
-                        listing_date=to_str(row.get("신주상장일")),
-                        board_resolution_date=to_str(row.get("이사회결의일")),
-                        initial_disclosure_date=to_str(row.get("최초공시일"))
+                        is_correction=str(get_val(row, "기재정정여부", "정정여부") or "").strip() == "Y" or "정정" in str(get_val(row, "기재정정여부", "정정여부") or ""),
+                        disclosure_date=to_str(get_val(row, "유상증자공시일", "공시일", "일자")),
+                        rcp_no=to_str(get_val(row, "접수번호", "접수 번호")),
+                        parent_rcp_no=to_str(get_val(row, "상위접수번호")) if not pd.isna(get_val(row, "상위접수번호")) else None,
+                        new_shares=to_int(get_val(row, "신주발행주식수", "신주발행수", "발행배정주식수")),
+                        face_value=to_int(get_val(row, "1주당 액면가", "1주당 액면가액", "액면가")),
+                        pre_issued_shares=to_int(get_val(row, "증자전 발행주식총수", "증자전 발행주식 총수")),
+                        fund_facility=to_int(get_val(row, "시설자금", "시설 자금")),
+                        fund_operation=to_int(get_val(row, "운영자금", "운영 자금")),
+                        fund_acquisition=to_int(get_val(row, "타법인증권", "타법인 취득자금", "타법인")),
+                        fund_etc=to_int(get_val(row, "기타자금", "기타 자금")),
+                        method=to_str(get_val(row, "증자방식", "증자 방식")),
+                        issue_price=to_int(get_val(row, "신주의 발행가액", "발행가액", "발행가격")),
+                        confirmed_price=to_int(get_val(row, "발행확정가액", "확정가액")) if not pd.isna(get_val(row, "발행확정가액", "확정가액")) else None,
+                        record_date=to_str(get_val(row, "신주배정기준일", "기준일")),
+                        shares_per_old=to_float(get_val(row, "1주당 신주배정주식수", "배정비율", "1주당배정주식수")),
+                        subscription_date=to_str(get_val(row, "청약예정일", "청약일")),
+                        payment_date=to_str(get_val(row, "납입일")),
+                        listing_date=to_str(get_val(row, "신주상장일", "상장일", "상장예정일")),
+                        board_resolution_date=to_str(get_val(row, "이사회결의일", "결의일")),
+                        initial_disclosure_date=to_str(get_val(row, "최초공시일", "최초 공시일"))
                     )
                     results.append(item)
                 except Exception as e:
@@ -517,6 +526,17 @@ class ExcelStatisticsParser:
             if pd.isna(val): return ""
             return str(val).strip()
 
+        # 컬럼 매핑 헬퍼 (유연한 헤더 매칭)
+        def get_val(row: pd.Series, *keys: str) -> Any:
+            """여러 개의 키 중 가장 먼저 매칭되는 컬럼의 값을 반환합니다."""
+            for key in keys:
+                cleaned_key = re.sub(r"\s+", "", key)
+                for col in row.index:
+                    cleaned_col = re.sub(r"\s+", "", str(col))
+                    if cleaned_key == cleaned_col:
+                        return row.get(col)
+            return None
+
         for sheet_name, df in sheets_dict.items():
             if df.empty: continue
 
@@ -535,22 +555,26 @@ class ExcelStatisticsParser:
 
             for _, row in new_df.iterrows():
                 try:
-                    name_raw = row.get("종목명")
+                    name_raw = get_val(row, "종목명", "종목")
                     if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() == "종목명":
                         continue
 
                     item = BonusIssue(
-                        date=to_str(row.get("일자")),
+                        date=to_str(get_val(row, "일자", "일 시", "공시일")),
                         name=ExcelStatisticsParser._clean_stock_name(to_str(name_raw)),
-                        is_correction=str(row.get("기재정정여부")).strip() == "Y" or "정정" in str(row.get("기재정정여부")),
-                        disclosure_date=to_str(row.get("무상증자공시일") or row.get("공시일")),
-                        rcp_no=to_str(row.get("접수번호")),
-                        parent_rcp_no=to_str(row.get("상위접수번호")) if not pd.isna(row.get("상위접수번호")) else None,
-                        new_shares=to_int(row.get("신주발행주식수")),
-                        shares_per_old=to_float(row.get("1주당 신주배정주식수")),
-                        record_date=to_str(row.get("신주배정기준일")),
-                        listing_date=to_str(row.get("신주상장일")),
-                        capital_reserve=to_str(row.get("무상증자 재원") or row.get("재원") or "")
+                        is_correction=str(get_val(row, "기재정정여부", "정정여부") or "").strip() == "Y" or "정정" in str(get_val(row, "기재정정여부", "정정여부") or ""),
+                        disclosure_date=to_str(get_val(row, "무상증자공시일", "공시일", "일자", "최초공시일")),
+                        rcp_no=to_str(get_val(row, "접수번호", "접수 번호")),
+                        parent_rcp_no=to_str(get_val(row, "상위접수번호")) if not pd.isna(get_val(row, "상위접수번호")) else None,
+                        new_shares=to_int(get_val(row, "신주발행주식수", "신주의 종류와 수", "신주수", "발행배정주식수")),
+                        face_value=to_int(get_val(row, "1주당 액면가액", "1주당 액면가", "액면가", "액면가액")),
+                        pre_issued_shares=to_int(get_val(row, "증자전 발행주식총수", "증자전 발행주식 총수")),
+                        shares_per_old=to_float(get_val(row, "1주당 신주배정주식수", "1주당 신주배정 주식수", "배정비율")),
+                        record_date=to_str(get_val(row, "신주배정기준일", "기준일")),
+                        listing_date=to_str(get_val(row, "신주상장일", "신주의 상장 예정일", "상장일", "상장예정일")),
+                        capital_reserve=to_str(get_val(row, "무상증자 재원", "무상증자재원", "재원") or ""),
+                        board_resolution_date=to_str(get_val(row, "이사회결의일", "결의일")),
+                        initial_disclosure_date=to_str(get_val(row, "최초공시일", "최초 공시일"))
                     )
                     results.append(item)
                 except Exception as e:

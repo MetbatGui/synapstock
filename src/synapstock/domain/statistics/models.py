@@ -226,12 +226,16 @@ class BonusIssue(BaseModel):
     date: str  # 일자 (YYYY-MM-DD)
     name: str  # 종목명
     is_correction: bool = False  # 기재정정여부
-    disclosure_date: str  # 무상증자공시일
+    disclosure_date: str  # 무상증자공시일 (또는 일자)
     rcp_no: str  # 접수번호
     parent_rcp_no: str | None = None  # 상위접수번호
-    new_shares: int = 0  # 신주발행주식수
+    new_shares: int = 0  # 신주발행주식수 (신주의 종류와 수)
+    face_value: int = 0  # 1주당 액면가 (1주당 액면가액)
+    pre_issued_shares: int = 0  # 증자전 발행주식총수
     shares_per_old: float = 0.0  # 1주당 신주배정주식수
     record_date: str | None = None  # 신주배정기준일
-    listing_date: str | None = None  # 신주상장일
+    listing_date: str | None = None  # 신주상장일 (신주의 상장 예정일)
     capital_reserve: str = ""  # 무상증자 재원 (주식발행초과금 등)
+    board_resolution_date: str | None = None  # 이사회결의일
+    initial_disclosure_date: str | None = None  # 최초공시일
     ticker: str | None = None  # 시스템 연결용 티커
