@@ -21,6 +21,7 @@ import { statisticsMonthView } from './ui/statistics/statistics_month_view.js';
 import { ceilingView } from './ui/statistics/ceiling_view.js';
 import { capitalIncreaseView } from './ui/statistics/capital_increase_view.js';
 import { bonusIssueView } from './ui/statistics/bonus_issue_view.js';
+import { convertibleBondView } from './ui/statistics/convertible_bond_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -155,7 +156,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 capitalIncreaseView.render(statsContainer);
             } else if (path.includes('bonus-issue')) {
                 bonusIssueView.render(statsContainer);
+            } else if (path.includes('convertible-bond')) {
+                convertibleBondView.render(statsContainer);
             }
         }
+    }
+
+    // 통계 서브 내비게이션 이벤트 (SPA 처리)
+    const statsSubNav = document.querySelector('.stats-subnav');
+    if (statsSubNav) {
+        statsSubNav.addEventListener('click', (e) => {
+            const link = e.target.closest('.stats-nav-item');
+            if (!link) return;
+
+            e.preventDefault();
+            const href = link.getAttribute('href');
+            const route = link.getAttribute('data-route');
+
+            // URL 업데이트
+            history.pushState({ tab: 'statistics', route }, '', href);
+
+            // 모든 탭에서 active 제거 후 현재 탭에 추가
+            document.querySelectorAll('.stats-nav-item').forEach(item => item.classList.remove('active'));
+            link.classList.add('active');
+
+            // 뷰 렌더링
+            const statsContainer = document.getElementById('statistics-container');
+            if (statsContainer) {
+                if (route === 'netbuy-ranking' || href === '/statistics') {
+                    statisticsView.init(statsContainer);
+                } else if (route === 'month') {
+                    statisticsMonthView.init(statsContainer);
+                } else if (route === 'ceiling') {
+                    ceilingView.init(statsContainer);
+                } else if (route === 'capital-increase') {
+                    capitalIncreaseView.render(statsContainer);
+                } else if (route === 'bonus-issue') {
+                    bonusIssueView.render(statsContainer);
+                } else if (route === 'convertible-bond') {
+                    convertibleBondView.render(statsContainer);
+                }
+            }
+        });
+
+        // 초기 진입 시 active 클래스 설정
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.stats-nav-item').forEach(link => {
+            const href = link.getAttribute('href');
+            if (currentPath === href || (currentPath === '/statistics' && href === '/statistics')) {
+                link.classList.add('active');
+            } else if (currentPath.startsWith(href) && href !== '/statistics') {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
     }
 });

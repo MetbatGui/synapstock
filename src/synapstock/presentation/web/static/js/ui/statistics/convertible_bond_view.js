@@ -1,0 +1,302 @@
+/**
+ * @fileoverview 전환사채(Convertible Bond) 분석 뷰 모듈.
+ * 
+ * 구글 드라이브에서 동기화된 전환사채 발행 결정 공시 데이터를 시각화합니다.
+ */
+
+export const convertibleBondView = {
+    /**
+     * 전환사채 분석 뷰를 렌더링합니다.
+     */
+    render: async function (container) {
+        this.mainContainer = container;
+        container.innerHTML = `
+            <div class="stats-container stats-narrow animate-fade-in">
+                <div class="stats-header">
+                    <h2><i class="fas fa-file-contract"></i> 전환사채(CB) 발행 결정 분석</h2>
+                    <div class="stats-filters">
+                        <select id="cb-year-select" class="stats-select" title="연도 선택">
+                            <option value="2026">2026년</option>
+                            <option value="all">전체 연도</option>
+                        </select>
+                        <button id="sync-convertible-bond-btn" class="stats-btn-refresh" title="최신 데이터 동기화">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="stats-table-wrapper">
+                    <table class="stats-table" id="convertible-bond-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">공시일</th>
+                                <th>상호 (종목명)</th>
+                                <th style="width: 80px;">회차</th>
+                                <th style="width: 100px; text-align:right;">권면총액</th>
+                                <th style="width: 100px; text-align:right;">전환가액</th>
+                                <th style="width: 120px; text-align:right;">납입일</th>
+                                <th style="width: 70px; text-align:center;">상세</th>
+                            </tr>
+                        </thead>
+                        <tbody id="convertible-bond-tbody">
+                            <tr><td colspan="7" class="stats-loader">데이터를 불러오는 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        this.initEventListeners();
+        await this.loadData();
+    },
+
+    initEventListeners: function () {
+        const syncBtn = document.getElementById('sync-convertible-bond-btn');
+        if (syncBtn) {
+            syncBtn.onclick = async () => {
+                const icon = syncBtn.querySelector('i');
+                syncBtn.disabled = true;
+                if (icon) icon.classList.add('fa-spin');
+                await this.loadData(true);
+                syncBtn.disabled = false;
+                if (icon) icon.classList.remove('fa-spin');
+            };
+        }
+
+        const yearSelect = document.getElementById('cb-year-select');
+        if (yearSelect) {
+            yearSelect.onchange = () => {
+                this.renderTable(this.cachedItems, yearSelect.value);
+            };
+        }
+    },
+
+    cachedItems: [],
+
+    loadData: async function (forceSync = false) {
+        try {
+            const response = await fetch(`/api/statistics/convertible-bond?force_sync=${forceSync}`);
+            const data = await response.json();
+            const items = data.items || [];
+
+            items.sort((a, b) => b.date.localeCompare(a.date));
+            this.cachedItems = items;
+
+            this.updateYearOptions(items);
+            const yearSelect = document.getElementById('cb-year-select');
+            this.renderTable(this.cachedItems, yearSelect ? yearSelect.value : 'all');
+
+        } catch (err) {
+            console.error('Failed to load CB data:', err);
+            const tbody = document.getElementById('convertible-bond-tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="stats-error">로드 실패: ${err.message}</td></tr>`;
+        }
+    },
+
+    updateYearOptions: function (items) {
+        const yearSelect = document.getElementById('cb-year-select');
+        if (!yearSelect) return;
+
+        const currentValue = yearSelect.value;
+        yearSelect.innerHTML = '<option value="all">전체 연도</option>';
+
+        const years = [...new Set(items.map(item => item.date.substring(0, 4)))]
+            .filter(y => y && y.length === 4)
+            .sort((a, b) => b.localeCompare(a));
+
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = `${year}년`;
+            yearSelect.appendChild(option);
+        });
+
+        if (years.includes("2026")) yearSelect.value = "2026";
+        else if (years.length > 0) yearSelect.value = years[0];
+    },
+
+    renderTable: function (items, selectedYear) {
+        const tbody = document.getElementById('convertible-bond-tbody');
+        if (!tbody) return;
+
+        let filteredItems = items;
+        if (selectedYear && selectedYear !== "all") {
+            filteredItems = items.filter(item => item.date.startsWith(selectedYear));
+        }
+
+        if (filteredItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="stats-empty">데이터가 없습니다.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        filteredItems.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.className = 'cb-row';
+            tr.style.cursor = 'pointer';
+            tr.innerHTML = `
+                <td style="color:#9ca3af;">${item.date}</td>
+                <td style="font-weight:600; color:#e5e7eb;">
+                    ${item.ticker ? `<a href="#" onclick="window._jumpToStock('${item.ticker}', '${item.name}'); event.stopPropagation(); return false;" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
+                    ${item.is_correction ? `<span class="badge-correction">정정</span>` : ''}
+                </td>
+                <td style="text-align:center; color:#60a5fa;">${item.bond_round}</td>
+                <td style="text-align:right; font-weight:600; color:#facc15;">${this.formatUnit(item.bond_amount)}</td>
+                <td style="text-align:right; color:#4ade80;">${item.conversion_price ? item.conversion_price.toLocaleString() : '-'}</td>
+                <td style="text-align:right; color:#9ca3af;">${item.payment_date || '-'}</td>
+                <td style="text-align:center;"><span class="expand-icon">▼</span></td>
+            `;
+
+            const detailTr = document.createElement('tr');
+            detailTr.className = 'detail-row';
+            detailTr.style.display = 'none';
+            detailTr.innerHTML = `<td colspan="7" class="detail-container"></td>`;
+
+            tbody.appendChild(tr);
+            tbody.appendChild(detailTr);
+
+            tr.onclick = () => {
+                const container = detailTr.querySelector('.detail-container');
+                const icon = tr.querySelector('.expand-icon');
+                const isHidden = detailTr.style.display === 'none';
+
+                if (isHidden) {
+                    if (container.innerHTML.trim().length < 50) {
+                        container.innerHTML = this.generateDetailHtml(item);
+                    }
+                    detailTr.style.display = 'table-row';
+                    if (icon) icon.style.transform = 'rotate(180deg)';
+                } else {
+                    detailTr.style.display = 'none';
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                }
+            };
+        });
+    },
+
+    generateDetailHtml: function (item) {
+        const total = item.total_fund || item.bond_amount;
+        const segments = [
+            { label: '시설', amount: item.fund_facility, class: 'segment-facility' },
+            { label: '운영', amount: item.fund_operation, class: 'segment-operation' },
+            { label: '영업양수', amount: item.fund_acquisition_biz, class: 'segment-acquisition-biz' },
+            { label: '타법인', amount: item.fund_acquisition_sec, class: 'segment-acquisition' },
+            { label: '채무상환', amount: item.fund_debt_repayment, class: 'segment-debt' },
+            { label: '기타', amount: item.fund_etc, class: 'segment-etc' }
+        ].filter(s => s.amount > 0);
+
+        const stackedBarHtml = segments.map(s => {
+            const pct = ((s.amount / total) * 100).toFixed(1);
+            return `<div class="fund-segment ${s.class}" style="width: ${pct}%" title="${s.label}: ${this.formatUnit(s.amount)} (${pct}%)"></div>`;
+        }).join('');
+
+        return `
+            <div class="stats-detail-container animate-fade-in">
+                <div class="stats-detail-grid" style="grid-template-columns: 1fr 1fr 1.2fr;">
+                    <!-- 카드 1: 자금조달 목적 -->
+                    <div class="stats-card">
+                        <h4 class="card-title"><i class="fas fa-coins"></i> 자금조달 목적 및 규모</h4>
+                        <div class="fund-summary">
+                            <span class="label">총 발행 금액</span>
+                            <span class="value headline">${this.formatUnit(item.bond_amount)}</span>
+                        </div>
+                        <div class="fund-stacked-container">
+                            <div class="fund-stacked-bar">${stackedBarHtml}</div>
+                            <div class="fund-legend">
+                                ${segments.map(s => `
+                                    <div class="fund-legend-item">
+                                        <div class="legend-dot ${s.class}"></div>
+                                        <span class="fund-label-row">
+                                            <span class="fund-amount-text">${s.label}: <b>${this.formatUnit(s.amount)}</b></span>
+                                            <span class="fund-pct-text">(${( (s.amount / total) * 100).toFixed(1)}%)</span>
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 카드 2: 상세 발행 조건 -->
+                    <div class="stats-card">
+                        <h4 class="card-title"><i class="fas fa-file-signature"></i> 상세 발행 조건</h4>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="label">회차 / 종류</span>
+                                <span class="value">${item.bond_round} / ${item.bond_type}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">발행방법</span>
+                                <span class="value highlight">${item.issue_method}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">전환가액</span>
+                                <span class="value highlight">${item.conversion_price ? item.conversion_price.toLocaleString() + ' 원' : '-'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">전환비율</span>
+                                <span class="value">${item.conversion_ratio}%</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">발행주식수</span>
+                                <span class="value">${item.new_shares ? item.new_shares.toLocaleString() + ' 주' : '-'}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="label">주식대비비율</span>
+                                <span class="value" style="color:#4ade80;">${item.shares_ratio}%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 카드 3: 주요 일정 -->
+                    <div class="stats-card">
+                        <h4 class="card-title"><i class="fas fa-calendar-check"></i> 주요 일정</h4>
+                        <div class="stats-timeline">
+                            <div class="stats-timeline-item">
+                                <div class="label">청약 / 납입일</div>
+                                <div class="stats-timeline-date">${item.subscription_date ? item.subscription_date + ' / ' : ''}${item.payment_date || '-'}</div>
+                            </div>
+                            <div class="stats-timeline-item active">
+                                <div class="label">전환청구기간</div>
+                                <div class="stats-timeline-date" style="font-size:0.85rem;">
+                                    ${item.exercise_start_date || '-'} ~<br/>${item.exercise_end_date || '-'}
+                                </div>
+                            </div>
+                            <div class="stats-timeline-item">
+                                <div class="label">사채만기일</div>
+                                <div class="stats-timeline-date headline" style="color:#facc15;">${item.maturity_date || '-'}</div>
+                            </div>
+                        </div>
+                        <div class="info-footer">
+                            <i class="fas fa-info-circle"></i> 최초 공시: ${item.initial_disclosure_date || '-'} <br/>
+                            <i class="fas fa-gavel"></i> 이사회결의: ${item.board_resolution_date || '-'}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-info-footer">
+                    <div class="footer-left">
+                         <i class="fas fa-fingerprint"></i> 접수번호: ${item.rcp_no}
+                         ${item.parent_rcp_no ? `<br/><i class="fas fa-link"></i> 상위공시: ${item.parent_rcp_no}` : ''}
+                    </div>
+                    <div class="footer-actions">
+                        ${item.ticker ? `
+                        <button onclick="window._jumpToStock('${item.ticker}', '${item.name}')" class="stats-btn-action stats-btn-stock">
+                             <i class="fas fa-search-dollar"></i> 종목 분석
+                        </button>
+                        ` : ''}
+                        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="stats-btn-action stats-btn-dart">
+                            DART 원문 <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    formatUnit: function (value) {
+        if (!value || value === 0) return '0';
+        if (value >= 100000000) return `${(value / 100000000).toFixed(1)}억`;
+        if (value >= 10000) return `${(value / 10000).toFixed(0)}만`;
+        return value.toLocaleString();
+    }
+};
