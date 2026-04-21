@@ -95,3 +95,135 @@
     align-items: center;
     gap: 20px;
 }
+
+/* Funding Section Stacked Bar Styles */
+.fund-stacked-container {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.fund-stacked-bar {
+    height: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    display: flex;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fund-segment {
+    height: 100%;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.fund-segment:hover {
+    filter: brightness(1.3);
+    z-index: 10;
+}
+
+/* Colors for segments */
+.segment-facility { background: #3b82f6; }    /* Blue */
+.segment-operation { background: #f59e0b; }   /* Amber */
+.segment-acquisition { background: #a855f7; } /* Purple */
+.segment-etc { background: #6b7280; }         /* Gray */
+
+.fund-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.fund-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.fund-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #9ca3af;
+}
+
+.fund-amount-text {
+    font-size: 0.8rem;
+    color: #e5e7eb;
+    font-weight: 500;
+}
+
+.fund-pct-text {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-left: 4px;
+}
+
+/* Footer and Action Buttons */
+.ci-info-footer {
+    margin-top: 25px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.ci-btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.ci-btn-dart {
+    background: var(--accent-blue);
+    color: #111827;
+    box-shadow: 0 4px 12px rgba(0, 210, 255, 0.2);
+}
+
+.ci-btn-dart:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 210, 255, 0.4);
+    filter: brightness(1.1);
+}
+
+.ci-btn-stock {
+    background: var(--accent-purple);
+    color: white;
+    box-shadow: 0 4px 12px rgba(157, 80, 187, 0.2);
+}
+
+.ci-btn-stock:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(157, 80, 187, 0.4);
+    filter: brightness(1.1);
+}
+
+.ci-btn-dart i, .ci-btn-stock i {
+    font-size: 0.8rem;
+}
+
+/* Timeline update */
+.timeline-date {
+    color: #e5e7eb;
+    font-weight: 600;
+}

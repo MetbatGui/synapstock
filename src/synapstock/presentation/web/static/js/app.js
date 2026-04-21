@@ -39,6 +39,22 @@ window.showAddStockModal = showAddStockModal;
 window.triggerReportUpload = triggerReportUpload;
 window.triggerNewsAdd = triggerNewsAdd;
 
+/**
+ * 종목 상세 페이지로 즉시 이동하는 전역 함수
+ * @param {string} ticker - 종목 티커
+ * @param {string} name - 종목명
+ */
+window._jumpToStock = (ticker, name) => {
+    if (!ticker || ticker === 'none') return;
+    
+    // URL 상태 업데이트 (뒤로가기 지원)
+    history.pushState({ tab: 'dashboard', ticker, name }, '', `/stock/${ticker}`);
+    
+    // 탭 전환 및 대시보드 로드
+    switchTab('dashboard-tab', false);
+    loadStockDashboard(ticker, name, loadBoardData, window._globalLocalReportCounts);
+};
+
 // 인자(loadBoardData) 주입이 필요한 함수 래핑
 window.deleteNode = (nodeName) => deleteNode(nodeName, loadBoardData);
 window.deleteStock = (ticker) => deleteStock(ticker, loadBoardData);

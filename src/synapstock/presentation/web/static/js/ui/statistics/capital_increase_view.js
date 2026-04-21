@@ -13,7 +13,7 @@ export const capitalIncreaseView = {
     render: async function (container) {
         this.mainContainer = container;
         container.innerHTML = `
-            <div class="stats-container animate-fade-in">
+            <div class="stats-container stats-narrow animate-fade-in">
                 <div class="stats-header">
                     <h2><i class="fas fa-rocket"></i> 유상증자 결정 공시 분석</h2>
                     <div class="stats-filters">
@@ -107,7 +107,7 @@ export const capitalIncreaseView = {
 
             // 테이블 렌더링 (기본값: 전체 또는 현재 선택된 연도)
             const yearSelect = document.getElementById('ci-year-select');
-            this.renderTable(items, yearSelect ? yearSelect.value : 'all');
+            this.renderTable(this.cachedItems, yearSelect ? yearSelect.value : 'all');
 
         } catch (err) {
             console.error('Failed to load capital increase data:', err);
@@ -185,7 +185,7 @@ export const capitalIncreaseView = {
                 <td style="color:#9ca3af;">${item.disclosure_date || item.date}</td>
                 <td style="font-weight:600; color:#e5e7eb;">
                     ${item.ticker ? `<a href="/stock/${item.ticker}" onclick="event.stopPropagation(); event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
-                    ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정${item.correction_count > 0 ? ` (${item.correction_count}차)` : ''}</span>` : ''}
+                    ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정 ${item.correction_count > 0 ? `+${item.correction_count}` : ''}</span>` : ''}
                 </td>
                 <td style="color:#60a5fa;">${item.method}</td>
                 <td style="text-align:right; font-weight:600; color:#facc15;">${this.formatUnit(total)}</td>
@@ -273,40 +273,56 @@ export const capitalIncreaseView = {
                     <!-- 자금 조달 목적 분석 -->
                     <div class="ci-card">
                         <h4><i class="fas fa-chart-pie"></i> 자금 조달 목적 비중</h4>
-                        <div class="fund-item">
-                            <div class="fund-label-row">
-                                <span>시설 자금</span>
-                                <span>${this.formatUnit(item.fund_facility)} (${p(item.fund_facility)}%)</span>
+                        <div class="fund-stacked-container">
+                            <div class="fund-stacked-bar">
+                                ${item.fund_facility > 0 ? `<div class="fund-segment segment-facility" style="width: ${p(item.fund_facility)}%;" title="시설 자금: ${this.formatUnit(item.fund_facility)} (${p(item.fund_facility)}%)"></div>` : ''}
+                                ${item.fund_operation > 0 ? `<div class="fund-segment segment-operation" style="width: ${p(item.fund_operation)}%;" title="운영 자금: ${this.formatUnit(item.fund_operation)} (${p(item.fund_operation)}%)"></div>` : ''}
+                                ${item.fund_acquisition > 0 ? `<div class="fund-segment segment-acquisition" style="width: ${p(item.fund_acquisition)}%;" title="타법인 증권 취득: ${this.formatUnit(item.fund_acquisition)} (${p(item.fund_acquisition)}%)"></div>` : ''}
+                                ${item.fund_etc > 0 ? `<div class="fund-segment segment-etc" style="width: ${p(item.fund_etc)}%;" title="기타 자금: ${this.formatUnit(item.fund_etc)} (${p(item.fund_etc)}%)"></div>` : ''}
+                                ${totalAmount === 0 ? `<div class="fund-segment" style="width: 100%; background: rgba(255,255,255,0.05);"></div>` : ''}
                             </div>
-                            <div class="fund-progress-bg">
-                                <div class="fund-progress-bar" style="width: ${p(item.fund_facility)}%;"></div>
-                            </div>
-                        </div>
-                        <div class="fund-item">
-                            <div class="fund-label-row">
-                                <span>운영 자금</span>
-                                <span>${this.formatUnit(item.fund_operation)} (${p(item.fund_operation)}%)</span>
-                            </div>
-                            <div class="fund-progress-bg">
-                                <div class="fund-progress-bar" style="width: ${p(item.fund_operation)}%; opacity: 0.8;"></div>
-                            </div>
-                        </div>
-                        <div class="fund-item">
-                            <div class="fund-label-row">
-                                <span>타법인 증권 취득</span>
-                                <span>${this.formatUnit(item.fund_acquisition)} (${p(item.fund_acquisition)}%)</span>
-                            </div>
-                            <div class="fund-progress-bg">
-                                <div class="fund-progress-bar" style="width: ${p(item.fund_acquisition)}%; opacity: 0.6;"></div>
-                            </div>
-                        </div>
-                        <div class="fund-item">
-                            <div class="fund-label-row">
-                                <span>기타 자금</span>
-                                <span>${this.formatUnit(item.fund_etc)} (${p(item.fund_etc)}%)</span>
-                            </div>
-                            <div class="fund-progress-bg">
-                                <div class="fund-progress-bar" style="width: ${p(item.fund_etc)}%; opacity: 0.4;"></div>
+                            
+                            <div class="fund-legend">
+                                <div class="fund-legend-item">
+                                    <div class="legend-dot segment-facility"></div>
+                                    <div style="flex:1;">
+                                        <div class="fund-label-row">
+                                            <span>시설</span>
+                                            <span class="fund-amount-text">${this.formatUnit(item.fund_facility)}</span>
+                                        </div>
+                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_facility)}%</div>
+                                    </div>
+                                </div>
+                                <div class="fund-legend-item">
+                                    <div class="legend-dot segment-operation"></div>
+                                    <div style="flex:1;">
+                                        <div class="fund-label-row">
+                                            <span>운영</span>
+                                            <span class="fund-amount-text">${this.formatUnit(item.fund_operation)}</span>
+                                        </div>
+                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_operation)}%</div>
+                                    </div>
+                                </div>
+                                <div class="fund-legend-item">
+                                    <div class="legend-dot segment-acquisition"></div>
+                                    <div style="flex:1;">
+                                        <div class="fund-label-row">
+                                            <span>취득</span>
+                                            <span class="fund-amount-text">${this.formatUnit(item.fund_acquisition)}</span>
+                                        </div>
+                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_acquisition)}%</div>
+                                    </div>
+                                </div>
+                                <div class="fund-legend-item">
+                                    <div class="legend-dot segment-etc"></div>
+                                    <div style="flex:1;">
+                                        <div class="fund-label-row">
+                                            <span>기타</span>
+                                            <span class="fund-amount-text">${this.formatUnit(item.fund_etc)}</span>
+                                        </div>
+                                        <div style="font-size:0.7rem; color:#6b7280;">비중: ${p(item.fund_etc)}%</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -388,9 +404,16 @@ export const capitalIncreaseView = {
                     <div style="margin-right: auto; font-size: 0.85rem; color: #9ca3af;">
                         <span>증자후 발행주식총수: <b>${(item.pre_issued_shares + (item.new_shares || 0)).toLocaleString()}</b> 주</span>
                     </div>
-                    <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="ci-btn-action ci-btn-dart">
-                        DART 공시 원문 보기 <i class="fas fa-external-link-alt"></i>
-                    </a>
+                    <div style="display: flex; gap: 10px;">
+                        ${item.ticker ? `
+                        <a href="/stock/${item.ticker}" onclick="event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" class="ci-btn-action ci-btn-stock">
+                             <i class="fas fa-search-dollar"></i> 종목 분석 페이지 이동
+                        </a>
+                        ` : ''}
+                        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="ci-btn-action ci-btn-dart">
+                            DART 공시 원문 보기 <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
                 </div>
                 ${historyOptions}
             </div>
