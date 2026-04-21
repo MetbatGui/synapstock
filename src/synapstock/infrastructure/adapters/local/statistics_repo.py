@@ -7,6 +7,7 @@ from synapstock.domain.statistics.models import (
     PaidInCapitalIncrease,
     BonusIssue,
     ConvertibleBond,
+    BondWithWarrants,
     SupplySubject,
 )
 
@@ -190,3 +191,30 @@ class LocalConvertibleBondRepository:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
             return [ConvertibleBond.model_validate(item) for item in data]
+
+
+class LocalBondWithWarrantsRepository:
+    """신주인수권부사채(BW) 분석 데이터를 로컬 JSON 파일로 관리하는 저장소."""
+
+    def __init__(self, data_root: str = "data/statistics/bw"):
+        self.root = Path(data_root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_data(self, items: list[BondWithWarrants]):
+        """신주인수권부사채 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        path = self.root / "bw_data.json"
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            data = [item.model_dump() for item in items]
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def load_data(self) -> list[BondWithWarrants]:
+        """로컬에 저장된 신주인수권부사채 데이터 리스트를 불러옵니다."""
+        path = self.root / "bw_data.json"
+        if not path.exists():
+            return []
+
+        import json
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+            return [BondWithWarrants.model_validate(item) for item in data]
