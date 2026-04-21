@@ -80,7 +80,7 @@ export const convertibleBondView = {
             const items = data.items || [];
 
             items.sort((a, b) => b.date.localeCompare(a.date));
-            this.cachedItems = items;
+            this.cachedItems = this.calculateCorrectionOrders(items);
 
             this.updateYearOptions(items);
             const yearSelect = document.getElementById('cb-year-select');
@@ -137,8 +137,8 @@ export const convertibleBondView = {
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${item.date}</td>
                 <td style="font-weight:600; color:#e5e7eb;">
-                    ${item.ticker ? `<a href="#" onclick="window._jumpToStock('${item.ticker}', '${item.name}'); event.stopPropagation(); return false;" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
-                    ${item.is_correction ? `<span class="badge-correction">정정</span>` : ''}
+                    ${item.ticker ? `<a href="/stock/${item.ticker}" onclick="event.stopPropagation(); event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" style="color:inherit; text-decoration:none;">${item.name}</a>` : item.name}
+                    ${item.is_correction ? `<span style="font-size:0.75rem; background:#ef4444; color:white; padding:1px 4px; border-radius:3px; margin-left:5px;">기재정정 ${item.correction_count > 0 ? `+${item.correction_count}` : ''}</span>` : ''}
                 </td>
                 <td style="text-align:center; color:#60a5fa;">${item.bond_round}</td>
                 <td style="text-align:right; font-weight:600; color:#facc15;">${this.formatUnit(item.bond_amount)}</td>
@@ -146,6 +146,7 @@ export const convertibleBondView = {
                 <td style="text-align:right; color:#9ca3af;">${item.payment_date || '-'}</td>
                 <td style="text-align:center;"><span class="expand-icon">▼</span></td>
             `;
+            tr.dataset.rcpNo = item.rcp_no;
 
             const detailTr = document.createElement('tr');
             detailTr.className = 'detail-row';
@@ -162,7 +163,8 @@ export const convertibleBondView = {
 
                 if (isHidden) {
                     if (container.innerHTML.trim().length < 50) {
-                        container.innerHTML = this.generateDetailHtml(item);
+                        const history = this.getHistoryChain(item.rcp_no);
+                        container.innerHTML = this.generateDetailHtml(item, history);
                     }
                     detailTr.style.display = 'table-row';
                     if (icon) icon.style.transform = 'rotate(180deg)';
@@ -174,7 +176,7 @@ export const convertibleBondView = {
         });
     },
 
-    generateDetailHtml: function (item) {
+    generateDetailHtml: function (item, history = []) {
         const total = item.total_fund || item.bond_amount;
         const segments = [
             { label: '시설', amount: item.fund_facility, class: 'segment-facility' },
@@ -280,17 +282,102 @@ export const convertibleBondView = {
                     </div>
                     <div class="footer-actions">
                         ${item.ticker ? `
-                        <button onclick="window._jumpToStock('${item.ticker}', '${item.name}')" class="stats-btn-action stats-btn-stock">
+                        <a href="/stock/${item.ticker}" onclick="event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" class="stats-btn-action stats-btn-stock">
                              <i class="fas fa-search-dollar"></i> 종목 분석
-                        </button>
+                        </a>
                         ` : ''}
                         <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="stats-btn-action stats-btn-dart">
-                            DART 원문 <i class="fas fa-external-link-alt"></i>
+                             DART 원문 <i class="fas fa-external-link-alt"></i>
                         </a>
                     </div>
                 </div>
+                
+                ${history.length > 1 ? `
+                <div style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:0.85rem; color:#9ca3af;"><i class="fas fa-history"></i> 공시 이력:</span>
+                        <select class="stats-select" style="padding: 4px 8px; font-size: 0.8rem;" onchange="convertibleBondView.jumpToHistory(this.value)">
+                            <option value="">이전/정정 공시로 이동...</option>
+                            ${history.map(h => `
+                                <option value="${h.rcp_no}" ${h.rcp_no === item.rcp_no ? 'selected disabled' : ''}>
+                                    ${h.date} - ${h.correction_count === 0 ? '최초공시' : h.correction_count + '차정정'} ${h.rcp_no === item.rcp_no ? '(현재)' : ''}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
+    },
+
+    jumpToHistory: function (rcpNo) {
+        const target = this.cachedItems.find(it => it.rcp_no === rcpNo);
+        if (!target) return;
+
+        const year = (target.date || "").substring(0, 4);
+        const yearSelect = document.getElementById('cb-year-select');
+        
+        if (yearSelect && yearSelect.value !== year) {
+            yearSelect.value = year;
+            this.renderTable(this.cachedItems, year);
+        }
+
+        setTimeout(() => {
+            const targetRow = document.querySelector(`.cb-row[data-rcp-no="${rcpNo}"]`);
+            if (targetRow) {
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetRow.style.outline = '2px solid var(--accent-blue)';
+                setTimeout(() => targetRow.style.outline = 'none', 2000);
+                
+                const detailRow = targetRow.nextElementSibling;
+                if (detailRow && detailRow.style.display === 'none') {
+                    targetRow.click();
+                }
+            }
+        }, 100);
+    },
+
+    calculateCorrectionOrders: function (items) {
+        if (!items || items.length === 0) return [];
+        const itemMap = {};
+        items.forEach(item => { if (item.rcp_no) itemMap[item.rcp_no] = item; });
+
+        return items.map(item => {
+            let count = 0;
+            let current = item;
+            while (current && current.parent_rcp_no && itemMap[current.parent_rcp_no]) {
+                count++;
+                current = itemMap[current.parent_rcp_no];
+                if (current.rcp_no === item.rcp_no) break;
+            }
+            return { ...item, correction_count: count };
+        });
+    },
+
+    getHistoryChain: function (rcpNo) {
+        const chain = [];
+        const itemMap = {};
+        this.cachedItems.forEach(it => { itemMap[it.rcp_no] = it; });
+
+        let current = itemMap[rcpNo];
+        if (!current) return [];
+
+        let root = current;
+        while (root.parent_rcp_no && itemMap[root.parent_rcp_no]) {
+            root = itemMap[root.parent_rcp_no];
+        }
+
+        const findChildren = (node) => {
+            chain.push(node);
+            const children = this.cachedItems.filter(it => it.parent_rcp_no === node.rcp_no);
+            children.forEach(child => findChildren(child));
+        };
+        findChildren(root);
+
+        return [...new Set(chain)].sort((a, b) => {
+            return (a.date || "").localeCompare(b.date || "");
+        });
     },
 
     formatUnit: function (value) {

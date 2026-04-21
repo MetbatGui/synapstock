@@ -297,7 +297,7 @@ export const bonusIssueView = {
                     <div style="display: flex; gap: 10px;">
                         ${item.ticker ? `
                         <a href="/stock/${item.ticker}" onclick="event.preventDefault(); window._jumpToStock('${item.ticker}', '${item.name}')" class="stats-btn-action stats-btn-stock">
-                             <i class="fas fa-search-dollar"></i> 종목 분석 페이지 이동
+                             <i class="fas fa-search-dollar"></i> 종목 분석
                         </a>
                         ` : ''}
                         <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no}" target="_blank" class="stats-btn-action stats-btn-dart">
