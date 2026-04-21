@@ -22,6 +22,7 @@ import { ceilingView } from './ui/statistics/ceiling_view.js';
 import { capitalIncreaseView } from './ui/statistics/capital_increase_view.js';
 import { bonusIssueView } from './ui/statistics/bonus_issue_view.js';
 import { convertibleBondView } from './ui/statistics/convertible_bond_view.js';
+import { bondWithWarrantsView } from './ui/statistics/bond_with_warrants_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -158,6 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 bonusIssueView.render(statsContainer);
             } else if (path.includes('convertible-bond')) {
                 convertibleBondView.render(statsContainer);
+            } else if (path.includes('bond-with-warrants')) {
+                bondWithWarrantsView.render(statsContainer);
             }
         }
     }
@@ -195,6 +198,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     bonusIssueView.render(statsContainer);
                 } else if (route === 'convertible-bond') {
                     convertibleBondView.render(statsContainer);
+                } else if (route === 'bond-with-warrants') {
+                    bondWithWarrantsView.render(statsContainer);
                 }
             }
         });

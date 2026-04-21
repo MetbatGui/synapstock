@@ -1,0 +1,143 @@
+/* Bond with Warrants Analysis Styles */
+
+/* 
+ * CB와 동일한 디자인 시스템을 공유하여 일관성을 유지합니다.
+ * 클래스명은 뷰 모듈의 유연성을 위해 cb-row 등을 그대로 사용하거나 보완합니다.
+ */
+
+.cb-row:hover {
+    background: rgba(0, 210, 255, 0.05);
+}
+
+.badge-correction {
+    font-size: 0.75rem;
+    background: #ef4444;
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+
+.expand-icon {
+    color: var(--accent-blue);
+    display: inline-block;
+    transition: transform 0.2s;
+}
+
+/* Card Styling */
+.card-title {
+    margin-top: 0;
+    color: var(--accent-blue);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+
+.fund-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 15px;
+}
+
+.fund-summary .label { color: #9ca3af; font-size: 0.9rem; }
+.headline { font-size: 1.4rem; font-weight: 700; color: #facc15; }
+
+/* Fund Stacked Bar */
+.fund-stacked-container {
+    margin-top: 10px;
+}
+
+.fund-stacked-bar {
+    display: flex;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.fund-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.segment-facility { background: #3b82f6; }
+.segment-operation { background: #10b981; }
+.segment-acquisition-biz { background: #8b5cf6; }
+.segment-acquisition { background: #ec4899; }
+.segment-debt { background: #f59e0b; }
+.segment-etc { background: #6b7280; }
+
+.fund-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fund-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.fund-label-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.fund-amount-text { color: #d1d5db; }
+.fund-pct-text { color: #6b7280; margin-left: 5px; }
+
+/* Info List */
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.info-item .label { color: #9ca3af; font-size: 0.9rem; }
+.info-item .value { font-weight: 600; color: #e5e7eb; }
+.info-item .value.highlight { color: #60a5fa; }
+
+/* Timeline adjustments */
+.stats-timeline-item .label {
+    color: #9ca3af;
+    margin-bottom: 4px;
+}
+
+.info-footer {
+    margin-top: 15px;
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+/* Footer layout */
+.footer-left {
+    margin-right: auto;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    line-height: 1.4;
+}
+
+.footer-actions {
+    display: flex;
+    gap: 10px;
+}
