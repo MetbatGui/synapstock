@@ -13,6 +13,7 @@ from synapstock.domain.statistics.models import (
     MonthlyMarketStats,
     PaidInCapitalIncrease,
     BonusIssue,
+    ConvertibleBond,
     RankingItem,
     SupplySubject,
 )
@@ -579,6 +580,108 @@ class ExcelStatisticsParser:
                     results.append(item)
                 except Exception as e:
                     logger.error(f"[ExcelParser] 무상증자 파싱 실패 (시트: {sheet_name}): {e}")
+                    continue
+
+        return results
+
+    @staticmethod
+    def parse_convertible_bond(content: bytes) -> list[ConvertibleBond]:
+        """전환사채(CB) 발행 결정 엑셀 파일을 파싱하여 도메인 모델 리스트로 변환합니다.
+        
+        Args:
+            content (bytes): 엑셀 바이너리 데이터.
+
+        Returns:
+            list[ConvertibleBond]: 파싱된 전환사채 데이터 리스트.
+        """
+        sheets_dict = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
+        results: list[ConvertibleBond] = []
+
+        def to_int(val: Any) -> int:
+            if pd.isna(val) or val == "" or val == "-": return 0
+            if isinstance(val, (int, float)): return int(val)
+            cleaned = re.sub(r"[^0-9-]", "", str(val))
+            return int(cleaned) if cleaned else 0
+
+        def to_float(val: Any) -> float:
+            if pd.isna(val) or val == "" or val == "-": return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            cleaned = re.sub(r"[^0-9.-]", "", str(val))
+            return float(cleaned) if cleaned else 0.0
+
+        def to_str(val: Any) -> str:
+            if pd.isna(val): return ""
+            # 날짜형 데이터가 datetime 객체로 올 경우 처리
+            if isinstance(val, pd.Timestamp):
+                return val.strftime("%Y-%m-%d")
+            return str(val).strip()
+
+        def get_val(row: pd.Series, *keys: str) -> Any:
+            for key in keys:
+                cleaned_key = re.sub(r"\s+", "", key)
+                for col in row.index:
+                    cleaned_col = re.sub(r"\s+", "", str(col))
+                    if cleaned_key in cleaned_col:
+                        return row.get(col)
+            return None
+
+        for sheet_name, df in sheets_dict.items():
+            if df.empty: continue
+
+            # 헤더 행 찾기
+            header_idx = -1
+            for i in range(min(15, len(df))):
+                row_values = [str(v).strip() for v in df.iloc[i].values if not pd.isna(v)]
+                if any(k in v for v in row_values for k in ["상호", "종목명", "회사명"]):
+                    header_idx = i
+                    break
+
+            if header_idx == -1: continue
+
+            new_df = df.iloc[header_idx + 1:].copy()
+            new_df.columns = [str(v).strip() for v in df.iloc[header_idx].values]
+
+            for _, row in new_df.iterrows():
+                try:
+                    name_raw = get_val(row, "상호", "종목명", "회사명")
+                    if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() in ["상호", "종목명"]:
+                        continue
+
+                    date_val = to_str(get_val(row, "공시일", "일자"))
+                    if date_val and " " in date_val:
+                        date_val = date_val.split(" ")[0]
+
+                    item = ConvertibleBond(
+                        date=date_val,
+                        name=ExcelStatisticsParser._clean_stock_name(to_str(name_raw)),
+                        is_correction="정정" in str(get_val(row, "기재정정여부", "정정여부") or ""),
+                        bond_round=to_str(get_val(row, "회차", "회 차")),
+                        bond_type=to_str(get_val(row, "종류", "채권종류")),
+                        bond_amount=to_int(get_val(row, "권면총액", "사채의권면(전자등록)총액")),
+                        fund_facility=to_int(get_val(row, "시설자금")),
+                        fund_operation=to_int(get_val(row, "운영자금")),
+                        fund_acquisition_biz=to_int(get_val(row, "영업양수자금")),
+                        fund_acquisition_sec=to_int(get_val(row, "타법인증권", "타법인 증권")),
+                        fund_debt_repayment=to_int(get_val(row, "채무상환자금")),
+                        fund_etc=to_int(get_val(row, "기타자금")),
+                        maturity_date=to_str(get_val(row, "사채의만기일", "만기일")),
+                        issue_method=to_str(get_val(row, "사채발행방법", "발행방법")),
+                        conversion_ratio=to_float(get_val(row, "전환비율")),
+                        conversion_price=to_int(get_val(row, "전환가액")),
+                        new_shares=to_int(get_val(row, "전환에따라발행할주식수", "전환주식수")),
+                        shares_ratio=to_float(get_val(row, "주식총수대비비율", "총수대비비율")),
+                        exercise_start_date=to_str(get_val(row, "전환청구기간시작일", "행사시작일")),
+                        exercise_end_date=to_str(get_val(row, "전환청구기간종료일", "행사종료일")),
+                        subscription_date=to_str(get_val(row, "청약일")),
+                        payment_date=to_str(get_val(row, "납입일")),
+                        board_resolution_date=to_str(get_val(row, "이사회결의일", "결의일")),
+                        rcp_no=to_str(get_val(row, "접수번호")),
+                        parent_rcp_no=to_str(get_val(row, "상위접수번호")) if not pd.isna(get_val(row, "상위접수번호")) else None,
+                        initial_disclosure_date=to_str(get_val(row, "최초공시일"))
+                    )
+                    results.append(item)
+                except Exception as e:
+                    logger.error(f"[ExcelParser] 전환사채 파싱 실패 (시트: {sheet_name}): {e}")
                     continue
 
         return results

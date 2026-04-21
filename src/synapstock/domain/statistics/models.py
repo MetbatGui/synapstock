@@ -239,3 +239,43 @@ class BonusIssue(BaseModel):
     board_resolution_date: str | None = None  # 이사회결의일
     initial_disclosure_date: str | None = None  # 최초공시일
     ticker: str | None = None  # 시스템 연결용 티커
+
+
+class ConvertibleBond(BaseModel):
+    """전환사채(CB) 발행 결정 공시 데이터 도메인 모델.
+
+    사용자가 제공한 27개 필드 구조를 기반으로 설계되었습니다.
+    """
+    date: str  # 공시일 (YYYY-MM-DD)
+    name: str  # 상호 (종목명)
+    is_correction: bool = False  # 기재정정여부
+    bond_round: str = ""  # 회차
+    bond_type: str = ""  # 종류
+    bond_amount: int = 0  # 사채의 권면(전자등록)총액
+    fund_facility: int = 0  # 시설자금
+    fund_operation: int = 0  # 운영자금
+    fund_acquisition_biz: int = 0  # 영업양수자금
+    fund_acquisition_sec: int = 0  # 타법인증권
+    fund_debt_repayment: int = 0  # 채무상환자금
+    fund_etc: int = 0  # 기타자금
+    maturity_date: str | None = None  # 사채의 만기일
+    issue_method: str = ""  # 사채발행방법 (사모 등)
+    conversion_ratio: float = 100.0  # 전환비율 (%)
+    conversion_price: int = 0  # 전환가액 (원)
+    new_shares: int = 0  # 전환에 따라 발행할 주식수
+    shares_ratio: float = 0.0  # 주식총수 대비 비율 (%)
+    exercise_start_date: str | None = None  # 전환청구기간시작일
+    exercise_end_date: str | None = None  # 전환청구기간종료일
+    subscription_date: str | None = None  # 청약일
+    payment_date: str | None = None  # 납입일
+    board_resolution_date: str | None = None  # 이사회결의일
+    rcp_no: str  # 접수번호
+    parent_rcp_no: str | None = None  # 상위접수번호
+    initial_disclosure_date: str | None = None  # 최초공시일
+    ticker: str | None = None  # 시스템 연결용 티커
+
+    @computed_field
+    def total_fund(self) -> int:
+        """총 자금조달 규모 합계."""
+        return (self.fund_facility + self.fund_operation + self.fund_acquisition_biz + 
+                self.fund_acquisition_sec + self.fund_debt_repayment + self.fund_etc)

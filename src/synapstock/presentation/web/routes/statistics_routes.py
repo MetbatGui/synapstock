@@ -208,3 +208,22 @@ async def get_bonus_issue(
     except Exception as e:
         logger.error(f"Error in get_bonus_issue: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
+
+
+@router.get("/convertible-bond", response_model=None)
+async def get_convertible_bond(
+    force_sync: bool = Query(False, description="강제 동기화 여부")
+):
+    """전환사채(CB) 발행 결정 공시 분석 데이터를 가져옵니다."""
+    try:
+        if not statistics_service:
+            raise HTTPException(status_code=500, detail="Statistics service not available")
+
+        items = statistics_service.get_convertible_bond_data(force_sync=force_sync)
+        return {
+            "count": len(items),
+            "items": items
+        }
+    except Exception as e:
+        logger.error(f"Error in get_convertible_bond: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
