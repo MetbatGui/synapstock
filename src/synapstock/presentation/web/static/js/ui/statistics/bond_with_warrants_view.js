@@ -292,7 +292,7 @@ export const bondWithWarrantsView = {
                 <div class="stats-info-footer">
                     <div class="footer-left">
                          <i class="fas fa-fingerprint"></i> 접수번호: ${item.rcp_no}
-                         ${item.parent_rcp_no ? `<br/><i class="fas fa-link"></i> 상위공시: ${item.parent_rcp_no}` : ''}
+                         ${item.parent_rcp_no ? `<br/><i class="fas fa-link"></i> 상위공시: <a href="#" onclick="bondWithWarrantsView.jumpToHistory('${item.parent_rcp_no}'); return false;" style="color:var(--accent-blue); text-decoration:underline;">${item.parent_rcp_no}</a>` : ''}
                     </div>
                     <div class="footer-actions">
                         ${item.ticker ? `
@@ -326,33 +326,38 @@ export const bondWithWarrantsView = {
     },
 
     jumpToHistory: function (rcpNo) {
-        const target = this.cachedItems.find(it => it.rcp_no === rcpNo);
-        if (!target) return;
-
-        const year = (target.date || "").substring(0, 4);
-        const yearSelect = document.getElementById('bw-year-select');
+        // 1. 현재 필터에서 이미 보이는 행인지 확인
+        let targetRow = document.querySelector(`.bw-row[data-rcp-no="${rcpNo}"]`);
         
-        if (yearSelect && yearSelect.value !== year) {
-            yearSelect.value = year;
-            this.renderTable(this.cachedItems, year);
+        // 2. 안 보인다면 필터 변경 및 재렌더링
+        if (!targetRow) {
+            const year = (target.date || "").substring(0, 4);
+            const yearSelect = document.getElementById('bw-year-select');
+            if (yearSelect && yearSelect.value !== year) {
+                yearSelect.value = year;
+                this.renderTable(this.cachedItems, year);
+            }
         }
 
+        // 3. 렌더링 완료를 기다린 후 이동 및 상세 열기
         setTimeout(() => {
-            const targetRow = document.querySelector(`.bw-row[data-rcp-no="${rcpNo}"]`);
+            targetRow = document.querySelector(`.bw-row[data-rcp-no="${rcpNo}"]`);
             if (targetRow) {
                 targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 targetRow.style.outline = '2px solid var(--accent-blue)';
-                setTimeout(() => targetRow.style.outline = 'none', 2000);
+                targetRow.style.boxShadow = '0 0 15px rgba(96, 165, 250, 0.5)';
+                setTimeout(() => {
+                    targetRow.style.outline = 'none';
+                    targetRow.style.boxShadow = 'none';
+                }, 2000);
                 
                 const detailRow = targetRow.nextElementSibling;
                 if (detailRow && detailRow.style.display === 'none') {
                     // 강제 오픈
                     targetRow.click();
-                } else if (detailRow && detailRow.classList.contains('expanded')) {
-                    // 이미 열려있다면 유지
                 }
             }
-        }, 150);
+        }, 200);
     },
 
     calculateCorrectionOrders: function (items) {

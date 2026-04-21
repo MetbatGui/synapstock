@@ -365,7 +365,9 @@ export const capitalIncreaseView = {
                 <!-- 하단 정보 및 액션 버튼 -->
                 <div class="stats-info-footer">
                     <div style="margin-right: auto; font-size: 0.85rem; color: #9ca3af;">
-                         <i class="fas fa-chart-pie" style="margin-right: 5px;"></i> 증자후 예상 발행주식총수: <b style="color: #e5e7eb;">${(item.pre_issued_shares + (item.new_shares || 0)).toLocaleString()}</b> 주
+                         <i class="fas fa-chart-pie" style="margin-right: 5px;"></i> 증자후 예상 발행주식총수: <b style="color: #e5e7eb;">${(item.pre_issued_shares + (item.new_shares || 0)).toLocaleString()}</b> 주<br/>
+                         <i class="fas fa-fingerprint"></i> 접수번호: ${item.rcp_no}
+                         ${item.parent_rcp_no ? `<br/><i class="fas fa-link"></i> 상위공시: <a href="#" onclick="capitalIncreaseView.jumpToHistory('${item.parent_rcp_no}'); return false;" style="color:var(--accent-blue); text-decoration:underline;">${item.parent_rcp_no}</a>` : ''}
                     </div>
                     <div style="display: flex; gap: 10px;">
                         ${item.ticker ? `
@@ -474,7 +476,7 @@ export const capitalIncreaseView = {
      * 특정 공시 번호로 화면을 이동하고 상세 내용을 펼칩니다.
      * @param {string} rcpNo - 이동할 타겟 공시 번호
      */
-    jumpToDisclosure: async function (rcpNo) {
+    jumpToHistory: async function (rcpNo) {
         const target = this.cachedItems.find(it => it.rcp_no === rcpNo);
         if (!target) return;
 
