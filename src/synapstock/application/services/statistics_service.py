@@ -17,6 +17,7 @@ from synapstock.domain.statistics.models import (
     DailyMarketRankingAnalysis,
     MarketType,
     MonthlyMarketStats,
+    NewListing,
     PaidInCapitalIncrease,
     RankingItem,
     SupplySubject,
@@ -24,6 +25,7 @@ from synapstock.domain.statistics.models import (
 from synapstock.infrastructure.parsers.excel import (
     CeilingParser,
     DisclosureParser,
+    NewListingParser,
     SupplyDemandParser,
 )
 
@@ -67,10 +69,13 @@ class StatisticsService:
         self._convertible_bond_repo = convertible_bond_repository
         self._bw_repo = bw_repository
         self._market_data_service = market_data_service
+        self._new_listing_repo = None  # TODO: 신규상장주 저장소 필요시 추가
+
         # 리팩토링된 파서들
         self._disclosure_parser = DisclosureParser()
         self._supply_parser = SupplyDemandParser()
         self._ceiling_parser = CeilingParser()
+        self._new_listing_parser = NewListingParser()
 
     def _build_local_ticker_map(self) -> dict[str, str]:
         """마인드맵 보드의 모든 종목명-티커 매핑을 가져옵니다.
@@ -758,4 +763,38 @@ class StatisticsService:
             logger.error(f"[StatisticsService] BW 동기화 실패: {e}", exc_info=True)
             return []
 
+    def get_new_listing_data(self, force_sync: bool = False) -> list[NewListing]:
+        """신규상장주(IPO) 데이터를 가져옵니다 (현재는 동기화만 지원)."""
+        # TODO: 신규상장용 레포지토리가 구현되면 캐시 로직 추가
+        return self.sync_new_listing_data()
 
+    def sync_new_listing_data(self) -> list[NewListing]:
+        """구글 드라이브에서 연도별 신규상장주 엑셀 파일을 모두 읽어 동기화합니다."""
+        if not self._storage:
+            return []
+
+        try:
+            # 신규상장주 폴더 내의 연도별 파일 목록 조회
+            files = self._storage.list_files_in_folder("", folder="new_listing")
+            xlsx_files = [f for f in files if f["name"].lower().endswith((".xlsx", ".xls"))]
+
+            all_items = []
+            for f_info in sorted(xlsx_files, key=lambda x: x["name"], reverse=True):
+                target_file = f_info["name"]
+                logger.info(f"[StatisticsService] 신규상장주 데이터 동기화 시도: {target_file}")
+                content = self._storage.get_file(target_file, folder="new_listing")
+                if content:
+                    items = self._new_listing_parser.parse(content)
+                    all_items.extend(items)
+
+            # 티커 보강
+            ticker_map = self._build_local_ticker_map()
+            for item in all_items:
+                if not item.ticker and item.name in ticker_map:
+                    item.ticker = ticker_map[item.name]
+
+            logger.info(f"[StatisticsService] 신규상장주 데이터 총 {len(all_items)}건 파싱 완료")
+            return all_items
+        except Exception as e:
+            logger.error(f"[StatisticsService] 신규상장주 동기화 실패: {e}", exc_info=True)
+            return []

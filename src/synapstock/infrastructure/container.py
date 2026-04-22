@@ -65,8 +65,8 @@ class Container:
         self.config.capital_increase_dir.mkdir(parents=True, exist_ok=True)
         self.config.bonus_issue_dir.mkdir(parents=True, exist_ok=True)
         self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
-        self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
         self.config.bw_dir.mkdir(parents=True, exist_ok=True)
+        self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
         (self.config.data_dir / "market" / "raw").mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
@@ -142,6 +142,7 @@ class Container:
                 "bonus_issue": self.config.bonus_issue_folder_id,
                 "convertible_bond": self.config.convertible_bond_folder_id,
                 "bw": self.config.bw_folder_id,
+                "new_listing": self.config.new_listing_folder_id,
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),

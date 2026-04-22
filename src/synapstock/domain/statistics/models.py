@@ -369,3 +369,41 @@ class BondWithWarrants(FundingDisclosure):
     subscription_date: str | None = None
     payment_date: str | None = None
     board_resolution_date: str | None = None
+
+
+class NewListing(BaseModel):
+    """신규상장주(IPO) 분석 정보를 담는 모델.
+
+    Attributes:
+        listing_date (str): 상장일 (YYYY-MM-DD).
+        name (str): 종목명.
+        ticker (str | None): 종목 코드 (티커).
+        sector (str | None): 업종.
+        offer_price (int): 확정 공모 가액.
+        lead_manager (str | None): 주간 금융투자업자(주간사).
+        institutional_competition (float): 기관 투자자 경쟁률.
+        mandatory_retention_pct (float): 의무보유확약 비율 (%).
+        float_shares_pct (float): 유통 가능 물량 비율 (%).
+        listing_day_open (int): 상장 당일 시가.
+        listing_day_high (int): 상장 당일 고가.
+        listing_day_low (int): 상장 당일 저가.
+        listing_day_close (int): 상장 당일 종가.
+        listing_day_change_pct (float): 상장 당일 등락률 (%).
+        note (str | None): 비고/참고사항.
+    """
+
+    listing_date: str
+    name: str
+    ticker: str | None = None
+    sector: str | None = None
+    offer_price: int = 0
+    lead_manager: str | None = None
+    institutional_competition: float = 0.0
+    mandatory_retention_pct: float = 0.0
+    float_shares_pct: float = 0.0
+    listing_day_open: int = 0
+    listing_day_high: int = 0
+    listing_day_low: int = 0
+    listing_day_close: int = 0
+    listing_day_change_pct: float = 0.0
+    note: str | None = None
