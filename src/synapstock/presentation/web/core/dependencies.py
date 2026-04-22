@@ -4,6 +4,7 @@
 ``GoogleDriveAdapter`` 를 초기화합니다. 모듈 레벨에 제공되는
 ``service``와 ``drive_adapter`` 싱글톤은 모든 라우터에서 공유합니다.
 """
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ report_service = container.report_service
 drive_adapter = container.drive_adapter
 news_scraper_adapter = container.news_scraper
 statistics_service = container.statistics_service
+
 
 async def sync_indices_if_needed(force: bool = False):
     """(하위 호환성 유지) ReportService를 통해 동기화를 수행합니다."""

@@ -3,6 +3,7 @@
 로컬 인덱스(``list.json``, ``reports.json``) 조회, Google Drive 강제 동기화,
 PDF 파일 온디맨드 다운로드 및 서빙 엔드포인트를 제공합니다.
 """
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,8 @@ async def get_local_reports(name: str):
                 "date": r.date,
                 "provider": r.provider,
                 "title": r.title,
-            } for r in reports
+            }
+            for r in reports
         ]
     except Exception as e:
         logger.error(f"Error in get_local_reports: {e}")
@@ -77,4 +79,3 @@ async def serve_report_file(filename: str):
         return FileResponse(local_path)
 
     return JSONResponse(status_code=404, content={"message": "File not found locally or in cloud"})
-

@@ -12,5 +12,6 @@ def main():
     webbrowser.open("http://localhost:8090")
     run_server(port=8090)
 
+
 if __name__ == "__main__":
     main()

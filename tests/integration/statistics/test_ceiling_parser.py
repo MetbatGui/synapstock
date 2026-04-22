@@ -1,6 +1,6 @@
 import pytest
 from synapstock.infrastructure.container import container
-from synapstock.application.services.statistics_service import ExcelStatisticsParser
+from synapstock.infrastructure.parsers.excel import CeilingParser
 from synapstock.domain.statistics.models import CeilingAnalysisReport
 
 def test_parse_real_ceiling_report_from_drive():
@@ -18,7 +18,7 @@ def test_parse_real_ceiling_report_from_drive():
         return
     
     # 2. 파서 실행
-    report = ExcelStatisticsParser.parse_ceiling_report(
+    report = CeilingParser().parse_ceiling_report(
         content=content,
         title="2026년 상한가 분석 재현 테스트"
     )

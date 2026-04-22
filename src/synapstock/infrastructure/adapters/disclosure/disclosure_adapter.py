@@ -10,6 +10,7 @@ from synapstock.domain.ports import DisclosurePort
 
 logger = logging.getLogger(__name__)
 
+
 class DartDisclosureAdapter(DisclosurePort):
     """DART(전자공시시스템) 상세검색을 활용한 공시 정보 어댑터입니다."""
 
@@ -25,7 +26,7 @@ class DartDisclosureAdapter(DisclosurePort):
             ),
             "Referer": f"{self.base_url}/dsab007/main.do",
             "Origin": self.base_url,
-            "X-Requested-With": "XMLHttpRequest"
+            "X-Requested-With": "XMLHttpRequest",
         }
 
     def get_recent_disclosures(self, ticker: str) -> list[dict]:
@@ -47,7 +48,7 @@ class DartDisclosureAdapter(DisclosurePort):
             "maxLinks": "10",
             "sort": "date",
             "series": "desc",
-            "textCrpNm": ticker, # 종목 코드로 검색
+            "textCrpNm": ticker,  # 종목 코드로 검색
             "startDate": start_date,
             "endDate": end_date,
             "decadeType": "finalReport",
@@ -56,7 +57,7 @@ class DartDisclosureAdapter(DisclosurePort):
             "closingAccountsMonth": "all",
             "reportNamePopYn": "N",
             "autoSearch": "N",
-            "option": "corp"
+            "option": "corp",
         }
 
         try:
@@ -86,14 +87,16 @@ class DartDisclosureAdapter(DisclosurePort):
                 date = cols[4].get_text(strip=True)
 
                 if rcp_no:
-                    results.append({
-                        "title": title,
-                        "date": date,
-                        "rcpNo": rcp_no,
-                        "url": f"{self.base_url}/dsaf001/main.do?rcpNo={rcp_no}"
-                    })
+                    results.append(
+                        {
+                            "title": title,
+                            "date": date,
+                            "rcpNo": rcp_no,
+                            "url": f"{self.base_url}/dsaf001/main.do?rcpNo={rcp_no}",
+                        }
+                    )
 
-            return cast(list[dict], results[:10]) # 최신 10건만 반환
+            return cast(list[dict], results[:10])  # 최신 10건만 반환
 
         except Exception as e:
             logger.error(f"[DART ERROR] Failed to fetch disclosures for {ticker}: {e}")

@@ -1,7 +1,7 @@
 import io
 import pandas as pd
 import pytest
-from synapstock.infrastructure.parsers.excel_statistics_parser import ExcelStatisticsParser
+from synapstock.infrastructure.parsers.excel import DisclosureParser
 from synapstock.domain.statistics.models import ConvertibleBond
 
 def test_parse_convertible_bond_with_user_example():
@@ -42,7 +42,7 @@ def test_parse_convertible_bond_with_user_example():
     content = output.getvalue()
     
     # 파싱 수행
-    parser = ExcelStatisticsParser()
+    parser = DisclosureParser()
     results = parser.parse_convertible_bond(content)
     
     # 검증
@@ -80,7 +80,7 @@ def test_parse_convertible_bond_with_dirty_numbers():
         df.to_excel(writer, index=False)
     content = output.getvalue()
     
-    parser = ExcelStatisticsParser()
+    parser = DisclosureParser()
     results = parser.parse_convertible_bond(content)
     
     assert len(results) == 1

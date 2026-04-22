@@ -1,11 +1,12 @@
-import os
-import requests
 import logging
-import time
-from typing import Optional, List, Dict
+import os
+
+import requests
+
 from synapstock.domain.ports import KrxDataPort, PriceDataPort
 
 logger = logging.getLogger(__name__)
+
 
 class NativeKrxAdapter(KrxDataPort, PriceDataPort):
     """KRX 내부 비공식 API를 직접 호출하여 데이터를 수집하는 어댑터."""
@@ -17,7 +18,7 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         self.username = os.getenv("KRX_USERNAME")
         self.password = os.getenv("KRX_PASSWORD")
         self.is_logged_in = False
-        
+
         self.otp_url = f"{self.BASE_URL}/comm/fileDn/GenerateOTP/generate.cmd"
         self.download_url = f"{self.BASE_URL}/comm/fileDn/download_excel/download.cmd"
         self.api_url = f"{self.BASE_URL}/comm/bldAttendant/getJsonData.cmd"
@@ -25,7 +26,7 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Referer": f"{self.BASE_URL}/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201",
-            "X-Requested-With": "XMLHttpRequest"
+            "X-Requested-With": "XMLHttpRequest",
         }
         self.session.headers.update(self.headers)
 
@@ -37,15 +38,15 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
 
         login_url = f"{self.BASE_URL}/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
         payload = {"mbrId": self.username, "pw": self.password}
-        
+
         try:
             # 초기 페이지 접근으로 세션 초기화
             self.session.get(f"{self.BASE_URL}/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201")
-            
+
             resp = self.session.post(login_url, data=payload)
             data = resp.json()
 
-            if data.get("_error_code") == "CD011": # 중복 로그인 처리
+            if data.get("_error_code") == "CD011":  # 중복 로그인 처리
                 payload["skipDup"] = "Y"
                 resp = self.session.post(login_url, data=payload)
                 data = resp.json()
@@ -67,29 +68,29 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
             self._login()
 
         otp_params = {
-            'locale': 'ko_KR',
-            'mktId': market, # STK, KSQ
-            'invstTpCd': investor, # 7050(기관), 9000(외국인-사용자기준)
-            'strtDd': date_str,
-            'endDd': date_str,
-            'share': '1',
-            'money': '1',
-            'csvxls_isNo': 'false',
-            'name': 'fileDown',
-            'url': 'dbms/MDC/STAT/standard/MDCSTAT02401'
+            "locale": "ko_KR",
+            "mktId": market,  # STK, KSQ
+            "invstTpCd": investor,  # 7050(기관), 9000(외국인-사용자기준)
+            "strtDd": date_str,
+            "endDd": date_str,
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+            "name": "fileDown",
+            "url": "dbms/MDC/STAT/standard/MDCSTAT02401",
         }
-        if market == 'KSQ':
-            otp_params['segTpCd'] = 'ALL'
+        if market == "KSQ":
+            otp_params["segTpCd"] = "ALL"
 
         try:
             otp_resp = self.session.post(self.otp_url, data=otp_params)
             otp_code = otp_resp.text.strip()
-            
+
             if len(otp_code) < 10:
                 logger.error(f"[KRX] OTP 발급 실패 ({market}-{investor})")
                 return b""
 
-            down_resp = self.session.post(self.download_url, data={'code': otp_code})
+            down_resp = self.session.post(self.download_url, data={"code": otp_code})
             return down_resp.content
         except Exception as e:
             logger.error(f"[KRX] 수급 데이터 수집 중 오류: {e}")
@@ -103,33 +104,33 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
             self._login()
 
         otp_params = {
-            'bld': 'dbms/MDC/STAT/standard/MDCSTAT02201',
-            'locale': 'ko_KR',
-            'inqTpCd': '1', # 투자자별 합계
-            'trdVolVal': '2', # 거래대금 기반
-            'askBid': '3', # 순매수 기준
-            'mktId': market, # STK, KSQ
-            'etf': 'EF',
-            'etn': 'EN',
-            'elw': 'EW',
-            'strtDd': date_str,
-            'endDd': date_str,
-            'share': '1',
-            'money': '1',
-            'csvxls_isNo': 'false',
-            'name': 'fileDown',
-            'url': 'dbms/MDC/STAT/standard/MDCSTAT02201'
+            "bld": "dbms/MDC/STAT/standard/MDCSTAT02201",
+            "locale": "ko_KR",
+            "inqTpCd": "1",  # 투자자별 합계
+            "trdVolVal": "2",  # 거래대금 기반
+            "askBid": "3",  # 순매수 기준
+            "mktId": market,  # STK, KSQ
+            "etf": "EF",
+            "etn": "EN",
+            "elw": "EW",
+            "strtDd": date_str,
+            "endDd": date_str,
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
+            "name": "fileDown",
+            "url": "dbms/MDC/STAT/standard/MDCSTAT02201",
         }
 
         try:
             otp_resp = self.session.post(self.otp_url, data=otp_params)
             otp_code = otp_resp.text.strip()
-            
+
             if len(otp_code) < 10:
                 logger.error(f"[KRX] OTP 발급 실패 (MDCSTAT02201-{market})")
                 return b""
 
-            down_resp = self.session.post(self.download_url, data={'code': otp_code})
+            down_resp = self.session.post(self.download_url, data={"code": otp_code})
             return down_resp.content
         except Exception as e:
             logger.error(f"[KRX] 투자자 거래실적 수집 중 오류: {e}")
@@ -141,23 +142,23 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
             self._login()
 
         payload = {
-            'bld': 'dbms/MDC/STAT/standard/MDCSTAT01501',
-            'locale': 'ko_KR',
-            'mktId': market, # STK, KSQ
-            'trdDd': date_str,
-            'share': '1',
-            'money': '1',
-            'csvxls_isNo': 'false',
+            "bld": "dbms/MDC/STAT/standard/MDCSTAT01501",
+            "locale": "ko_KR",
+            "mktId": market,  # STK, KSQ
+            "trdDd": date_str,
+            "share": "1",
+            "money": "1",
+            "csvxls_isNo": "false",
         }
         try:
             resp = self.session.post(self.api_url, data=payload)
             data = resp.json()
-            return data.get('OutBlock_1', []) or data.get('output', [])
+            return data.get("OutBlock_1", []) or data.get("output", [])
         except Exception as e:
             logger.error(f"[KRX] 전종목 시세 조회 중 오류: {e}")
             return []
 
-    def get_price_info(self, ticker: str, date_str: str) -> Optional[Dict]:
+    def get_price_info(self, ticker: str, date_str: str) -> dict | None:
         """특정 종목 일자별 시세 조회 (MDCSTAT01701)."""
         # ISO 종목 풀코드 조회를 위한 임시 맵 필요 (추후 고도화 가능)
         # 여기서는 종목 코드가 들어온다고 가정하거나, 선행 작업으로 풀코드를 구해야 함

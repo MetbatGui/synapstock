@@ -26,6 +26,7 @@ class BoardSyncService:
 
     def _normalize_board_tickers(self, board: Board, progress_callback: Callable[[str, float], None] | None) -> None:
         """보드 내의 모든 종목에 대해 티커 매칭 및 정규화를 시도합니다."""
+
         def normalize_node(n):
             for s in n.stocks:
                 # 1. 티커가 부실한 경우 검색하여 채워줌

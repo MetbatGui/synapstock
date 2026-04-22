@@ -16,7 +16,7 @@ class ExcelFinancialDataAdapter:
             # 전체 데이터를 로드 (캐싱)
             df = pd.read_excel(self.file_path)
             # 첫 번째 컬럼 이름을 'company_name'으로 변경
-            df.rename(columns={df.columns[0]: 'company_name'}, inplace=True)
+            df.rename(columns={df.columns[0]: "company_name"}, inplace=True)
             self._df = df
 
     def get_financial_data(self, company_name: str) -> list[dict[str, Any]]:
@@ -30,7 +30,7 @@ class ExcelFinancialDataAdapter:
             return []
 
         # 기업명으로 행 필터링
-        row = self._df[self._df['company_name'] == company_name]
+        row = self._df[self._df["company_name"] == company_name]
         if row.empty:
             return []
 

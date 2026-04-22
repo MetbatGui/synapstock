@@ -10,6 +10,7 @@ class AppConfig(BaseModel):
 
     환경 변수와 하드코딩된 기본 경로를 중앙에서 관리합니다.
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # 기본 경로 설정
@@ -77,5 +78,5 @@ class AppConfig(BaseModel):
             capital_increase_folder_id=os.getenv("GOOGLE_DRIVE_CAPITAL_INCREASE_FOLDER_ID"),
             bonus_issue_folder_id=os.getenv("GOOGLE_DRIVE_BONUS_SHARE_FOLDER_ID"),
             convertible_bond_folder_id=os.getenv("GOOGLE_DRIVE_CONVERTIBLE_BOND_FOLDER_ID"),
-            bw_folder_id=os.getenv("GOOGLE_DRIVE_BW_FOLDER_ID")
+            bw_folder_id=os.getenv("GOOGLE_DRIVE_BW_FOLDER_ID"),
         )

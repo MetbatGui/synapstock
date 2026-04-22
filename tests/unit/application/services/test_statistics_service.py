@@ -114,7 +114,7 @@ class TestStatisticsService:
             ConvertibleBond(date="2026-01-01", name="삼성전자", bond_amount=1000, rcp_no="1"),
             ConvertibleBond(date="2026-01-02", name="현대차", bond_amount=2000, rcp_no="2")
         ]
-        service._parser.parse_convertible_bond = MagicMock(return_value=mock_items)
+        service._disclosure_parser.parse_convertible_bond = MagicMock(return_value=mock_items)
 
         # 3. 티커 맵 모킹
         mock_query_service.get_all_stocks_flat.return_value = [
@@ -174,7 +174,7 @@ class TestStatisticsService:
         mock_items = [
             BondWithWarrants(date="2026-01-05", name="오텍", rcp_no="bw1", bond_amount=20000000000),
         ]
-        service._parser.parse_bond_with_warrants = MagicMock(return_value=mock_items)
+        service._disclosure_parser.parse_bond_with_warrants = MagicMock(return_value=mock_items)
 
         mock_query_service.get_all_stocks_flat.return_value = [
             {"name": "오텍", "ticker": "067170", "aliases": []}

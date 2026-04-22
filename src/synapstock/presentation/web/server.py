@@ -3,6 +3,7 @@
 앱 초기화, 라우터 등록, 정적 파일 마운트, WebSocket, 시작 이벤트 등
 서버 레벨의 인프라륜쪫만 담당하며 비증니스 로직은 routes/ 하위 모듈에 완전 위임합니다.
 """
+
 import asyncio
 import os
 import threading
@@ -81,17 +82,14 @@ async def get_statistics_page(request: Request):
     """수급 통계 분석 페이지 기본 진입점을 서빙합니다."""
     return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "statistics"})
 
+
 @app.get("/statistics/{subpath:path}", response_class=HTMLResponse)
 async def get_statistics_subpage(request: Request, subpath: str):
     """수급 분석 서브 라우트(netbuy/ranking 등)를 위해 SPA 템플릿을 서빙합니다."""
     return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "ticker": None,
-            "mode": f"statistics-{subpath.replace('/', '-')}"
-        }
+        "index.html", {"request": request, "ticker": None, "mode": f"statistics-{subpath.replace('/', '-')}"}
     )
+
 
 # ── WebSocket ────────────────────────────────────────────────────────────────
 @app.websocket("/ws/logs")
@@ -117,6 +115,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def startup_event():
     """서버 시작 시 인덱스 동기화 및 초기 설정을 수행합니다."""
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info("[Startup] SynapStock 서버 시작 중...")
 

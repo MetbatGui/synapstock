@@ -6,6 +6,7 @@ from synapstock.domain.ports import StoragePort
 
 logger = logging.getLogger(__name__)
 
+
 class LocalFileStorageAdapter(StoragePort):
     """로컬 파일 시스템을 위한 StoragePort 구현체."""
 
@@ -64,10 +65,9 @@ class LocalFileStorageAdapter(StoragePort):
         results = []
         for p in abs_path.iterdir():
             if p.is_file():
-                results.append({
-                    "id": str(p.relative_to(self.base_dir)) if not p.is_absolute() else str(p),
-                    "name": p.name
-                })
+                results.append(
+                    {"id": str(p.relative_to(self.base_dir)) if not p.is_absolute() else str(p), "name": p.name}
+                )
         return results
 
     def download_file(self, filename: str, local_path: str, **kwargs) -> bool:

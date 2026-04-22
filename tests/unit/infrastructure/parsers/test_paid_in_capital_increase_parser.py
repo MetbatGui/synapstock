@@ -1,7 +1,7 @@
 import io
 import pandas as pd
 import pytest
-from synapstock.infrastructure.parsers.excel_statistics_parser import ExcelStatisticsParser
+from synapstock.infrastructure.parsers.excel import DisclosureParser
 from synapstock.domain.statistics.models import PaidInCapitalIncrease
 
 def test_parse_paid_in_capital_increase_with_real_example():
@@ -36,7 +36,7 @@ def test_parse_paid_in_capital_increase_with_real_example():
     content = output.getvalue()
     
     # 3. 파싱 수행
-    parser = ExcelStatisticsParser()
+    parser = DisclosureParser()
     results = parser.parse_paid_in_capital_increase(content)
     
     # 4. 검증
@@ -74,7 +74,7 @@ def test_parse_paid_in_capital_increase_with_dirty_data():
         df.to_excel(writer, index=False)
     content = output.getvalue()
     
-    parser = ExcelStatisticsParser()
+    parser = DisclosureParser()
     results = parser.parse_paid_in_capital_increase(content)
     
     assert len(results) == 1
@@ -104,7 +104,7 @@ def test_parse_paid_in_capital_increase_multi_sheets():
         df_2024.to_excel(writer, sheet_name='2024', index=False)
     content = output.getvalue()
     
-    parser = ExcelStatisticsParser()
+    parser = DisclosureParser()
     results = parser.parse_paid_in_capital_increase(content)
     
     # 모든 시트의 데이터 합계 확인

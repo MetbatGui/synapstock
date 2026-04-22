@@ -80,7 +80,7 @@ class TestBoardQueryService:
         
         # Assert
         assert result is not None
-        stock, b_name = result
+        stock, b_name, path = result
         assert stock.name == "삼성전자"
         assert b_name == "theme_mobile"
         assert mock_repo.load.call_count == 2

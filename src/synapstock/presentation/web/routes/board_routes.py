@@ -2,6 +2,7 @@
 
 보드 목록 조회, 계층형 데이터 로드, Miro 동기화, 노드/종목/리포트 CRUD 엔드포인트를 제공합니다.
 """
+
 import asyncio
 import json
 import threading
@@ -52,8 +53,7 @@ async def get_board_data(name: str) -> dict | JSONResponse:
                 "name": node.name,
                 "nodes": [to_dict(n) for n in node.nodes],
                 "stocks": [
-                    {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news}
-                    for s in node.stocks
+                    {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news} for s in node.stocks
                 ],
             }
 
@@ -75,6 +75,7 @@ async def trigger_sync(name: str) -> dict | JSONResponse:
     Returns:
         dict: ``{"status": "started"}`` 형태의 응답.
     """
+
     def do_sync():
         async def log_callback(msg, val):
             await manager.broadcast(json.dumps({"type": "log", "message": msg, "progress": val}))

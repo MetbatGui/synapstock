@@ -55,7 +55,9 @@ def test_actual_capital_increase_sync_robust():
     # 6. 수치 정합성 전수 조사 (Math Logic Integrity)
     error_count = 0
     for i, item in enumerate(items):
-        expected_total = item.fund_facility + item.fund_operation + item.fund_acquisition + item.fund_etc
+        expected_total = (item.fund_facility + item.fund_operation + 
+                         item.fund_acquisition_biz + item.fund_acquisition_sec + 
+                         item.fund_debt_repayment + item.fund_etc)
         if item.total_fund != expected_total:
             if error_count < 5: # 로그 폭주 방지
                 logger.error(f"❌ 금액 불일치 발견 [{item.date} {item.name}]: Expected {expected_total}, Got {item.total_fund}")

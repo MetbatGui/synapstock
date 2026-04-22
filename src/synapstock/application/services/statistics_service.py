@@ -9,20 +9,22 @@ import pandas as pd
 
 from synapstock.domain.statistics.models import (
     AnalyzedRankingItem,
+    BondWithWarrants,
+    BonusIssue,
     CeilingAnalysisReport,
+    ConvertibleBond,
     DailyMarketRanking,
     DailyMarketRankingAnalysis,
     MarketType,
     MonthlyMarketStats,
+    PaidInCapitalIncrease,
     RankingItem,
     SupplySubject,
-    PaidInCapitalIncrease,
-    BonusIssue,
-    ConvertibleBond,
-    BondWithWarrants
 )
-from synapstock.infrastructure.parsers.excel_statistics_parser import (
-    ExcelStatisticsParser,
+from synapstock.infrastructure.parsers.excel import (
+    CeilingParser,
+    DisclosureParser,
+    SupplyDemandParser,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,10 @@ class StatisticsService:
         self._convertible_bond_repo = convertible_bond_repository
         self._bw_repo = bw_repository
         self._market_data_service = market_data_service
-        self._parser = ExcelStatisticsParser()
+        # 리팩토링된 파서들
+        self._disclosure_parser = DisclosureParser()
+        self._supply_parser = SupplyDemandParser()
+        self._ceiling_parser = CeilingParser()
 
     def _build_local_ticker_map(self) -> dict[str, str]:
         """마인드맵 보드의 모든 종목명-티커 매핑을 가져옵니다.
@@ -81,9 +86,9 @@ class StatisticsService:
             # 모든 보드의 종목 정보를 평탄화하여 가져옴
             all_stocks = cast(list[dict], self._query_service.get_all_stocks_flat())
             for stock in all_stocks:
-                name = stock.get('name')
-                ticker = stock.get('ticker')
-                aliases = stock.get('aliases', [])
+                name = stock.get("name")
+                ticker = stock.get("ticker")
+                aliases = stock.get("aliases", [])
                 if name and ticker:
                     ticker_map[name] = ticker
                     # 별칭들도 모두 동일한 티커로 매핑
@@ -106,13 +111,8 @@ class StatisticsService:
         for ranking in rankings:
             self._repository.save_daily_ranking(ranking)
 
-
     def get_daily_ranking(
-        self,
-        date: str,
-        market: MarketType,
-        subject: SupplySubject,
-        force_sync: bool = False
+        self, date: str, market: MarketType, subject: SupplySubject, force_sync: bool = False
     ) -> DailyMarketRanking | None:
         """특정 날짜의 수급 순위 데이터를 가져옵니다."""
         if self._repository and not force_sync:
@@ -155,8 +155,8 @@ class StatisticsService:
             return []
 
         try:
-            rankings = self._parser.parse_summary_table(content, sheet_name, date_str)
-            
+            rankings = self._supply_parser.parse_summary_table(content, sheet_name, date_str)
+
             # 종목명 정규화 (별칭 -> 정규 사명)
             for ranking in rankings:
                 for item in ranking.items:
@@ -173,7 +173,7 @@ class StatisticsService:
         """TickerSearchPort를 활용하여 종목명을 정규 사명으로 치환합니다."""
         if not self._query_service:
             return
-            
+
         try:
             # query_service.search_ticker는 내부적으로 정규화된 NaverTickerSearchAdapter를 사용함
             search_results = self._query_service.search_ticker(item.name)
@@ -183,7 +183,7 @@ class StatisticsService:
                 if item.name != best_match["name"]:
                     logger.debug(f"[StatisticsService] 종목명 정규화: {item.name} -> {best_match['name']}")
                     item.name = best_match["name"]
-                
+
                 # 티커 정보가 누락된 경우에도 보완
                 if not item.ticker:
                     item.ticker = best_match["ticker"]
@@ -234,7 +234,7 @@ class StatisticsService:
                     synced_count += 1
 
             logger.info(f"[StatisticsService] 총 {synced_count}개 일자 동기화 완료")
-            
+
             # [추가] 구글 동기화 완료 후 KRX 데이터 연쇄 수집
             if self._market_data_service:
                 logger.info("[StatisticsService] 연쇄 작업 시작: KRX 데이터 동기화 트리거")
@@ -247,12 +247,7 @@ class StatisticsService:
             logger.error(f"[StatisticsService] 일괄 동기화 실패: {e}", exc_info=True)
             return 0
 
-    def get_monthly_ranking(
-        self,
-        year_month: str,
-        market: MarketType,
-        subject: SupplySubject
-    ) -> MonthlyMarketStats:
+    def get_monthly_ranking(self, year_month: str, market: MarketType, subject: SupplySubject) -> MonthlyMarketStats:
         """지정된 월의 일별 데이터를 모두 취합하여 누적 수급 TOP 30 랭킹을 산출합니다."""
         if not self._repository:
             return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=[])
@@ -261,9 +256,7 @@ class StatisticsService:
         target_dates = [d for d in available_dates if d.startswith(year_month)]
 
         if not target_dates:
-            logger.info(
-                f"[StatisticsService] {year_month} ({market}, {subject})에 해당하는 데이터가 없습니다."
-            )
+            logger.info(f"[StatisticsService] {year_month} ({market}, {subject})에 해당하는 데이터가 없습니다.")
             return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=[])
 
         logger.info(f"[StatisticsService] {year_month} 월간 집계 시작 (대상 일수: {len(target_dates)}일)")
@@ -278,8 +271,7 @@ class StatisticsService:
         local_ticker_map = self._build_local_ticker_map()
         ranking_items = [
             RankingItem(
-                rank=rank, name=name, amount=int(amount),
-                ticker=local_ticker_map.get(name), high_price_type=None
+                rank=rank, name=name, amount=int(amount), ticker=local_ticker_map.get(name), high_price_type=None
             )
             for rank, (name, amount) in enumerate(sorted_items, 1)
         ]
@@ -288,10 +280,7 @@ class StatisticsService:
         return MonthlyMarketStats(month=year_month, market=market, subject=subject, items=ranking_items)
 
     def _aggregate_monthly_amounts(
-        self,
-        target_dates: list[str],
-        market: MarketType,
-        subject: SupplySubject
+        self, target_dates: list[str], market: MarketType, subject: SupplySubject
     ) -> dict[str, float]:
         """지정된 기간(일자 리스트) 동안의 종목별 순매수 합계를 계산합니다.
 
@@ -313,11 +302,7 @@ class StatisticsService:
         return accumulation
 
     def get_analyzed_ranking(
-        self,
-        date: str,
-        market: MarketType,
-        subject: SupplySubject,
-        force_sync: bool = False
+        self, date: str, market: MarketType, subject: SupplySubject, force_sync: bool = False
     ) -> DailyMarketRankingAnalysis | None:
         """순위 변동 및 연속 등장 횟수가 포함된 분석 랭킹 데이터를 제공합니다."""
         raw = self.get_daily_ranking(date, market, subject, force_sync=force_sync)
@@ -358,7 +343,7 @@ class StatisticsService:
         current_idx: int,
         available_dates: list[str],
         market: MarketType,
-        subject: SupplySubject
+        subject: SupplySubject,
     ) -> AnalyzedRankingItem:
         """단일 종목에 대해 이전 기록(순위 변동, 연속 등장) 지표를 분석합니다.
 
@@ -410,7 +395,7 @@ class StatisticsService:
                 ),
                 "INSTITUTION": self.get_analyzed_ranking(
                     date, MarketType.KOSPI, SupplySubject.INSTITUTION, force_sync=force_sync
-                )
+                ),
             },
             "KOSDAQ": {
                 "FOREIGN": self.get_analyzed_ranking(
@@ -418,15 +403,11 @@ class StatisticsService:
                 ),
                 "INSTITUTION": self.get_analyzed_ranking(
                     date, MarketType.KOSDAQ, SupplySubject.INSTITUTION, force_sync=force_sync
-                )
-            }
+                ),
+            },
         }
 
-    def get_ceiling_analysis(
-        self,
-        date: str,
-        force_sync: bool = False
-    ) -> CeilingAnalysisReport | None:
+    def get_ceiling_analysis(self, date: str, force_sync: bool = False) -> CeilingAnalysisReport | None:
         """특정 날짜의 상한가 분석 리포트를 가져옵니다 (캐시 우선)."""
         if not self._ceiling_repo:
             return None
@@ -463,14 +444,14 @@ class StatisticsService:
 
         year = date[:4]
         filename = f"상한가분석({year}년).xlsx"
-        sheet_name = date[2:4] + date[5:7] + date[8:10] # YYMMDD
+        sheet_name = date[2:4] + date[5:7] + date[8:10]  # YYMMDD
 
         content = self._storage.get_file(filename, folder="ceiling")
         if not content:
             return None
 
         try:
-            report = self._parser.parse_ceiling_report(
+            report = self._ceiling_parser.parse_ceiling_report(
                 content=content, title=f"{year}년 상한가 분석 ({date})", sheet_name=sheet_name
             )
             if report:
@@ -496,7 +477,7 @@ class StatisticsService:
         for m_key in ["KOSPI", "KOSDAQ"]:
             for s_key in ["FOREIGN", "INSTITUTION"]:
                 cat_data = summary.get(m_key, {}).get(s_key)
-                if cat_data and hasattr(cat_data, 'items'):
+                if cat_data and hasattr(cat_data, "items"):
                     for rank_item in cat_data.items:
                         if rank_item.high_price_type:
                             high_price_map[rank_item.name] = rank_item.high_price_type
@@ -610,7 +591,7 @@ class StatisticsService:
             if not content:
                 return []
 
-            items = self._parser.parse_paid_in_capital_increase(content)
+            items = self._disclosure_parser.parse_paid_in_capital_increase(content)
 
             # 로컬 티커 맵을 활용한 정보 보강
             ticker_map = self._build_local_ticker_map()
@@ -660,7 +641,7 @@ class StatisticsService:
             if not content:
                 return []
 
-            items = self._parser.parse_bonus_issue(content)
+            items = self._disclosure_parser.parse_bonus_issue(content)
 
             # 티커 보강
             ticker_map = self._build_local_ticker_map()
@@ -710,7 +691,7 @@ class StatisticsService:
             if not content:
                 return []
 
-            items = self._parser.parse_convertible_bond(content)
+            items = self._disclosure_parser.parse_convertible_bond(content)
 
             # 티커 보강
             ticker_map = self._build_local_ticker_map()
@@ -760,7 +741,7 @@ class StatisticsService:
             if not content:
                 return []
 
-            items = self._parser.parse_bond_with_warrants(content)
+            items = self._disclosure_parser.parse_bond_with_warrants(content)
 
             # 티커 보강
             ticker_map = self._build_local_ticker_map()
@@ -776,3 +757,5 @@ class StatisticsService:
         except Exception as e:
             logger.error(f"[StatisticsService] BW 동기화 실패: {e}", exc_info=True)
             return []
+
+

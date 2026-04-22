@@ -3,6 +3,7 @@
 실시간 로그 브로드캐스트를 위한 WebSocket 연결 풀을 관리합니다.
 모듈 하단에 전역 싱글톤 인스턴스 ``manager`` 가 선언되어 있습니다.
 """
+
 from fastapi import WebSocket
 
 
