@@ -378,12 +378,24 @@ class NewListing(BaseModel):
         listing_date (str): 상장일 (YYYY-MM-DD).
         name (str): 종목명.
         ticker (str | None): 종목 코드 (티커).
+        market (str | None): 시장 구분 (예: 코스피, 코스닥).
         sector (str | None): 업종.
+        face_value (int): 액면가.
+        hope_price (str | None): 희망 공모 가액 범위.
         offer_price (int): 확정 공모 가액.
         lead_manager (str | None): 주간 금융투자업자(주간사).
         institutional_competition (float): 기관 투자자 경쟁률.
-        mandatory_retention_pct (float): 의무보유확약 비율 (%).
+        employee_shares (int): 우리사주조합 배정 주식수.
+        inst_shares (int): 기관투자자 배정 주식수.
+        retail_shares (int): 일반청약자 배정 주식수.
         float_shares_pct (float): 유통 가능 물량 비율 (%).
+        float_shares_vol (int): 유통 가능 물량 (주).
+        total_offer_shares (int): 총 공모 주식수.
+        offer_amount (int): 공모 금액 (백만원).
+        revenue (int): 매출액 (백만원).
+        ebt (int): 법인세비용차감전계속사업이익 (백만원).
+        net_income (int): 순이익 (백만원).
+        capital (int): 자본금 (백만원).
         listing_day_open (int): 상장 당일 시가.
         listing_day_high (int): 상장 당일 고가.
         listing_day_low (int): 상장 당일 저가.
@@ -395,12 +407,24 @@ class NewListing(BaseModel):
     listing_date: str
     name: str
     ticker: str | None = None
+    market: str | None = None
     sector: str | None = None
+    face_value: int = 0
+    hope_price: str | None = None
     offer_price: int = 0
     lead_manager: str | None = None
     institutional_competition: float = 0.0
-    mandatory_retention_pct: float = 0.0
+    employee_shares: int = 0
+    inst_shares: int = 0
+    retail_shares: int = 0
     float_shares_pct: float = 0.0
+    float_shares_vol: int = 0
+    total_offer_shares: int = 0
+    offer_amount: int = 0
+    revenue: int = 0
+    ebt: int = 0
+    net_income: int = 0
+    capital: int = 0
     listing_day_open: int = 0
     listing_day_high: int = 0
     listing_day_low: int = 0

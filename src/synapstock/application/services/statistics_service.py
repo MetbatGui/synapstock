@@ -136,7 +136,7 @@ class StatisticsService:
     def sync_from_storage(self, date_str: str) -> list[DailyMarketRanking]:
         """지정된 날짜의 통계 데이터를 클라우드 스토리지에서 수동으로 강제 동기화합니다."""
         logger.info(f"[StatisticsService] 특정 날짜 동기화 시도: {date_str}")
-        return cast(list[DailyMarketRanking], self._fetch_and_sync_rankings(date_str))
+        return self._fetch_and_sync_rankings(date_str)
 
     def _fetch_and_sync_rankings(self, date_str: str) -> list[DailyMarketRanking]:
         """클라우드 스토리지에서 엑셀 파일을 다운로드하여 파싱하고 로컬 저장소에 캐싱합니다.
@@ -169,7 +169,7 @@ class StatisticsService:
 
             self.save_rankings(rankings)
             logger.info(f"[StatisticsService] 구글 드라이브 동기화 및 캐싱 완료: {date_str}")
-            return cast(list[DailyMarketRanking], rankings)
+            return rankings
         except Exception as e:
             logger.error(f"[StatisticsService] 파싱 실패 ({filename}, 시트:{sheet_name}): {e}")
             return []
@@ -318,7 +318,7 @@ class StatisticsService:
         try:
             current_idx = available_dates.index(date)
         except ValueError:
-            analyzed_items = [AnalyzedRankingItem(**item.model_dump(), is_new=True) for item in raw.items]
+            analyzed_items = [AnalyzedRankingItem(**item.model_dump()) for item in raw.items]
             return DailyMarketRankingAnalysis(date=date, market=market, subject=subject, items=analyzed_items)
 
         # 1. 이전 거래일 데이터 확보
@@ -461,7 +461,7 @@ class StatisticsService:
             )
             if report:
                 report.end_date = date
-            return cast(CeilingAnalysisReport, report)
+            return report
         except Exception as e:
             logger.error(f"[StatisticsService] 상한가 파싱 실패: {e}")
             return None
@@ -787,13 +787,23 @@ class StatisticsService:
                     items = self._new_listing_parser.parse(content)
                     all_items.extend(items)
 
-            # 티커 보강
+            # 티커 보강 및 중복 제거
             ticker_map = self._build_local_ticker_map()
+            unique_items = {}
+
             for item in all_items:
+                # 티커 보강
                 if not item.ticker and item.name in ticker_map:
                     item.ticker = ticker_map[item.name]
 
-            logger.info(f"[StatisticsService] 신규상장주 데이터 총 {len(all_items)}건 파싱 완료")
+                # 중복 제거 키 (종목명 + 상장일)
+                key = (item.name, item.listing_date)
+                if key not in unique_items:
+                    unique_items[key] = item
+
+            all_items = list(unique_items.values())
+
+            logger.info(f"[StatisticsService] 신규상장주 데이터 총 {len(all_items)}건 파싱 완료 (중복 제외)")
             return all_items
         except Exception as e:
             logger.error(f"[StatisticsService] 신규상장주 동기화 실패: {e}", exc_info=True)
