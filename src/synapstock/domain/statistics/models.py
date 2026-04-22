@@ -4,87 +4,96 @@ from pydantic import BaseModel, computed_field
 
 
 class MarketType(StrEnum):
-    """주식 시장 유형.
+    """주식 시장 유형을 정의하는 열거형 클래스.
 
     Attributes:
-        KOSPI: 유가증권시장.
-        KOSDAQ: 코스닥시장.
+        KOSPI: 유가증권 시장.
+        KOSDAQ: 코스닥 시장.
     """
+
     KOSPI = "KOSPI"
     KOSDAQ = "KOSDAQ"
 
+
 class SupplySubject(StrEnum):
-    """수급 주체 유형.
+    """수급 주체 유형을 정의하는 열거형 클래스.
 
     Attributes:
         FOREIGN: 외국인 투자자.
         INSTITUTION: 기관 투자자.
     """
+
     FOREIGN = "FOREIGN"
     INSTITUTION = "INSTITUTION"
+
 
 class RankingItem(BaseModel):
     """수급 순위표의 개별 종목 항목 모델.
 
     Attributes:
-        rank (int): 해당 종목의 순위.
+        rank (int): 순위.
         name (str): 종목명.
-        amount (int): 순매수 금액 (단위: 억 또는 천만, 엑셀 기준).
-        ticker (Optional[str]): 시스템 내 매칭된 전문 티커 번호.
-        high_price_type (Optional[str]): 신고가 유형 약어 (예: 역·신, 52·근).
+        amount (int): 순매수 금액.
+        ticker (str | None): 종목 코드 (선택 사항).
+        high_price_type (str | None): 고가 유형 (선택 사항).
     """
+
     rank: int
     name: str
     amount: int
     ticker: str | None = None
     high_price_type: str | None = None
 
+
 class DailyMarketRanking(BaseModel):
     """특정 마켓 및 주체의 일별 수급 TOP 30 리포트 모델.
 
     Attributes:
-        date (str): 기준 날짜 (YYYY-MM-DD).
-        market (MarketType): 시장 유형.
-        subject (SupplySubject): 수급 주체.
-        items (List[RankingItem]): 순위 항목 리스트.
+        date (str): 기준 일자 (YYYY-MM-DD).
+        market (MarketType): 시장 유형 (KOSPI/KOSDAQ).
+        subject (SupplySubject): 수급 주체 (FOREIGN/INSTITUTION).
+        items (list[RankingItem]): 순위표 항목 리스트.
     """
+
     date: str
     market: MarketType
     subject: SupplySubject
     items: list[RankingItem]
+
 
 class MonthlyMarketStats(BaseModel):
     """월간 누적 수급 통계 모델.
 
     Attributes:
         month (str): 기준 월 (YYYY-MM).
-        market (MarketType): 시장 유형.
-        subject (SupplySubject): 수급 주체.
-        items (List[RankingItem]): 누적 순위 항목 리스트 (최대 100개).
+        market (MarketType): 시장 유형 (KOSPI/KOSDAQ).
+        subject (SupplySubject): 수급 주체 (FOREIGN/INSTITUTION).
+        items (list[RankingItem]): 누적 순위표 항목 리스트.
     """
+
     month: str
     market: MarketType
     subject: SupplySubject
     items: list[RankingItem]
 
-# --- Analysis DTOs ---
 
 class AnalyzedRankingItem(RankingItem):
     """순위 변동성 분석 정보가 포함된 확장 종목 모델.
 
     Attributes:
-        prev_rank (Optional[int]): 이전 거래일의 순위.
-        consecutive_days (int): 연속 상위권 등장 횟수 (기본값 1).
+        prev_rank (int | None): 이전 거래일 순위.
+        consecutive_days (int): 연속 순위권 진입 일수.
     """
+
     prev_rank: int | None = None
     consecutive_days: int = 1
 
     @computed_field
     def rank_change(self) -> int | None:
-        """순위 변동폭 (이전 순위 - 현재 순위).
+        """이전 순위 대비 변동 폭을 계산합니다.
 
         Returns:
-            Optional[int]: 변동폭. 이전 순위가 없으면 None.
+            int | None: 순위 변동값 (상승 시 양수, 하락 시 음수). 이전 순위가 없으면 None.
         """
         if self.prev_rank is None:
             return None
@@ -92,40 +101,42 @@ class AnalyzedRankingItem(RankingItem):
 
     @computed_field
     def is_new(self) -> bool:
-        """신규 진입 여부 판단.
+        """순위권에 신규로 진입했는지 여부를 확인합니다.
 
         Returns:
-            bool: 이전 순위 정보가 없으면 True.
+            bool: 신규 진입 시 True, 아니면 False.
         """
         return self.prev_rank is None
+
 
 class DailyMarketRankingAnalysis(BaseModel):
     """분석 정보가 포함된 종합 수급 분석 모델.
 
     Attributes:
-        date (str): 기준 날짜.
+        date (str): 기준 일자 (YYYY-MM-DD).
         market (MarketType): 시장 유형.
         subject (SupplySubject): 수급 주체.
-        items (List[AnalyzedRankingItem]): 분석 지표가 포함된 항목 리스트.
-        previous_date (Optional[str]): 비교 대상이 된 이전 거래일 날짜.
+        items (list[AnalyzedRankingItem]): 분석된 순위 항목 리스트.
+        previous_date (str | None): 비교 대상 이전 일자.
     """
+
     date: str
     market: MarketType
     subject: SupplySubject
     items: list[AnalyzedRankingItem]
     previous_date: str | None = None
 
-# --- Ceiling Analysis Models ---
 
 class CeilingItem(BaseModel):
     """상한가 분석의 개별 종목 항목 모델.
 
     Attributes:
         name (str): 종목명.
-        entry_tag (str): 진입 시점의 시장 상태 태그 (예: 상, 역·신).
-        closing_prices (List[int]): n거래일 동안 수집된 종가 리스트.
-        ticker (Optional[str]): 매칭된 티커 번호.
+        entry_tag (str): 진입 태그/이유.
+        closing_prices (list[int]): 최근 종가 리스트.
+        ticker (str | None): 종목 코드.
     """
+
     name: str
     entry_tag: str
     closing_prices: list[int]
@@ -133,12 +144,10 @@ class CeilingItem(BaseModel):
 
     @computed_field
     def change_rate(self) -> float:
-        """기준일 대비 최종 수익률 (%) 계산.
-
-        공식: ((현재가 - 진입가) / 진입가) * 100
+        """첫 번째 종가 대비 마지막 종가의 등락률을 계산합니다.
 
         Returns:
-            float: 소수점 둘째 자리까지 반올림된 수익률.
+            float: 등락률 (백분율, 소수점 2자리 반올림).
         """
         if not self.closing_prices or len(self.closing_prices) < 2:
             return 0.0
@@ -150,23 +159,17 @@ class CeilingItem(BaseModel):
 
     @computed_field
     def is_completed(self) -> bool:
-        """10거래일 데이터 수집 완료 여부 판단.
+        """충분한 데이터(10일치 이상)가 수집되었는지 확인합니다.
 
         Returns:
-            bool: 가격 리스트 크기가 10 이상이면 True.
+            bool: 데이터 수집 완료 여부.
         """
         return len(self.closing_prices) >= 10
 
-class CeilingAnalysisReport(BaseModel):
-    """상한가 분석 전체 리포트 모델.
 
-    Attributes:
-        title (str): 리포트 제목.
-        start_date (str): 분석 시작일 (YYYY-MM-DD).
-        end_date (str): 분석 종료일 (YYYY-MM-DD).
-        dates (List[str]): 데이터가 존재하는 MM-DD 형식 날짜 목록.
-        items (List[CeilingItem]): 분석 대상 종목 리스트.
-    """
+class CeilingAnalysisReport(BaseModel):
+    """상한가 분석 전체 리포트 모델."""
+
     title: str
     start_date: str
     end_date: str
@@ -175,147 +178,194 @@ class CeilingAnalysisReport(BaseModel):
 
     @computed_field
     def is_fully_collected(self) -> bool:
-        """리포트 내 모든 종속 항목의 수집 완결 여부 확인.
-
-        Returns:
-            bool: 모든 item의 is_completed가 True인 경우 True.
-        """
         return all(it.is_completed for it in self.items) if self.items else False
 
 
-class PaidInCapitalIncrease(BaseModel):
+class BaseDisclosure(BaseModel):
+    """공시 데이터의 공통 필드를 담는 기본 모델.
+
+    Attributes:
+        date (str): 공시 관련 기준 일자 (YYYY-MM-DD).
+        name (str): 종목명.
+        is_correction (bool): 기재정정 공시 여부.
+        rcp_no (str): DART 접수번호.
+        parent_rcp_no (str | None): 원본 공시 접수번호 (정정 공시인 경우).
+        initial_disclosure_date (str | None): 최초 공시 일자.
+        ticker (str | None): 종목 코드.
+    """
+
+    date: str
+    name: str
+    is_correction: bool = False
+    rcp_no: str
+    parent_rcp_no: str | None = None
+    initial_disclosure_date: str | None = None
+    ticker: str | None = None
+
+
+class FundingDisclosure(BaseDisclosure):
+    """자금 조달 관련 공시의 공통 필드를 담는 모델.
+
+    Attributes:
+        fund_facility (int): 시설자금.
+        fund_operation (int): 운영자금.
+        fund_acquisition_biz (int): 영업양수자금.
+        fund_acquisition_sec (int): 타법인 증권 취득자금.
+        fund_debt_repayment (int): 채무상환자금.
+        fund_etc (int): 기타자금.
+    """
+
+    fund_facility: int = 0
+    fund_operation: int = 0
+    fund_acquisition_biz: int = 0
+    fund_acquisition_sec: int = 0
+    fund_debt_repayment: int = 0
+    fund_etc: int = 0
+
+    @computed_field
+    def total_fund(self) -> int:
+        """조달하려는 자금의 총합을 계산합니다.
+
+        Returns:
+            int: 전체 자금 합계.
+        """
+        return (
+            self.fund_facility
+            + self.fund_operation
+            + self.fund_acquisition_biz
+            + self.fund_acquisition_sec
+            + self.fund_debt_repayment
+            + self.fund_etc
+        )
+
+
+class PaidInCapitalIncrease(FundingDisclosure):
     """유상증자 결정 공시 데이터 도메인 모델.
 
-    사용자가 관리하는 엑셀 통계 구조(23개 칼럼)를 반영합니다.
+    Attributes:
+        disclosure_date (str): 실제 공시일.
+        new_shares (int): 발행할 신주의 수.
+        face_value (int): 1주당 액면가.
+        pre_issued_shares (int): 증자 전 발행주식 총수.
+        method (str): 증자 방식 (제3자배정 등).
+        issue_price (int): 신주 발행 가액.
+        confirmed_price (int | None): 확정 발행 가액.
+        record_date (str | None): 신주배정 기준일.
+        shares_per_old (float | None): 1주당 신주배정 주식수.
+        subscription_date (str | None): 청약 예정일.
+        payment_date (str | None): 납입일.
+        listing_date (str | None): 신주 상장 예정일.
+        board_resolution_date (str | None): 이사회 결의일.
     """
-    date: str  # 일자 (YYYY-MM-DD)
-    name: str  # 종목명
-    is_correction: bool = False  # 기재정정여부
-    disclosure_date: str  # 유상증자공시일
-    rcp_no: str  # 접수번호
-    parent_rcp_no: str | None = None  # 상위접수번호
-    new_shares: int = 0  # 신주발행주식수
-    face_value: int = 0  # 1주당 액면가
-    pre_issued_shares: int = 0  # 증자전 발행주식총수
-    fund_facility: int = 0  # 시설자금
-    fund_operation: int = 0  # 운영자금
-    fund_acquisition: int = 0  # 타법인증권
-    fund_etc: int = 0  # 기타자금
-    method: str = ""  # 증자방식 (제3자배정, 주주배정 등)
-    issue_price: int = 0  # 신주의 발행가액
-    confirmed_price: int | None = None  # 발행확정가액
-    record_date: str | None = None  # 신주배정기준일
-    shares_per_old: float | None = None  # 1주당 신주배정주식수
-    subscription_date: str | None = None  # 청약예정일
-    payment_date: str | None = None  # 납입일
-    listing_date: str | None = None  # 신주상장일
-    board_resolution_date: str | None = None  # 이사회결의일
-    initial_disclosure_date: str | None = None  # 최초공시일
-    ticker: str | None = None  # 시스템 연결용 티커
 
-    @computed_field
-    def total_fund(self) -> int:
-        """총 자금조달 규모 합계.
-        (시설 + 운영 + 타법인 + 기타)
-        """
-        return self.fund_facility + self.fund_operation + self.fund_acquisition + self.fund_etc
+    disclosure_date: str
+    new_shares: int = 0
+    face_value: int = 0
+    pre_issued_shares: int = 0
+    method: str = ""
+    issue_price: int = 0
+    confirmed_price: int | None = None
+    record_date: str | None = None
+    shares_per_old: float | None = None
+    subscription_date: str | None = None
+    payment_date: str | None = None
+    listing_date: str | None = None
+    board_resolution_date: str | None = None
 
 
-class BonusIssue(BaseModel):
-    """무상증자 결정 공시 데이터 도메인 모델."""
-    date: str  # 일자 (YYYY-MM-DD)
-    name: str  # 종목명
-    is_correction: bool = False  # 기재정정여부
-    disclosure_date: str  # 무상증자공시일 (또는 일자)
-    rcp_no: str  # 접수번호
-    parent_rcp_no: str | None = None  # 상위접수번호
-    new_shares: int = 0  # 신주발행주식수 (신주의 종류와 수)
-    face_value: int = 0  # 1주당 액면가 (1주당 액면가액)
-    pre_issued_shares: int = 0  # 증자전 발행주식총수
-    shares_per_old: float = 0.0  # 1주당 신주배정주식수
-    record_date: str | None = None  # 신주배정기준일
-    listing_date: str | None = None  # 신주상장일 (신주의 상장 예정일)
-    capital_reserve: str = ""  # 무상증자 재원 (주식발행초과금 등)
-    board_resolution_date: str | None = None  # 이사회결의일
-    initial_disclosure_date: str | None = None  # 최초공시일
-    ticker: str | None = None  # 시스템 연결용 티커
+class BonusIssue(BaseDisclosure):
+    """무상증자 결정 공시 데이터 도메인 모델.
+
+    Attributes:
+        disclosure_date (str): 실제 공시일.
+        new_shares (int): 발행할 신주의 수.
+        face_value (int): 1주당 액면가.
+        pre_issued_shares (int): 증자 전 발행주식 총수.
+        shares_per_old (float): 1주당 신주배정 주식수.
+        record_date (str | None): 신주배정 기준일.
+        listing_date (str | None): 신주 상장 예정일.
+        capital_reserve (str): 증자 재원.
+        board_resolution_date (str | None): 이사회 결의일.
+    """
+
+    disclosure_date: str
+    new_shares: int = 0
+    face_value: int = 0
+    pre_issued_shares: int = 0
+    shares_per_old: float = 0.0
+    record_date: str | None = None
+    listing_date: str | None = None
+    capital_reserve: str = ""
+    board_resolution_date: str | None = None
 
 
-class ConvertibleBond(BaseModel):
+class ConvertibleBond(FundingDisclosure):
     """전환사채(CB) 발행 결정 공시 데이터 도메인 모델.
 
-    사용자가 제공한 27개 필드 구조를 기반으로 설계되었습니다.
+    Attributes:
+        bond_round (str): 사채 회차.
+        bond_type (str): 사채의 종류.
+        bond_amount (int): 권면 총액.
+        maturity_date (str | None): 사채 만기일.
+        issue_method (str): 발행 방법 (사모/공모 등).
+        conversion_ratio (float): 전환 비율 (%).
+        conversion_price (int): 전환 가액.
+        new_shares (int): 전환에 따라 발행할 주식수.
+        shares_ratio (float): 주식총수 대비 비율.
+        exercise_start_date (str | None): 전환청구 시작일.
+        exercise_end_date (str | None): 전환청구 종료일.
+        subscription_date (str | None): 청약일.
+        payment_date (str | None): 납입일.
+        board_resolution_date (str | None): 이사회 결의일.
     """
-    date: str  # 공시일 (YYYY-MM-DD)
-    name: str  # 상호 (종목명)
-    is_correction: bool = False  # 기재정정여부
-    bond_round: str = ""  # 회차
-    bond_type: str = ""  # 종류
-    bond_amount: int = 0  # 사채의 권면(전자등록)총액
-    fund_facility: int = 0  # 시설자금
-    fund_operation: int = 0  # 운영자금
-    fund_acquisition_biz: int = 0  # 영업양수자금
-    fund_acquisition_sec: int = 0  # 타법인증권
-    fund_debt_repayment: int = 0  # 채무상환자금
-    fund_etc: int = 0  # 기타자금
-    maturity_date: str | None = None  # 사채의 만기일
-    issue_method: str = ""  # 사채발행방법 (사모 등)
-    conversion_ratio: float = 100.0  # 전환비율 (%)
-    conversion_price: int = 0  # 전환가액 (원)
-    new_shares: int = 0  # 전환에 따라 발행할 주식수
-    shares_ratio: float = 0.0  # 주식총수 대비 비율 (%)
-    exercise_start_date: str | None = None  # 전환청구기간시작일
-    exercise_end_date: str | None = None  # 전환청구기간종료일
-    subscription_date: str | None = None  # 청약일
-    payment_date: str | None = None  # 납입일
-    board_resolution_date: str | None = None  # 이사회결의일
-    rcp_no: str  # 접수번호
-    parent_rcp_no: str | None = None  # 상위접수번호
-    initial_disclosure_date: str | None = None  # 최초공시일
-    ticker: str | None = None  # 시스템 연결용 티커
 
-    @computed_field
-    def total_fund(self) -> int:
-        """총 자금조달 규모 합계."""
-        return (self.fund_facility + self.fund_operation + self.fund_acquisition_biz + 
-                self.fund_acquisition_sec + self.fund_debt_repayment + self.fund_etc)
+    bond_round: str = ""
+    bond_type: str = ""
+    bond_amount: int = 0
+    maturity_date: str | None = None
+    issue_method: str = ""
+    conversion_ratio: float = 100.0
+    conversion_price: int = 0
+    new_shares: int = 0
+    shares_ratio: float = 0.0
+    exercise_start_date: str | None = None
+    exercise_end_date: str | None = None
+    subscription_date: str | None = None
+    payment_date: str | None = None
+    board_resolution_date: str | None = None
 
 
-class BondWithWarrants(BaseModel):
+class BondWithWarrants(FundingDisclosure):
     """신주인수권부사채(BW) 발행 결정 공시 데이터 도메인 모델.
 
-    사용자가 제공한 BW 특화 필드 구조를 기반으로 설계되었습니다.
+    Attributes:
+        bond_round (str): 사채 회차.
+        bond_type (str): 사채의 종류.
+        bond_amount (int): 권면 총액.
+        maturity_date (str | None): 사채 만기일.
+        issue_method (str): 발행 방법 (사모/공모 등).
+        warrant_ratio (float): 신주인수권 비율 (%).
+        exercise_price (int): 행사 가액.
+        new_shares (int): 행사에 따라 발행할 주식수.
+        shares_ratio (float): 주식총수 대비 비율.
+        exercise_start_date (str | None): 권리행사 시작일.
+        exercise_end_date (str | None): 권리행사 종료일.
+        subscription_date (str | None): 청약일.
+        payment_date (str | None): 납입일.
+        board_resolution_date (str | None): 이사회 결의일.
     """
-    date: str  # 공시일 (YYYY-MM-DD)
-    name: str  # 상호 (종목명)
-    is_correction: bool = False  # 기재정정여부
-    bond_round: str = ""  # 회차
-    bond_type: str = ""  # 종류
-    bond_amount: int = 0  # 사채의 권면(전자등록)총액
-    fund_facility: int = 0  # 시설자금
-    fund_operation: int = 0  # 운영자금
-    fund_acquisition_biz: int = 0  # 영업양수자금
-    fund_acquisition_sec: int = 0  # 타법인증권
-    fund_debt_repayment: int = 0  # 채무상환자금
-    fund_etc: int = 0  # 기타자금
-    maturity_date: str | None = None  # 사채의 만기일
-    issue_method: str = ""  # 사채발행방법 (공모/사모 등)
-    warrant_ratio: float = 100.0  # 신주인수권 비율 (%)
-    exercise_price: int = 0  # 행사가액 (원)
-    new_shares: int = 0  # 행사에 따라 발행할 주식수
-    shares_ratio: float = 0.0  # 주식총수 대비 비율 (%)
-    exercise_start_date: str | None = None  # 권리행사기간 시작일
-    exercise_end_date: str | None = None  # 권리행사기간 종료일
-    subscription_date: str | None = None  # 청약일
-    payment_date: str | None = None  # 납입일
-    board_resolution_date: str | None = None  # 이사회결의일
-    rcp_no: str  # 접수번호
-    parent_rcp_no: str | None = None  # 상위접수번호
-    initial_disclosure_date: str | None = None  # 최초공시일
-    ticker: str | None = None  # 시스템 연결용 티커
 
-    @computed_field
-    def total_fund(self) -> int:
-        """총 자금조달 규모 합계."""
-        return (self.fund_facility + self.fund_operation + self.fund_acquisition_biz + 
-                self.fund_acquisition_sec + self.fund_debt_repayment + self.fund_etc)
+    bond_round: str = ""
+    bond_type: str = ""
+    bond_amount: int = 0
+    maturity_date: str | None = None
+    issue_method: str = ""
+    warrant_ratio: float = 100.0
+    exercise_price: int = 0
+    new_shares: int = 0
+    shares_ratio: float = 0.0
+    exercise_start_date: str | None = None
+    exercise_end_date: str | None = None
+    subscription_date: str | None = None
+    payment_date: str | None = None
+    board_resolution_date: str | None = None
