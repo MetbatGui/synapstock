@@ -24,7 +24,11 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         self.api_url = f"{self.BASE_URL}/comm/bldAttendant/getJsonData.cmd"
 
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
             "Referer": f"{self.BASE_URL}/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201",
             "X-Requested-With": "XMLHttpRequest",
         }
