@@ -21,7 +21,7 @@ class Stock(BaseModel):
     ticker: str
     aliases: list[str] = []
     reports: list[str] = []
-    news: list[dict[str, str]] = [] # [{"title": "...", "date": "...", "url": "..."}]
+    news: list[dict[str, str]] = []  # [{"title": "...", "date": "...", "url": "..."}]
 
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"
@@ -43,7 +43,7 @@ class Node(BaseModel):
     depth: int
     nodes: list[Node] = []
     stocks: list[Stock] = []
-    news: list[dict[str, str]] = [] # [{"title": "...", "date": "...", "url": "..."}]
+    news: list[dict[str, str]] = []  # [{"title": "...", "date": "...", "url": "..."}]
 
     def find_node(self, name: str) -> Node | None:
         """이름으로 하위 노드를 재귀적으로 검색한다."""
@@ -195,8 +195,8 @@ class Board(BaseModel):
         root: 자동 생성된 루트 노드 (depth=0, name=보드명).
     """
 
-    id: str | None = None # 파일명 및 고유 식별자
-    name: str # 표시 이름
+    id: str | None = None  # 파일명 및 고유 식별자
+    name: str  # 표시 이름
     root: Node
 
     @model_validator(mode="before")
@@ -258,6 +258,7 @@ Node.model_rebuild()
 @dataclass
 class ScrapedNews:
     """스크래핑된 뉴스 정보를 담는 값 객체."""
+
     title: str
     date: str  # YYYY-MM-DD
     url: str
@@ -265,6 +266,7 @@ class ScrapedNews:
 
 class SearchResultType(Enum):
     """검색 결과의 타입 (종목 또는 섹터/노드)."""
+
     STOCK = "STOCK"
     SECTOR = "SECTOR"
 
@@ -275,6 +277,7 @@ class SearchResult:
 
     종목(STOCK) 또는 섹터(SECTOR) 정보를 모두 포함할 수 있음.
     """
+
     type: SearchResultType
     name: str
     board_name: str
@@ -284,6 +287,7 @@ class SearchResult:
 
 class Report(BaseModel):
     """리포트 도메인 엔티티."""
+
     filename: str
     stock: str
     title: str

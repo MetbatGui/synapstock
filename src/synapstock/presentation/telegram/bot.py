@@ -17,10 +17,9 @@ from synapstock.presentation.telegram.handlers.news_handler import (
 from synapstock.presentation.telegram.keyboards.main_keyboard import get_main_keyboard
 
 # 로거 설정
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """봇에 최초 접속하거나 /start를 눌렀을 때의 웰컴 메시지와 메인 키보드를 렌더링합니다.
@@ -38,6 +37,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if update.message:
         await update.message.reply_text(welcome_msg, reply_markup=get_main_keyboard())
 
+
 async def unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """지정된 대화(진행중인 작업) 외의 아무 메시지가 왔을 때 주메뉴를 다시 띄워줍니다.
 
@@ -46,10 +46,8 @@ async def unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context (ContextTypes.DEFAULT_TYPE): 봇의 컨텍스트.
     """
     if update.message:
-        await update.message.reply_text(
-            "📰 아래 버튼을 눌러 작업을 시작해주세요.",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text("📰 아래 버튼을 눌러 작업을 시작해주세요.", reply_markup=get_main_keyboard())
+
 
 def main() -> None:
     """텔레그램 봇을 초기화하고 Long Polling 모드로 실행합니다.
@@ -71,11 +69,11 @@ def main() -> None:
     application = ApplicationBuilder().token(token).build()
 
     # 봇 전용 DI 컨테이너(bot_data)에 도메인 유즈케이스 서비스 주입
-    application.bot_data['query_service'] = container.query_service
-    application.bot_data['command_service'] = container.command_service
-    application.bot_data['media_service'] = container.media_service
-    application.bot_data['sync_service'] = container.sync_service
-    application.bot_data['news_scraper'] = container.news_scraper
+    application.bot_data["query_service"] = container.query_service
+    application.bot_data["command_service"] = container.command_service
+    application.bot_data["media_service"] = container.media_service
+    application.bot_data["sync_service"] = container.sync_service
+    application.bot_data["news_scraper"] = container.news_scraper
 
     # 4. 기본 핸들러(라우팅) 등록
     application.add_handler(CommandHandler("start", start_command))
@@ -89,6 +87,7 @@ def main() -> None:
     # Long Polling 무한 루프 시작
     logger.info("봇 폴링 시작 (Ctrl+C 로 종료)")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == "__main__":
     main()

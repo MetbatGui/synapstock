@@ -1,38 +1,36 @@
 import datetime
-import time
-import logging
 import io
+import logging
+import time
+
 import pandas as pd
-from typing import List, Dict, Optional
-from synapstock.domain.ports import KrxDataPort, PriceDataPort
+
+from synapstock.domain.ports import KrxDataPort
 from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
 
 logger = logging.getLogger(__name__)
 
+
 class MarketDataService:
     """시장 데이터 수집 및 파생 지표 분석을 담당하는 서비스."""
 
-    def __init__(
-        self, 
-        krx_adapter: KrxDataPort, 
-        repository: LocalMarketDataRepository
-    ):
+    def __init__(self, krx_adapter: KrxDataPort, repository: LocalMarketDataRepository):
         self.krx = krx_adapter
         self.repo = repository
 
-    def sync_daily_data(self, date_str: Optional[str] = None) -> bool:
+    def sync_daily_data(self, date_str: str | None = None) -> bool:
         """특정 날짜(기본값 당일)의 모든 시장 데이터를 수집하여 저장한다.
         수집할 데이터가 없거나 휴장일인 경우 False를 반환한다.
         """
         if not date_str:
             date_str = datetime.date.today().strftime("%Y%m%d")
-            
+
         logger.info(f"[MarketDataService] 데이터 동기화 시작: {date_str}")
 
         # 1. 전종목 시세/거래대금 수집 (KOSPI, KOSDAQ)
         markets = ["STK", "KSQ"]
         valid_date = False
-        
+
         for mkt in markets:
             prices = self.krx.fetch_market_prices(mkt, date_str)
             # 데이터가 비어있다면 휴장일일 가능성이 높음
@@ -55,7 +53,7 @@ class MarketDataService:
                 if excel_bytes:
                     try:
                         df = pd.read_excel(io.BytesIO(excel_bytes))
-                        data_list = df.to_dict(orient='records')
+                        data_list = df.to_dict(orient="records")
                         if len(data_list) > 0:
                             self.repo.save_raw_data(date_str, f"supply_{mkt}_{inv_name}", data_list)
                             logger.info(f"[MarketDataService] {mkt} {inv_name} 수급 저장 완료")
@@ -69,14 +67,15 @@ class MarketDataService:
             if perf_bytes:
                 try:
                     df_perf = pd.read_excel(io.BytesIO(perf_bytes))
-                    if len(df_perf) < 8: continue # 최소한의 행 확인
+                    if len(df_perf) < 8:
+                        continue  # 최소한의 행 확인
 
                     summary = {"market": mkt, "date": date_str}
-                    
+
                     # 인덱스 기반 정밀 추출 (인코딩 무관)
                     # Row 4: 외국인, Row 7: 기관합계, Row 9: 전체 합계
                     # Col 6: 순매수대금, Col 5: 거래대금(매수)
-                    
+
                     # 1. 외국인 수급
                     foreign_row = df_perf.iloc[4] if len(df_perf) > 4 else None
                     if foreign_row is not None:
@@ -92,9 +91,9 @@ class MarketDataService:
                         summary["InstitutionalSell"] = int(inst_row.iloc[4])
 
                     # 3. 전체 거래대금 (합계 행의 매수거래대금 활용)
-                    total_row = df_perf.iloc[df_perf.index[-1]] # 마지막 행이 보통 전체 합계
+                    total_row = df_perf.iloc[df_perf.index[-1]]  # 마지막 행이 보통 전체 합계
                     summary["TotalTradeValue"] = int(total_row.iloc[5])
-                        
+
                     market_performances[mkt] = summary
                     logger.info(f"[MarketDataService] {mkt} 시장 요약 데이터(인덱스 기반) 추출 완료")
                 except Exception as e:
@@ -120,18 +119,24 @@ class MarketDataService:
             # 주말 제외 (0:월, 1:화, ..., 4:금, 5:토, 6:일)
             if current_date.weekday() < 5:
                 curr_str = current_date.strftime("%Y%m%d")
-                
+
                 # 중복 체크: 모든 필수 파일이 이미 존재하는지 확인
                 is_all_exists = True
                 for mkt in ["STK", "KSQ"]:
-                    if not self.repo.exists(curr_str, f"prices_{mkt}"): is_all_exists = False; break
-                    if not self.repo.exists(curr_str, f"supply_{mkt}_FOREIGN"): is_all_exists = False; break
-                    if not self.repo.exists(curr_str, f"supply_{mkt}_INSTITUTION"): is_all_exists = False; break
-                
+                    if not self.repo.exists(curr_str, f"prices_{mkt}"):
+                        is_all_exists = False
+                        break
+                    if not self.repo.exists(curr_str, f"supply_{mkt}_FOREIGN"):
+                        is_all_exists = False
+                        break
+                    if not self.repo.exists(curr_str, f"supply_{mkt}_INSTITUTION"):
+                        is_all_exists = False
+                        break
+
                 # 신규 추가된 시장 요약 정보도 확인
                 if is_all_exists and not self.repo.exists(curr_str, "market_performance"):
                     is_all_exists = False
-                
+
                 if is_all_exists:
                     logger.info(f"[MarketDataService] {curr_str} 데이터가 이미 존재하여 건너뜁니다.")
                 else:
@@ -146,7 +151,7 @@ class MarketDataService:
                         logger.error(f"[MarketDataService] {curr_str} 동기화 중 오류 발생: {e}")
 
             current_date += datetime.timedelta(days=1)
-        
+
         logger.info(f"[MarketDataService] {start_date_str} ~ {end_date_str or '오늘'} 범위 수집 완료")
 
     def get_market_analysis(self, date_str: str) -> pd.DataFrame:
@@ -155,18 +160,16 @@ class MarketDataService:
         mkt_dfs = []
         for mkt in ["STK", "KSQ"]:
             prices = self.repo.load_raw_data(date_str, f"prices_{mkt}")
-            if not prices: continue
-            
+            if not prices:
+                continue
+
             df_price = pd.DataFrame(prices)
-            
+
             # 수급 데이터 결합 (외인/기관)
             for inv_name in ["INSTITUTION", "FOREIGN"]:
                 supply = self.repo.load_raw_data(date_str, f"supply_{mkt}_{inv_name}")
                 if supply:
-                    df_supply = pd.DataFrame(supply)
-                    # 종목코드 기준으로 Join (KRX 엑셀은 '종목코드' 컬럼 사용)
-                    # 시세 데이터는 'ISU_SRT_CD' 또는 'MKTSC_ITM_ID' 등 사용 (API마다 다름)
-                    # 여기선 티커를 맞추는 전처리가 필요함
+                    # pd.DataFrame(supply) # TODO: Logic implementation
                     pass
 
             mkt_dfs.append(df_price)
@@ -175,10 +178,10 @@ class MarketDataService:
             return pd.DataFrame()
 
         full_df = pd.concat(mkt_dfs)
-        
+
         # 2. 파생 지표 처리 (예: 거래대금 순위)
-        if 'AMT_TRD' in full_df.columns:
-            full_df['AMT_TRD'] = pd.to_numeric(full_df['AMT_TRD'].str.replace(',', ''), errors='coerce')
-            full_df['AMT_RANK'] = full_df['AMT_TRD'].rank(ascending=False)
-            
+        if "AMT_TRD" in full_df.columns:
+            full_df["AMT_TRD"] = pd.to_numeric(full_df["AMT_TRD"].str.replace(",", ""), errors="coerce")
+            full_df["AMT_RANK"] = full_df["AMT_TRD"].rank(ascending=False)
+
         return full_df

@@ -11,7 +11,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_exception_type
 
 from synapstock.domain.ports import StoragePort
 
@@ -25,14 +25,9 @@ class GoogleDriveAdapter(StoragePort):
     OAuth 2.0 Token을 사용하여 인증합니다.
     """
 
-    SCOPES = ['https://www.googleapis.com/auth/drive']
+    SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-    def __init__(
-        self,
-        token_file: str,
-        folders: dict[str, str] | None = None,
-        client_secret_file: str | None = None
-    ):
+    def __init__(self, token_file: str, folders: dict[str, str] | None = None, client_secret_file: str | None = None):
         """GoogleDriveAdapter 초기화.
 
         Args:
@@ -48,7 +43,7 @@ class GoogleDriveAdapter(StoragePort):
             raise ValueError("token_file must be provided.")
 
         if not os.path.exists(self.token_file):
-             raise FileNotFoundError(f"Token file not found: {self.token_file}")
+            raise FileNotFoundError(f"Token file not found: {self.token_file}")
 
         self.drive_service = self._authenticate()
 
@@ -76,39 +71,47 @@ class GoogleDriveAdapter(StoragePort):
             if creds and creds.expired and creds.refresh_token:
                 logger.info("[GoogleDrive] 토큰 만료됨. 갱신 시도 중...")
                 creds.refresh(Request())
-                with open(self.token_file, 'w') as token:
+                with open(self.token_file, "w") as token:
                     token.write(creds.to_json())
                 logger.info("[GoogleDrive] 토큰 갱신 완료.")
 
-            service = build('drive', 'v3', credentials=creds)
+            service = build("drive", "v3", credentials=creds)
             logger.info("[GoogleDrive] API 서비스 객체 생성 성공.")
             return service
         except Exception as e:
             logger.error("[GoogleDrive] 인증 실패", exc_info=True)
             raise RuntimeError(f"Google Drive 인증 실패: {e}")
 
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
-    def _get_or_create_folder(self, folder_name: str, parent_id: str = 'root') -> str:
+    @retry(
+        wait=wait_exponential(multiplier=1, max=10), 
+        stop=stop_after_attempt(3),
+        retry=retry_if_not_exception_type(ValueError)
+    )
+    def _get_or_create_folder(self, folder_name: str, parent_id: str = "root") -> str:
         """폴더를 찾거나 생성합니다."""
         query = (
             f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' "
             f"and '{parent_id}' in parents and trashed = false"
         )
         results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
-        files = results.get('files', [])
+        files = results.get("files", [])
 
         if files:
-            return str(files[0]['id'])
+            return str(files[0]["id"])
         else:
             file_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [parent_id]
+                "name": folder_name,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [parent_id],
             }
-            file = self.drive_service.files().create(body=file_metadata, fields='id').execute()
-            return cast(str, file.get('id', ''))
+            file = self.drive_service.files().create(body=file_metadata, fields="id").execute()
+            return cast(str, file.get("id", ""))
 
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, max=10), 
+        stop=stop_after_attempt(3),
+        retry=retry_if_not_exception_type(ValueError)
+    )
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
         """경로에 해당하는 파일/폴더의 ID를 찾습니다."""
         parts = path.strip("/").split("/")
@@ -118,30 +121,31 @@ class GoogleDriveAdapter(StoragePort):
         current_parent_id = target_root_id
 
         import unicodedata
-        
+
         for part in parts:
             if not part:
                 continue
-            
+
             # 한글 유니코드 정규화(NFC/NFD) 문제 대응을 위해 하위 목록 전체 조회 후 비교
-            results = self.drive_service.files().list(
-                q=f"'{current_parent_id}' in parents and trashed = false",
-                fields="files(id, name, mimeType)"
-            ).execute()
-            files = results.get('files', [])
-            
+            results = (
+                self.drive_service.files()
+                .list(q=f"'{current_parent_id}' in parents and trashed = false", fields="files(id, name, mimeType)")
+                .execute()
+            )
+            files = results.get("files", [])
+
             # 정확히 일치하거나 NFC 정규화 시 일치하는 항목 검색
-            part_nfc = unicodedata.normalize('NFC', part)
+            part_nfc = unicodedata.normalize("NFC", part)
             matched_file = None
             for f in files:
-                name_nfc = unicodedata.normalize('NFC', f['name'])
+                name_nfc = unicodedata.normalize("NFC", f["name"])
                 if name_nfc == part_nfc:
                     matched_file = f
                     break
-            
+
             if not matched_file:
                 return None
-            current_parent_id = matched_file['id']
+            current_parent_id = matched_file["id"]
 
         return current_parent_id
 
@@ -183,14 +187,14 @@ class GoogleDriveAdapter(StoragePort):
     def put_file(self, path: str, data: bytes, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
         """바이너리 데이터를 Google Drive에 직접 업로드합니다."""
         try:
-            if path.endswith('.xlsx'):
-                mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            elif path.endswith('.csv'):
-                mime_type = 'text/csv'
-            elif path.endswith('.pdf'):
-                mime_type = 'application/pdf'
+            if path.endswith(".xlsx"):
+                mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            elif path.endswith(".csv"):
+                mime_type = "text/csv"
+            elif path.endswith(".pdf"):
+                mime_type = "application/pdf"
             else:
-                mime_type = 'application/octet-stream'
+                mime_type = "application/octet-stream"
 
             output = io.BytesIO(data)
             self._upload_file(output, path, mime_type, folder=folder, root_id=root_id)
@@ -199,30 +203,29 @@ class GoogleDriveAdapter(StoragePort):
             logger.error(f"[GoogleDrive] 파일 업로드 실패 ({path}): {e}")
             return False
 
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, max=10), 
+        stop=stop_after_attempt(3),
+        retry=retry_if_not_exception_type(ValueError)
+    )
     def _upload_file(
-        self,
-        data: io.BytesIO,
-        path: str,
-        mime_type: str,
-        folder: str | None = None,
-        root_id: str | None = None
+        self, data: io.BytesIO, path: str, mime_type: str, folder: str | None = None, root_id: str | None = None
     ):
         filename = os.path.basename(path)
         parent_id = self._ensure_path_directories(path, folder=folder, root_id=root_id)
 
         query = f"name = '{filename}' and '{parent_id}' in parents and trashed = false"
         results = self.drive_service.files().list(q=query, fields="files(id)").execute()
-        files = results.get('files', [])
+        files = results.get("files", [])
 
         media = MediaIoBaseUpload(data, mimetype=mime_type, resumable=True)
 
         if files:
-            file_id = files[0]['id']
+            file_id = files[0]["id"]
             self.drive_service.files().update(fileId=file_id, media_body=media).execute()
         else:
-            file_metadata = {'name': filename, 'parents': [parent_id]}
-            self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            file_metadata = {"name": filename, "parents": [parent_id]}
+            self.drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
     def path_exists(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
         return self._get_file_id(path, folder=folder, root_id=root_id) is not None
@@ -242,20 +245,37 @@ class GoogleDriveAdapter(StoragePort):
                 return []
 
             query = f"'{folder_id}' in parents and trashed = false"
-            results = self.drive_service.files().list(
-                q=query,
-                fields="files(id, name, mimeType, size, createdTime)",
-                pageSize=1000
-            ).execute()
+            results = (
+                self.drive_service.files()
+                .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
+                .execute()
+            )
 
-            files = results.get('files', [])
+            files = results.get("files", [])
             logger.info(f"[GoogleDrive] 폴더 내 파일 조회 성공: {len(files)}개 발견")
-            for f in files[:5]:
-                logger.info(f"  - 파일: {f['name']} (ID: {f['id']})")
             return cast(list[dict], files)
         except Exception as e:
             logger.error(f"[GoogleDrive] 리스트 조회 실패 ({folder_path}): {e}")
             return []
+
+    def list_files(self, folder: str) -> list[dict]:
+        """등록된 폴더 키워드를 사용하여 파일 목록을 조회합니다."""
+        return self.list_files_in_folder("", folder=folder)
+
+    def get_file_by_id(self, file_id: str) -> bytes | None:
+        """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다."""
+        try:
+            request = self.drive_service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            fh.seek(0)
+            return fh.read()
+        except Exception as e:
+            logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
+            return None
 
     def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
@@ -266,14 +286,14 @@ class GoogleDriveAdapter(StoragePort):
 
         # 1. Google Drive 파일 목록 가져오기
         drive_files = self.list_files_in_folder(drive_folder_path)
-        drive_file_names = {f['name'] for f in drive_files}
+        drive_file_names = {f["name"] for f in drive_files}
 
         # 2. 로컬 파일 목록 가져오기
         if not os.path.exists(local_dir):
             logger.warning(f"[GoogleDrive] 로컬 디렉토리가 존재하지 않습니다: {local_dir}")
             return
 
-        local_files = [f for f in os.listdir(local_dir) if f.lower().endswith('.pdf')]
+        local_files = [f for f in os.listdir(local_dir) if f.lower().endswith(".pdf")]
         logger.info(f"[GoogleDrive] 로컬 파일 개수: {len(local_files)}")
         logger.info(f"[GoogleDrive] 드라이브 내 기존 파일 개수: {len(drive_file_names)}")
 
@@ -287,7 +307,7 @@ class GoogleDriveAdapter(StoragePort):
             local_path = os.path.join(local_dir, filename)
             drive_path = f"{drive_folder_path}/{filename}"
 
-            with open(local_path, 'rb') as f:
+            with open(local_path, "rb") as f:
                 data = f.read()
                 if self.put_file(drive_path, data):
                     logger.info(f"[GoogleDrive] 업로드 완료: {filename}")
@@ -298,11 +318,7 @@ class GoogleDriveAdapter(StoragePort):
         logger.info(f"[GoogleDrive] PDF 동기화 완료: {count}개 파일 업로드됨.")
 
     def download_file(
-        self,
-        filename: str,
-        local_path: str | Path,
-        folder: str | None = None,
-        root_id: str | None = None
+        self, filename: str, local_path: str | Path, folder: str | None = None, root_id: str | None = None
     ) -> bool:
         """Google Drive에서 단일 파일을 원자적으로(Atomic) 다운로드합니다.
 
@@ -324,16 +340,20 @@ class GoogleDriveAdapter(StoragePort):
 
         try:
             target_root_id = root_id or self._get_root_id(folder)
-            results = self.drive_service.files().list(
-                q=f"name = '{filename}' and '{target_root_id}' in parents and trashed = false",
-                fields="files(id, name)"
-            ).execute()
-            files = results.get('files', [])
+            results = (
+                self.drive_service.files()
+                .list(
+                    q=f"name = '{filename}' and '{target_root_id}' in parents and trashed = false",
+                    fields="files(id, name)",
+                )
+                .execute()
+            )
+            files = results.get("files", [])
 
             if not files:
                 return False
 
-            file_id = files[0]['id']
+            file_id = files[0]["id"]
             request = self.drive_service.files().get_media(fileId=file_id)
 
             local_path = Path(local_path)
@@ -358,11 +378,9 @@ class GoogleDriveAdapter(StoragePort):
         except Exception as e:
             logger.error(f"[GoogleDrive] 파일 조회 중 오류: {e}")
             return False
+
     def download_missing_reports(
-        self,
-        local_dir: str,
-        report_list: list[dict],
-        progress_callback: Callable[[str, float], Any] | None = None
+        self, local_dir: str, report_list: list[dict], progress_callback: Callable[[str, float], Any] | None = None
     ):
         """로컬에 없는 리포트들을 Google Drive에서 병렬로 일괄 다운로드합니다.
 
@@ -393,7 +411,7 @@ class GoogleDriveAdapter(StoragePort):
         # 다운로드 대상 필터링
         to_download = []
         for r in report_list:
-            fname = r.get('filename')
+            fname = r.get("filename")
             if isinstance(fname, str) and fname.lower() not in local_files:
                 to_download.append(r)
 
@@ -416,23 +434,23 @@ class GoogleDriveAdapter(StoragePort):
 
         def download_worker(report):
             nonlocal downloaded_count, failed_count
-            filename = report['filename']
+            filename = report["filename"]
 
             try:
                 # 스레드 전용 서비스 생성 (캐시 문제 방지를 위해 로컬 변수로 관리)
-                thread_service = build('drive', 'v3', credentials=creds, static_discovery=False)
+                thread_service = build("drive", "v3", credentials=creds, static_discovery=False)
 
                 # 파일 ID 찾기 (서버 부하 분산 및 속도를 위해 직접 검색)
                 query = f"name = '{filename}' and trashed = false"
                 results = thread_service.files().list(q=query, fields="files(id)").execute()
-                files = results.get('files', [])
+                files = results.get("files", [])
 
                 if not files:
                     with stats_lock:
                         failed_count += 1
                     return False
 
-                file_id = files[0]['id']
+                file_id = files[0]["id"]
                 request = thread_service.files().get_media(fileId=file_id)
 
                 # 원자적 쓰기를 위해 임시 파일 사용
@@ -455,7 +473,7 @@ class GoogleDriveAdapter(StoragePort):
                         if progress_callback is not None and downloaded_count % 5 == 0:
                             progress_callback(
                                 f"다운로드 중... ({downloaded_count}/{to_download_count})",
-                                float(current_total_processed) / total
+                                float(current_total_processed) / total,
                             )
                     return True
                 except Exception as e:
@@ -476,6 +494,5 @@ class GoogleDriveAdapter(StoragePort):
 
         if progress_callback:
             progress_callback(
-                f"일괄 다운로드 완료. 신규: {downloaded_count}, 기존: {skipped_count}, 실패: {failed_count}",
-                1.0
+                f"일괄 다운로드 완료. 신규: {downloaded_count}, 기존: {skipped_count}, 실패: {failed_count}", 1.0
             )

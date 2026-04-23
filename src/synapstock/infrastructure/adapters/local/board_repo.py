@@ -34,7 +34,7 @@ class LocalBoardRepository(BoardRepositoryPort):
         # 1. 정석 JSON 형식 (Board 모델 구조) 확인
         if "root" in raw:
             board = Board.model_validate(raw)
-            board.id = name # 파일명을 ID로 고정
+            board.id = name  # 파일명을 ID로 고정
             return board
 
         # 2. 레거시 형식 (theme_*.json) 처리
@@ -64,7 +64,7 @@ class LocalBoardRepository(BoardRepositoryPort):
         """Board를 id.json 파일로 저장한다. id가 없으면 name을 시도한다."""
         filename = board.id or board.name
         self._path(filename).write_text(
-            board.model_dump_json(indent=2, exclude={'id'}, exclude_defaults=True), encoding="utf-8"
+            board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True), encoding="utf-8"
         )
 
     def list_boards(self) -> list[str]:

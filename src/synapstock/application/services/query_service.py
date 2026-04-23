@@ -1,6 +1,5 @@
 """보드 및 종목 정보 조회 서비스를 담당하는 유즈케이스 레이어."""
 
-
 from typing import cast
 
 from synapstock.domain.models import Board, Node, Stock
@@ -20,7 +19,7 @@ class BoardQueryService:
         repository: BoardRepositoryPort,
         ticker_search: TickerSearchPort,
         disclosure: DisclosurePort | None = None,
-        financial: FinancialDataPort | None = None
+        financial: FinancialDataPort | None = None,
     ) -> None:
         """필요한 조회용 어댑터로 서비스를 초기화합니다."""
         self._repository = repository
@@ -102,14 +101,16 @@ class BoardQueryService:
             def flatten_recursive(node: Node, current_path: list[str]):
                 stocks = []
                 for s in node.stocks:
-                    stocks.append({
-                        "ticker": s.ticker,
-                        "name": s.name,
-                        "aliases": s.aliases,
-                        "board": b_name,
-                        "board_name": board.name,
-                        "path": current_path
-                    })
+                    stocks.append(
+                        {
+                            "ticker": s.ticker,
+                            "name": s.name,
+                            "aliases": s.aliases,
+                            "board": b_name,
+                            "board_name": board.name,
+                            "path": current_path,
+                        }
+                    )
                 for n in node.nodes:
                     stocks.extend(flatten_recursive(n, current_path + [n.name]))
                 return stocks
@@ -127,13 +128,15 @@ class BoardQueryService:
             def search_recursive(node: Node, current_path: list[str]):
                 for s in node.stocks:
                     if query in s.name or any(query in alias for alias in s.aliases):
-                        results.append({
-                            "board": b_name,
-                            "board_name": board.name,
-                            "name": s.name,
-                            "ticker": s.ticker,
-                            "path": f"[{board.name}] " + " > ".join(current_path + [s.name])
-                        })
+                        results.append(
+                            {
+                                "board": b_name,
+                                "board_name": board.name,
+                                "name": s.name,
+                                "ticker": s.ticker,
+                                "path": f"[{board.name}] " + " > ".join(current_path + [s.name]),
+                            }
+                        )
                 for n in node.nodes:
                     search_recursive(n, current_path + [n.name])
 

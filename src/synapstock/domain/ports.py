@@ -95,7 +95,6 @@ class MindmapPort(ABC):
         """
 
 
-
 class DisclosurePort(ABC):
     """공시 정보 조회를 위한 추상 포트."""
 
@@ -109,6 +108,7 @@ class DisclosurePort(ABC):
         Returns:
             공시 정보 리스트 (제목, 날짜, 링크 등).
         """
+
 
 class FinancialDataPort(ABC):
     """재무 데이터 조회를 위한 추상 포트."""
@@ -194,6 +194,7 @@ class KrxDataPort(ABC):
     @abstractmethod
     def fetch_market_prices(self, market: str, date_str: str) -> list[dict]:
         """특정 날짜의 전종목 시세/대금 데이터를 가져온다."""
+
 
 class PriceDataPort(ABC):
     """가격 및 신고가 지표 조회를 위한 추상 포트."""

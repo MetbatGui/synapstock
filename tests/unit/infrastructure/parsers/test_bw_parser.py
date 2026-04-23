@@ -1,7 +1,7 @@
 import io
 import pandas as pd
 import pytest
-from synapstock.infrastructure.parsers.excel_statistics_parser import ExcelStatisticsParser
+from synapstock.infrastructure.parsers.excel import DisclosureParser
 
 def test_parse_bond_with_warrants_real_example():
     # 사용자 제공 예시 데이터 (오텍)
@@ -44,7 +44,7 @@ def test_parse_bond_with_warrants_real_example():
         df.to_excel(writer, index=False, sheet_name="Sheet1")
     content = output.getvalue()
     
-    parser = ExcelStatisticsParser()
+    parser = DisclosureParser()
     items = parser.parse_bond_with_warrants(content)
     
     assert len(items) == 1

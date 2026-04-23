@@ -30,7 +30,7 @@ class MiroMindmapAdapter(MindmapPort):
         self.headers = {
             "Authorization": f"Bearer {api_token}",
             "Accept": "application/json",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
         self.session = requests.Session()
         self.session.headers.update(self.headers)
@@ -38,11 +38,12 @@ class MiroMindmapAdapter(MindmapPort):
         # 재시도 로직 추가 (429, 500, 502, 503, 504)
         from requests.adapters import HTTPAdapter
         from urllib3.util.retry import Retry
+
         retry_strategy = Retry(
             total=5,
-            backoff_factor=1, # 1, 2, 4, 8, 16초 대기
+            backoff_factor=1,  # 1, 2, 4, 8, 16초 대기
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+            allowed_methods=["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("https://", adapter)
@@ -80,8 +81,7 @@ class MiroMindmapAdapter(MindmapPort):
         # 보드가 없으면 생성
         logger.info(f"[*] Miro 보드 '{board_name}'가 존재하지 않아 새로 생성합니다.")
         create_res = self.session.post(
-            f"{self.base_url}/boards",
-            json={"name": board_name, "description": "SynapStock Automated Board"}
+            f"{self.base_url}/boards", json={"name": board_name, "description": "SynapStock Automated Board"}
         )
         create_res.raise_for_status()
         return cast(str, create_res.json()["id"])
@@ -112,9 +112,10 @@ class MiroMindmapAdapter(MindmapPort):
     def _extract_text_from_html(self, content: str) -> str:
         """HTML 형태의 텍스트에서 순수 텍스트만 추출한다."""
         import html
+
         # 태그 제거
-        clean = re.compile('<.*?>')
-        text = re.sub(clean, '', content)
+        clean = re.compile("<.*?>")
+        text = re.sub(clean, "", content)
         # HTML 엔티티 변환 (&nbsp; -> ' ', &amp; -> '&' 등)
         text = html.unescape(text)
         # 화이트스페이스 정문화 (줄바꿈 등을 공백으로)
@@ -133,6 +134,7 @@ class MiroMindmapAdapter(MindmapPort):
         Returns:
             Board: 재구성된 보드 객체.
         """
+
         def update_progress(msg, val):
             if progress_callback:
                 progress_callback(msg, val)
@@ -201,6 +203,7 @@ class MiroMindmapAdapter(MindmapPort):
 
         # 4. 도메인 객체로 파싱
         update_progress("도메인 모델로 변환 중...", 0.8)
+
         def build_domain_node(item_id, depth) -> Node:
             item = item_dict[item_id]
             html_content = item.get("data", {}).get("content", "")
@@ -240,7 +243,6 @@ class MiroMindmapAdapter(MindmapPort):
         update_progress("로드 완료!", 1.0)
         return board
 
-
     def save(self, board: Board, progress_callback: Callable[[str, float], None] | None = None) -> None:
         """현재 Board 데이터로 Miro 보드를 덮어씁니다.
 
@@ -250,6 +252,7 @@ class MiroMindmapAdapter(MindmapPort):
             board: 저장할 보드 데이터.
             progress_callback: 진행 상태 업데이트를 위한 선택적 콜백.
         """
+
         def update_progress(msg, val):
             if progress_callback:
                 progress_callback(msg, val)
@@ -284,6 +287,7 @@ class MiroMindmapAdapter(MindmapPort):
             board: 동기화할 보드 데이터.
             progress_callback: 진행 상태 업데이트를 위한 선택적 콜백.
         """
+
         def update_progress(msg, val):
             if progress_callback:
                 progress_callback(msg, val)
@@ -341,12 +345,12 @@ class MiroMindmapAdapter(MindmapPort):
             if is_stock:
                 link_url = f"http://localhost:8090/stock/{ticker}"
                 c_html = (
-                    f"<p style=\"text-align: center;\">"
-                    f"<a href=\"{link_url}\"><strong>{name}</strong></a>"
+                    f'<p style="text-align: center;">'
+                    f'<a href="{link_url}"><strong>{name}</strong></a>'
                     f"</p><!--ticker:{ticker}-->"
                 )
             else:
-                c_html = f"<p style=\"text-align: center;\"><strong>{name}</strong></p>"
+                c_html = f'<p style="text-align: center;"><strong>{name}</strong></p>'
 
             if depth == 0:
                 fill_color = "#e3f2fd"
@@ -367,12 +371,16 @@ class MiroMindmapAdapter(MindmapPort):
                 m_style = match.get("style", {})
 
                 # 좌표 이동 허용 오차 0.5px
-                if (abs(m_pos.get("x", 0) - x) > 0.5 or abs(m_pos.get("y", 0) - y) > 0.5 or
-                    m_data.get("content") != c_html or m_style.get("fillColor", "").lower() != fill_color.lower()):
+                if (
+                    abs(m_pos.get("x", 0) - x) > 0.5
+                    or abs(m_pos.get("y", 0) - y) > 0.5
+                    or m_data.get("content") != c_html
+                    or m_style.get("fillColor", "").lower() != fill_color.lower()
+                ):
                     patch_payload = {
                         "data": {"content": c_html},
                         "position": {"x": x, "y": y},
-                        "style": {"fillColor": fill_color}
+                        "style": {"fillColor": fill_color},
                     }
                     res = self.session.patch(f"{self.base_url}/boards/{board_id}/items/{m_id}", json=patch_payload)
                     res.raise_for_status()
@@ -385,10 +393,10 @@ class MiroMindmapAdapter(MindmapPort):
                         "fillOpacity": "1.0",
                         "fillColor": fill_color,
                         "textAlign": "center",
-                        "textAlignVertical": "middle"
+                        "textAlignVertical": "middle",
                     },
                     "position": {"x": x, "y": y},
-                    "geometry": {"width": calc_width, "height": 44}
+                    "geometry": {"width": calc_width, "height": 44},
                 }
                 res = self.session.post(f"{self.base_url}/boards/{board_id}/shapes", json=post_payload)
                 if not res.ok:
@@ -397,11 +405,12 @@ class MiroMindmapAdapter(MindmapPort):
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             from concurrent.futures import as_completed
+
             futures = [executor.submit(process_item, target) for target in target_layout]
             for i, future in enumerate(as_completed(futures)):
                 obj_id, m_id, x = future.result()
                 item_ids[obj_id] = {"id": m_id, "x": x}
-                update_progress(f"아이템 동기화 중 ({i+1}/{total_targets})...", 0.4 + (i+1)/total_targets * 0.4)
+                update_progress(f"아이템 동기화 중 ({i + 1}/{total_targets})...", 0.4 + (i + 1) / total_targets * 0.4)
 
         # 5. 삭제 (병렬 처리)
         update_progress("필요 없는 아이템 삭제 중 (병렬)...", 0.85)
@@ -444,8 +453,8 @@ class MiroMindmapAdapter(MindmapPort):
                 conn_map[(s_id, e_id)] = c["id"]
 
         # 2. 목표 커넥터 계산
-        target_conn_data = [] # list of dict for POST
-        target_conns_set = set() # for tracking
+        target_conn_data = []  # list of dict for POST
+        target_conns_set = set()  # for tracking
 
         def collect_targets(p):
             p_info = item_ids.get(id(p))
@@ -454,7 +463,7 @@ class MiroMindmapAdapter(MindmapPort):
             p_id = p_info["id"]
             p_x = p_info["x"]
 
-            for child in (p.nodes + p.stocks):
+            for child in p.nodes + p.stocks:
                 c_info = item_ids.get(id(child))
                 if c_info:
                     c_id = c_info["id"]
@@ -469,11 +478,13 @@ class MiroMindmapAdapter(MindmapPort):
                     target_conns_set.add(pair)
 
                     if pair not in conn_map:
-                        target_conn_data.append({
-                            "startItem": {"id": p_id, "snapTo": start_snap},
-                            "endItem": {"id": c_id, "snapTo": end_snap},
-                            "style": {"strokeColor": "#000000", "strokeWidth": "1.5"}
-                        })
+                        target_conn_data.append(
+                            {
+                                "startItem": {"id": p_id, "snapTo": start_snap},
+                                "endItem": {"id": c_id, "snapTo": end_snap},
+                                "style": {"strokeColor": "#000000", "strokeWidth": "1.5"},
+                            }
+                        )
 
                 if isinstance(child, Node):
                     collect_targets(child)
@@ -499,6 +510,7 @@ class MiroMindmapAdapter(MindmapPort):
         Returns:
             list[tuple]: [(obj, depth, x, y, is_stock), ...]
         """
+
         def get_leaf_count(n):
             if isinstance(n, Stock):
                 return 1
@@ -525,7 +537,7 @@ class MiroMindmapAdapter(MindmapPort):
 
             # 1. 먼저 Y 좌표와 계층 구조를 계산 (traverse)
             # 여기서는 X 좌표를 depth 기반의 '기본 X'로 임시 저장
-            node_data_list: list[dict[str, Any]] = [] # (node, depth, children_count, temp_y, temp_x, parent_idx)
+            node_data_list: list[dict[str, Any]] = []  # (node, depth, children_count, temp_y, temp_x, parent_idx)
 
             global_y = 0
 
@@ -535,14 +547,13 @@ class MiroMindmapAdapter(MindmapPort):
                 children = [] if is_stk else (node_obj.nodes + node_obj.stocks)
 
                 my_idx = len(node_data_list)
-                node_data_list.append({
-                    "obj": node_obj, "depth": depth, "is_stk": is_stk,
-                    "parent_idx": parent_idx, "children": children
-                })
+                node_data_list.append(
+                    {"obj": node_obj, "depth": depth, "is_stk": is_stk, "parent_idx": parent_idx, "children": children}
+                )
 
                 if not children:
                     my_y = global_y
-                    global_y += 55 # 리프 간 최소 간격
+                    global_y += 55  # 리프 간 최소 간격
                 else:
                     child_ys = []
                     for child in children:
@@ -557,7 +568,7 @@ class MiroMindmapAdapter(MindmapPort):
 
             for n in nodes:
                 calculate_y(n, 1, -1)
-                global_y += 100 # 루트 직계 자식 간의 간격 확대
+                global_y += 100  # 루트 직계 자식 간의 간격 확대
 
             if not node_data_list:
                 return []
@@ -595,7 +606,7 @@ class MiroMindmapAdapter(MindmapPort):
                         # 아이템이 많아질수록(y_range가 커질수록) 곡률 가중치를 동적으로 높여 평평해지는 현상 방지
                         # 기본 200px에서 시작하여 y_range의 15%를 가산 (최대 600px까지 확장)
                         curve_weight = 200 + min(400, y_range * 0.15)
-                        protrusion_dx = (1 - (norm_dist ** 2)) * curve_weight * direction_x
+                        protrusion_dx = (1 - (norm_dist**2)) * curve_weight * direction_x
 
                     my_x = px + base_dx + protrusion_dx
                     nd["x"] = my_x
@@ -613,7 +624,6 @@ class MiroMindmapAdapter(MindmapPort):
         all_layout: list[Any] = []
         all_layout.extend(left_layout)
         all_layout.extend(right_layout)
-        all_layout.append((root_node, 0, 0, 0, False)) # Root 노드
+        all_layout.append((root_node, 0, 0, 0, False))  # Root 노드
 
         return all_layout
-

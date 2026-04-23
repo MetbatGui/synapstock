@@ -6,14 +6,14 @@
 
 import logging
 
+from synapstock.application.services.analytics_service import AnalyticsService
 from synapstock.application.services.command_service import BoardCommandService
+from synapstock.application.services.market_data_service import MarketDataService
 from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
-from synapstock.application.services.market_data_service import MarketDataService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
-from synapstock.application.services.analytics_service import AnalyticsService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
     DartDisclosureAdapter,
 )
@@ -23,19 +23,20 @@ from synapstock.infrastructure.adapters.financial.excel_adapter import (
 from synapstock.infrastructure.adapters.google.google_drive_adapter import (
     GoogleDriveAdapter,
 )
+from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
+from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
 from synapstock.infrastructure.adapters.local.statistics_repo import (
+    LocalBondWithWarrantsRepository,
     LocalBonusIssueRepository,
     LocalCapitalIncreaseRepository,
     LocalCeilingRepository,
     LocalConvertibleBondRepository,
-    LocalBondWithWarrantsRepository,
     LocalStatisticsRepository,
 )
-from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
@@ -43,10 +44,10 @@ from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
 from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
-from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from synapstock.infrastructure.config import AppConfig
 
 logger = logging.getLogger(__name__)
+
 
 class Container:
     """애플리케이션 전역 의존성을 조립하고 관리하는 컨테이너 클래스."""
@@ -65,18 +66,15 @@ class Container:
         self.config.bonus_issue_dir.mkdir(parents=True, exist_ok=True)
         self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
         self.config.bw_dir.mkdir(parents=True, exist_ok=True)
+        self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
         (self.config.data_dir / "market" / "raw").mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
         self._miro_adapter = MiroMindmapAdapter(self.config.miro_token)
         self._disclosure_adapter = DartDisclosureAdapter()
-        self._financial_adapter = ExcelFinancialDataAdapter(
-            self.config.financial_dir / "financial_data.xlsx"
-        )
-        self._ticker_search_adapter = NaverTickerSearchAdapter(
-            cache_path=str(self.config.stock_cache_path)
-        )
+        self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "financial_data.xlsx")
+        self._ticker_search_adapter = NaverTickerSearchAdapter(cache_path=str(self.config.stock_cache_path))
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
         self._krx_adapter = NativeKrxAdapter()
 
@@ -100,26 +98,16 @@ class Container:
             repository=self._repo,
             ticker_search=self._ticker_search_adapter,
             disclosure=self._disclosure_adapter,
-            financial=self._financial_adapter
+            financial=self._financial_adapter,
         )
         self._command_service = BoardCommandService(repository=self._repo)
         self._media_service = StockMediaService(
-            repository=self._repo,
-            storage=self._pdf_storage,
-            pdf_dir=str(self.config.pdf_dir)
+            repository=self._repo, storage=self._pdf_storage, pdf_dir=str(self.config.pdf_dir)
         )
-        self._sync_service = BoardSyncService(
-            mindmap=self._miro_adapter,
-            ticker_search=self._ticker_search_adapter
-        )
-        self._market_data_service = MarketDataService(
-            krx_adapter=self._krx_adapter,
-            repository=self._market_data_repo
-        )
-        
-        self._analytics_service = AnalyticsService(
-            market_data_repo=self._market_data_repo
-        )
+        self._sync_service = BoardSyncService(mindmap=self._miro_adapter, ticker_search=self._ticker_search_adapter)
+        self._market_data_service = MarketDataService(krx_adapter=self._krx_adapter, repository=self._market_data_repo)
+
+        self._analytics_service = AnalyticsService(market_data_repo=self._market_data_repo)
 
         self._statistics_service = StatisticsService(
             storage=self._drive_adapter,
@@ -130,7 +118,7 @@ class Container:
             bonus_issue_repository=self._bonus_issue_repo,
             convertible_bond_repository=self._convertible_bond_repo,
             bw_repository=self._bw_repo,
-            market_data_service=self._market_data_service
+            market_data_service=self._market_data_service,
         )
 
         self._report_service = None
@@ -153,7 +141,8 @@ class Container:
                 "capital_increase": self.config.capital_increase_folder_id,
                 "bonus_issue": self.config.bonus_issue_folder_id,
                 "convertible_bond": self.config.convertible_bond_folder_id,
-                "bw": self.config.bw_folder_id
+                "bw": self.config.bw_folder_id,
+                "new_listing": self.config.new_listing_folder_id,
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
@@ -170,7 +159,7 @@ class Container:
                 cloud_storage=self._drive_adapter,
                 local_storage=self._report_storage,
                 report_folder_id=self.config.report_folder_id,
-                report_dir=str(self.config.report_dir)
+                report_dir=str(self.config.report_dir),
             )
 
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
@@ -222,6 +211,7 @@ class Container:
     @property
     def krx_adapter(self) -> NativeKrxAdapter:
         return self._krx_adapter
+
 
 # 전역 컨테이너 인스턴스 생성
 container = Container()

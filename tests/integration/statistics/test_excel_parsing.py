@@ -1,12 +1,12 @@
 import pytest
 import os
 import glob
-from synapstock.application.services.statistics_service import ExcelStatisticsParser
+from synapstock.infrastructure.parsers.excel import SupplyDemandParser
 from synapstock.domain.statistics.models import MarketType, SupplySubject
 
 def test_clean_stock_name():
     """종목명 정제 로직 테스트 ((쌍), (씽), (상) 등 제거 확인)"""
-    parser = ExcelStatisticsParser()
+    parser = SupplyDemandParser()
     assert parser._clean_stock_name("삼성전자") == "삼성전자"
     assert parser._clean_stock_name("삼성전자 (쌍)") == "삼성전자"
     assert parser._clean_stock_name("SK하이닉스(씽)") == "SK하이닉스"
@@ -25,7 +25,7 @@ def test_parse_real_daily_ranking():
     with open(file_path, "rb") as f:
         content = f.read()
         
-    parser = ExcelStatisticsParser()
+    parser = SupplyDemandParser()
     # 0407 시트 파싱 (종합 순위표 형식)
     rankings = parser.parse_summary_table(
         content=content,
@@ -49,7 +49,7 @@ def test_parse_real_daily_ranking():
 
 def test_parse_real_monthly_cumulative():
     """월간 누적 엑셀 파일 파싱 테스트."""
-    parser = ExcelStatisticsParser()
+    parser = SupplyDemandParser()
     
     # 1. 테스트용 더미 엑셀 파일 생성
     import io
@@ -113,7 +113,7 @@ def test_statistics_service_caching(tmp_path):
 
 def test_parse_high_price_type():
     """신고가 유형(high_price_type)이 정상 파싱되는지 검증하는 더미 엑셀 테스트."""
-    parser = ExcelStatisticsParser()
+    parser = SupplyDemandParser()
     import io
     import pandas as pd
     

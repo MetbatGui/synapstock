@@ -9,6 +9,7 @@ from synapstock.domain.ports import StoragePort
 
 logger = logging.getLogger(__name__)
 
+
 class ReportService:
     """리포트 관련 비즈니스 로직을 담당하는 애플리케이션 서비스.
 
@@ -21,7 +22,7 @@ class ReportService:
         cloud_storage: StoragePort,
         local_storage: StoragePort,
         report_folder_id: str,
-        report_dir: str = "data/report"
+        report_dir: str = "data/report",
     ):
         """필요한 저장소 어댑터들과 함께 ReportService를 초기화합니다.
 
@@ -156,14 +157,16 @@ class ReportService:
                     try:
                         f_stock = f_name.split("[")[1].split("]")[0]
                         if f_stock == stock_nfc:
-                            results.append(Report(
-                                filename=f_name,
-                                stock=f_stock,
-                                title=f_name,
-                                date=r["date"],
-                                provider="Unknown",
-                                url=f"/report_files/{f_name}"
-                            ))
+                            results.append(
+                                Report(
+                                    filename=f_name,
+                                    stock=f_stock,
+                                    title=f_name,
+                                    date=r["date"],
+                                    provider="Unknown",
+                                    url=f"/report_files/{f_name}",
+                                )
+                            )
                     except Exception:
                         continue
             return sorted(results, key=lambda x: x.date, reverse=True)
@@ -182,14 +185,16 @@ class ReportService:
             results = []
             for r in reports_data:
                 if unicodedata.normalize("NFC", r["stock"]) == stock_nfc:
-                    results.append(Report(
-                        filename=r["filename"],
-                        stock=r["stock"],
-                        title=r["title"],
-                        date=r["date"],
-                        provider=r["provider"],
-                        url=f"/report_files/{r['filename']}"
-                    ))
+                    results.append(
+                        Report(
+                            filename=r["filename"],
+                            stock=r["stock"],
+                            title=r["title"],
+                            date=r["date"],
+                            provider=r["provider"],
+                            url=f"/report_files/{r['filename']}",
+                        )
+                    )
             return sorted(results, key=lambda x: x.date, reverse=True)
         except Exception as e:
             logger.error(f"Error loading reports.json: {e}")
@@ -202,12 +207,14 @@ class ReportService:
         for f in files:
             filename_nfc = unicodedata.normalize("NFC", f["name"])
             if filename_nfc.lower().endswith(".pdf") and any(p in filename_nfc for p in search_patterns):
-                results.append(Report(
-                    filename=f["name"],
-                    stock=stock_nfc,
-                    title=f["name"],
-                    date="Unknown",
-                    provider="Manual",
-                    url=f"/report_files/{f['name']}"
-                ))
+                results.append(
+                    Report(
+                        filename=f["name"],
+                        stock=stock_nfc,
+                        title=f["name"],
+                        date="Unknown",
+                        provider="Manual",
+                        url=f"/report_files/{f['name']}",
+                    )
+                )
         return sorted(results, key=lambda x: x.filename, reverse=True)
