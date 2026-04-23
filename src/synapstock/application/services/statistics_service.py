@@ -88,12 +88,23 @@ class StatisticsService:
     def get_daily_ranking(self, date_str: str) -> list[DailyMarketRanking]:
         return self.ranking_svc.get_daily_ranking(date_str)
 
+    def save_rankings(self, rankings: list[DailyMarketRanking]):
+        """랭킹 데이터 리스트를 저장합니다."""
+        for r in rankings:
+            self.ranking_svc.repository.save_daily_ranking(r)
+
     def get_analyzed_ranking(self, date: str, market: Any, subject: Any) -> DailyMarketRankingAnalysis:
         return self.ranking_svc.get_analyzed_ranking(date, market, subject)
 
+    def get_daily_summary(self, date: str) -> dict:
+        return self.ranking_svc.get_daily_summary(date)
+
+    def get_monthly_ranking(self, month: str, market: Any, subject: Any) -> Any:
+        return self.ranking_svc.get_monthly_ranking(month, market, subject)
+
     # --- 상한가 분석 (Price Stats) ---
-    def get_ceiling_analysis(self, date: str) -> CeilingAnalysisReport | None:
-        return self.ceiling_svc.get_ceiling_analysis(date)
+    def get_ceiling_analysis(self, date: str, force_sync: bool = False) -> CeilingAnalysisReport | None:
+        return self.ceiling_svc.get_ceiling_analysis(date, force_sync=force_sync)
 
     def list_available_ceiling_years(self) -> list[str]:
         return self.ceiling_svc.list_available_years()
@@ -103,24 +114,24 @@ class StatisticsService:
 
     # --- 공시 분석 (Disclosure) ---
     def get_capital_increase_data(self, force_sync: bool = False, year: str = "2026") -> list:
-        items = self.disclosure_svc.get_data("capital_increase", year)
+        items = self.disclosure_svc.get_data("capital_increase", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
     def get_bonus_issue_data(self, force_sync: bool = False, year: str = "2026") -> list:
-        items = self.disclosure_svc.get_data("bonus_issue", year)
+        items = self.disclosure_svc.get_data("bonus_issue", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
     def get_convertible_bond_data(self, force_sync: bool = False, year: str = "2026") -> list:
-        items = self.disclosure_svc.get_data("cb", year)
+        items = self.disclosure_svc.get_data("cb", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
     def get_bw_data(self, force_sync: bool = False, year: str = "2026") -> list:
-        items = self.disclosure_svc.get_data("bw", year)
+        items = self.disclosure_svc.get_data("bw", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
     # --- 신규 상장 (IPO) ---
     def get_new_listing_data(self, force_sync: bool = False, year: str = "2026") -> list[NewListing]:
-        items = self.ipo_svc.get_data(year)
+        items = self.ipo_svc.get_data(year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
     # --- 동기화 명령 (Sync) ---
@@ -131,3 +142,20 @@ class StatisticsService:
     def sync_capital_increase_data(self, year: str = "2026") -> list:
         items = self.disclosure_svc.sync_data("capital_increase", year)
         return self._enrich_tickers(items)
+
+    def sync_recent_data(self, limit: int = 5) -> int:
+        """최근 랭킹 데이터를 동기화합니다."""
+        # RankingService.sync_data는 단일 날짜 또는 최신 날짜 동기화이므로 
+        # 여러 날짜를 하려면 별도 루프 필요할 수 있음. 
+        # 여기서는 단순 위임 또는 최근 N일치 처리 로직 구현.
+        # 기존 router는 count를 기대함.
+        res = self.ranking_svc.sync_data()
+        return len(res) if res else 0
+
+    def list_available_dates(self, market: Any, subject: Any) -> list[str]:
+        return self.ranking_svc.repository.list_available_dates(market, subject)
+
+    @property
+    def _repository(self):
+        """하위 호환성을 위해 랭킹 레포지토리를 반환합니다."""
+        return self.ranking_svc.repository

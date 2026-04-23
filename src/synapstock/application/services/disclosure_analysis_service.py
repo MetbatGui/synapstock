@@ -15,8 +15,11 @@ class DisclosureAnalysisService(BaseStatisticsService):
     def get_service_name(self) -> str:
         return "DisclosureAnalysisService"
 
-    def get_data(self, dataType: str, year: str) -> list:
+    def get_data(self, dataType: str, year: str, force_sync: bool = False) -> list:
         """데이터 타입별 조회를 처리합니다."""
+        if force_sync:
+            return self.sync_data(dataType, year)
+
         fetcher = {
             "capital_increase": getattr(self.repository, "get_capital_increase_data", lambda x: []),
             "bonus_issue": getattr(self.repository, "get_bonus_issue_data", lambda x: []),

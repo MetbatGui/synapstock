@@ -16,8 +16,11 @@ class NewListingService(BaseStatisticsService[NewListing]):
     def get_service_name(self) -> str:
         return "NewListingService"
 
-    def get_data(self, year: str) -> list[NewListing]:
-        """로컬에서 데이터를 조회하고, 없으면 클라우드와 수동 동기화를 시도합니다."""
+    def get_data(self, year: str, force_sync: bool = False) -> list[NewListing]:
+        """로컬에서 데이터를 조회하고, 없거나 force_sync=True이면 클라우드와 수동 동기화를 시도합니다."""
+        if force_sync:
+            return self.sync_data(year)
+
         # 신규 상장은 특정 연도 조회가 아닌 전체 또는 연도별 저장을 지원할 수 있음
         # 레포지토리 인터페이스에 맞춰 호출
         if hasattr(self.repository, "get_new_listings"):
