@@ -3,43 +3,64 @@ from synapstock.infrastructure.container import container
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.domain.statistics.models import CeilingAnalysisReport
 
-def test_get_ceiling_analysis_service_integration():
-    """StatisticsService를 통해 상한가 분석 데이터를 온디맨드로 가져오는 통합 테스트."""
-    
-    # 1. 서비스 획득
-    service = container.statistics_service
+def test_ceiling_service_full_workflow_integration():
+    """상한가 분석 서비스의 전체 워크플로우(목록 조회 -> 동기화 -> 로컬 캐시) 통합 테스트."""
+    # 1. 서비스 획득 (StatisticsService를 통한 접근)
+    ceiling_svc = container.statistics_service.ceiling_svc
     repo = container.ceiling_repo
     
-    # 테스트 날짜 (4월 중 하루)
-    test_date = "2026-04-10"
+    # 2. 가용 연도 목록 조회
+    years = ceiling_svc.list_available_years()
+    assert len(years) > 0
+    print(f"\n[Test Result] 가용 연도: {years}")
     
-    # 2. 기존 캐시가 있다면 삭제 (깨끗한 테스트를 위해)
-    # 실제 환경에서는 삭제하지 않으나 테스트 목적상 강제 동기화 흐름 확인용
+    # 3. 최신 연도의 가용 날짜 목록 조회
+    latest_year = years[0]
+    dates = ceiling_svc.list_available_dates(latest_year)
+    assert len(dates) > 0
+    print(f"[Test Result] {latest_year}년 가용 날짜 수: {len(dates)}")
+    
+    # 4. 최신 날짜로 실제 리포트 가져오기 (동기화 및 파싱 검증)
+    test_date = dates[0]
+    
+    # 깨끗한 테스트를 위해 기존 캐시 잠시 제거 (선택적)
     import os
     json_path = repo.root / f"ceiling_{test_date}.json"
     if json_path.exists():
         os.remove(json_path)
-    
-    # 3. 서비스 호출 (최초 호출 - 드라이브 접속 및 파싱 발생)
-    report = service.get_ceiling_analysis(test_date)
+        
+    report = ceiling_svc.get_ceiling_analysis(test_date)
     
     assert report is not None
     assert report.end_date == test_date
     assert len(report.items) > 0
     assert json_path.exists(), "결과가 로컬 캐시(JSON)로 저장되어야 합니다."
     
-    # 4. 두 번째 호출 (캐시 히트 확인)
-    # 드라이브 어댑터를 일시적으로 None으로 설정해도 캐시에서 가져와야 함
-    original_storage = service._storage
-    service._storage = None
-    try:
-        cached_report = service.get_ceiling_analysis(test_date)
-        assert cached_report is not None
-        assert cached_report.title == report.title
-        print(f"\n[Test Result] 캐시 히트 성공: {cached_report.title}")
-    finally:
-        service._storage = original_storage
-    
+    print(f"[Test Result] 리포트 조회 성공: {report.title}")
     print(f"기간: {report.start_date} ~ {report.end_date}")
     print(f"항목 수: {len(report.items)}")
-    print(f"샘플 항목: {report.items[0].name}")
+    if report.items:
+        print(f"샘플 항목: {report.items[0].name} ({report.items[0].entry_tag})")
+
+def test_ceiling_cache_hit_integration():
+    """드라이브 연결 없이 로컬 캐시에서 데이터를 정상적으로 가져오는지 확인."""
+    ceiling_svc = container.statistics_service.ceiling_svc
+    
+    # 1. 캐시된 날짜 확인
+    dates = ceiling_svc.list_available_dates("2026")
+    if not dates:
+        pytest.skip("테스트를 위한 캐시 데이터가 없습니다.")
+    
+    test_date = dates[0]
+    
+    # 2. 드라이브 어댑터를 일시적으로 제거하여 캐시 히트 강제 확인
+    original_adapter = ceiling_svc.drive_adapter
+    ceiling_svc.drive_adapter = None
+    
+    try:
+        report = ceiling_svc.get_ceiling_analysis(test_date)
+        assert report is not None
+        assert report.end_date == test_date
+        print(f"\n[Test Result] 캐시 히트 성공: {test_date}")
+    finally:
+        ceiling_svc.drive_adapter = original_adapter
