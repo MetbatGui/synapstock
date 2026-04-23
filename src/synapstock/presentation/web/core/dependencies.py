@@ -19,6 +19,7 @@ sync_service = container.sync_service
 report_service = container.report_service
 drive_adapter = container.drive_adapter
 news_scraper_adapter = container.news_scraper
+news_service = container.news_service
 statistics_service = container.statistics_service
 
 

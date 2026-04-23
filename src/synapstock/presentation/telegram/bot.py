@@ -74,6 +74,7 @@ def main() -> None:
     application.bot_data["media_service"] = container.media_service
     application.bot_data["sync_service"] = container.sync_service
     application.bot_data["news_scraper"] = container.news_scraper
+    application.bot_data["news_service"] = container.news_service
 
     # 4. 기본 핸들러(라우팅) 등록
     application.add_handler(CommandHandler("start", start_command))
