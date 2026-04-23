@@ -67,6 +67,7 @@ class Container:
         self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
         self.config.bw_dir.mkdir(parents=True, exist_ok=True)
         self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
+        self.config.news_dir.mkdir(parents=True, exist_ok=True)
         (self.config.data_dir / "market" / "raw").mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
@@ -88,6 +89,9 @@ class Container:
         self._convertible_bond_repo = LocalConvertibleBondRepository(self.config.convertible_bond_dir)
         self._bw_repo = LocalBondWithWarrantsRepository(self.config.bw_dir)
         self._market_data_repo = LocalMarketDataRepository(self.config.data_dir / "market" / "raw")
+        
+        from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
+        self._news_repo = LocalNewsRepository(self.config.news_dir)
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -101,8 +105,20 @@ class Container:
             financial=self._financial_adapter,
         )
         self._command_service = BoardCommandService(repository=self._repo)
+        
+        from synapstock.application.services.news_service import NewsService
+        self._news_service = NewsService(
+            repository=self._news_repo,
+            scraper=self._news_scraper_adapter,
+            drive_adapter=self._drive_adapter,
+            news_folder_id=self.config.news_folder_id
+        )
+
         self._media_service = StockMediaService(
-            repository=self._repo, storage=self._pdf_storage, pdf_dir=str(self.config.pdf_dir)
+            repository=self._repo, 
+            storage=self._pdf_storage, 
+            news_service=self._news_service,
+            pdf_dir=str(self.config.pdf_dir)
         )
         self._sync_service = BoardSyncService(mindmap=self._miro_adapter, ticker_search=self._ticker_search_adapter)
         self._market_data_service = MarketDataService(krx_adapter=self._krx_adapter, repository=self._market_data_repo)
@@ -143,6 +159,7 @@ class Container:
                 "convertible_bond": self.config.convertible_bond_folder_id,
                 "bw": self.config.bw_folder_id,
                 "new_listing": self.config.new_listing_folder_id,
+                "news": self.config.news_folder_id,
             }
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
@@ -211,6 +228,10 @@ class Container:
     @property
     def krx_adapter(self) -> NativeKrxAdapter:
         return self._krx_adapter
+        
+    @property
+    def news_service(self) -> "NewsService":
+        return self._news_service
 
 
 # 전역 컨테이너 인스턴스 생성
