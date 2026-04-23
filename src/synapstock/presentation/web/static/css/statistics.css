@@ -333,6 +333,45 @@
 .tag-ceiling { background: linear-gradient(135deg, #ef4444, #991b1b); color: white; }
 .tag-newhigh { background: linear-gradient(135deg, #fbbf24, #b45309); color: white; }
 
-.col-price-cell { text-align: center; font-weight: 600; padding: 12px 4px; border-left: 1px solid rgba(255, 255, 255, 0.03); min-width: 82px; }
-.col-price-cell.is-ceiling { background: rgba(239, 68, 68, 0.12) !important; color: #ff4d4d; }
-.col-price-cell.is-floor { background: rgba(59, 130, 246, 0.12) !important; color: #4da6ff; }
+.col-price-cell { 
+    text-align: center; 
+    font-weight: 600; 
+    padding: 12px 4px; 
+    border-left: 1px solid rgba(255, 255, 255, 0.03); 
+    min-width: 82px;
+    position: relative;
+    font-size: 0.95rem;
+}
+
+.col-price-cell.p-up { color: #f87171; }
+.col-price-cell.p-down { color: #60a5fa; }
+.col-price-cell.p-none { color: #9ca3af; opacity: 0.7; }
+
+.col-price-cell.is-ceiling { background: rgba(239, 68, 68, 0.1) !important; color: #ff4d4d !important; }
+.col-price-cell.is-floor { background: rgba(59, 130, 246, 0.1) !important; color: #4da6ff !important; }
+.col-price-cell.is-stopped { color: #6b7280 !important; }
+
+/* Badges inside cells */
+.ceiling-badge, .floor-badge, .stop-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: 800;
+    line-height: 1;
+    margin-left: 4px;
+    vertical-align: middle;
+    transform: translateY(-1px);
+}
+
+.ceiling-badge { background: #ef4444; color: white; box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+.floor-badge { background: #3b82f6; color: white; }
+.stop-badge { background: #6b7280; color: white; }
+
+/* Table specific */
+.ceiling-table th.col-date {
+    text-align: center !important;
+    background: rgba(255, 255, 255, 0.02);
+}

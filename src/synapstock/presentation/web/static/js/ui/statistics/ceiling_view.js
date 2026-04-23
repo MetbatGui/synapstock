@@ -221,12 +221,10 @@ export const ceilingView = {
         const todayStr = new Date().toISOString().split('T')[0];
         
         const headerDatesHtml = tradingDates.map(d => {
-            // "MM-DD" 형식을 "YYYY-MM-DD"로 추정하여 미래 날짜 판단
-            // (report.start_date의 연도를 활용)
             const year = report.start_date.substring(0, 4);
             const fullDate = `${year}-${d}`;
             const isFuture = fullDate > todayStr;
-            return `<th class="col-date">${isFuture ? '' : d}</th>`;
+            return `<th class="col-date" style="text-align: center;">${isFuture ? '' : d}</th>`;
         }).join('');
 
         let html = `
@@ -278,7 +276,7 @@ export const ceilingView = {
                         const prev = item.closing_prices[i-1];
                         if (prev > 0) {
                             const dailyRate = ((p - prev) / prev) * 100;
-                            diffClass = p > prev ? 'p-up' : (p < prev ? 'p-down' : '');
+                            diffClass = p > prev ? 'p-up' : (p < prev ? 'p-down' : 'p-none');
                             
                             if (dailyRate >= 29.8) {
                                 cellClass += ' is-ceiling';
