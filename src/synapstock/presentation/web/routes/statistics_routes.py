@@ -94,10 +94,8 @@ async def get_available_dates(
         if not statistics_service:
             return []
 
-        # StatisticsService에 repo 접근용 헬퍼가 없으면 직접 repo 호출 유도 (또는 서비스에 추가)
-        # 여기서는 서비스에 위임하는 것이 좋음
-        if hasattr(statistics_service, "_repository") and statistics_service._repository:
-            return statistics_service._repository.list_available_dates(market, subject)
+        if hasattr(statistics_service, "list_available_dates"):
+            return statistics_service.list_available_dates(market, subject)
         return []
     except Exception as e:
         logger.error(f"Error in get_available_dates: {e}")
