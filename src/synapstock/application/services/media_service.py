@@ -8,10 +8,11 @@ from synapstock.domain.ports import BoardRepositoryPort, StoragePort
 class StockMediaService:
     """종목에 종속된 외부 미디어 리소스(PDF, 뉴스 URL)를 관리하는 서비스 클래스입니다. (UseCase - Media)"""
 
-    def __init__(self, repository: BoardRepositoryPort, storage: StoragePort, pdf_dir: str = "data/pdf") -> None:
+    def __init__(self, repository: BoardRepositoryPort, storage: StoragePort, news_service: "NewsService" = None, pdf_dir: str = "data/pdf") -> None:
         """필요한 어댑터들로 서비스를 초기화합니다."""
         self._repository = repository
         self._storage = storage
+        self._news_service = news_service
         self._pdf_dir = pdf_dir
 
     def add_stock_report(self, board_name: str, ticker: str, file_content: bytes, filename: str) -> bool:
@@ -37,7 +38,7 @@ class StockMediaService:
             self._repository.save(board)
         return success
 
-    def add_stock_news(self, board_name: str, ticker: str, title: str, date: str, url: str) -> bool:
+    def add_stock_news(self, board_name: str, ticker: str, title: str, date: str, url: str, stock_name: str = "") -> bool:
         """종목에 뉴스 링크 정보를 추가합니다."""
         board = self._repository.load(board_name)
         news_entry = {"title": title, "date": date, "url": url}
@@ -45,6 +46,21 @@ class StockMediaService:
         success = cast(bool, board.root.find_and_add_news(ticker, news_entry))
         if success:
             self._repository.save(board)
+            
+            # 중앙 뉴스 아카이브(구글 드라이브 포함)에 기록
+            if self._news_service:
+                if not stock_name:
+                    found = board.root.find_node(ticker)
+                    if found:
+                        stock_name = found.name
+                
+                # 저장일 기준으로 아카이브에 기록 (비동기가 아닌 동기 호출)
+                self._news_service.save_news(
+                    title=title,
+                    url=url,
+                    ticker=ticker,
+                    stock_name=stock_name
+                )
         return success
 
     def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
