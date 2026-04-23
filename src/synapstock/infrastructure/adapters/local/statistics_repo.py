@@ -59,6 +59,16 @@ class LocalStatisticsRepository:
         # 파일명에서 날짜 부분만 추출 (YYYY-MM-DD)
         return sorted([f.name.split("_")[0] for f in files], reverse=True)
 
+    def get_rankings(self, date: str) -> list[DailyMarketRanking]:
+        """특정 날짜의 모든 시장/주체별 순위 리스트를 가져온다."""
+        results = []
+        for market in MarketType:
+            for subject in SupplySubject:
+                res = self.load_ranking(date, market, subject)
+                if res:
+                    results.append(res)
+        return results
+
 
 class LocalCeilingRepository:
     """상한가 분석 데이터를 로컬 JSON 파일로 관리하는 저장소."""
@@ -66,10 +76,35 @@ class LocalCeilingRepository:
     def __init__(self, data_root: str = "data/statistics/ceiling"):
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self.metadata_path = self.root / "metadata.json"
 
-    def save_report(self, report: CeilingAnalysisReport):
-        """상한가 분석 리포트 전체를 저장한다."""
-        # 파일명 형식: ceiling_2026-01-15.json
+    def save_metadata(self, metadata: dict):
+        """동기화 메타데이터를 저장한다."""
+        import json
+        with open(self.metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    def load_metadata(self) -> dict:
+        """동기화 메타데이터를 불러온다."""
+        import json
+        if not self.metadata_path.exists():
+            return {"last_synced_at": "1970-01-01T00:00:00Z", "latest_data_date": ""}
+        try:
+            with open(self.metadata_path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {"last_synced_at": "1970-01-01T00:00:00Z", "latest_data_date": ""}
+
+    def save_report(self, report: CeilingAnalysisReport | list[CeilingAnalysisReport]):
+        """상한가 분석 리포트(들)를 저장한다."""
+        if isinstance(report, list):
+            for r in report:
+                self._save_single_report(r)
+        else:
+            self._save_single_report(report)
+
+    def _save_single_report(self, report: CeilingAnalysisReport):
+        """단일 리포트를 파일로 저장한다."""
         filename = f"ceiling_{report.end_date}.json"
         path = self.root / filename
         with open(path, "w", encoding="utf-8") as f:

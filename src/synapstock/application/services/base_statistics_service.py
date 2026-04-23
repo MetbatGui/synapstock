@@ -26,7 +26,8 @@ class BaseStatisticsService(ABC, Generic[T]):
         filename_pattern: str | None = None, 
         parser_func: Any = None,
         save_func: Any = None,
-        folder_name: str | None = None
+        folder_name: str | None = None,
+        **kwargs
     ) -> list[T]:
         """도메인 데이터를 클라우드에서 동기화하는 공통 워크플로우 (유연한 필터링 적용)."""
         try:
@@ -77,11 +78,15 @@ class BaseStatisticsService(ABC, Generic[T]):
                 return []
 
             # 4. 파싱 및 저장
-            items = parser_func(content)
-            save_func(items)
+            result = parser_func(content, **kwargs)
+            save_func(result)
             
-            logger.info(f"[{self.get_service_name()}] {latest_file['name']} 동기화 완료: {len(items)}건")
-            return items
+            # 결과가 리스트가 아닌 단일 객체일 경우 처리
+            is_list = isinstance(result, list)
+            items_count = len(result) if is_list else 1
+            
+            logger.info(f"[{self.get_service_name()}] {latest_file['name']} 동기화 완료: {items_count}건")
+            return result if is_list else [result]
         except Exception as e:
             logger.error(f"[{self.get_service_name()}] 동기화 중 오류 발생: {e}", exc_info=True)
             return []
