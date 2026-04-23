@@ -155,27 +155,27 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # 1. 메시지 임시 전송 (처리 지연 안내)
     progress_msg = await update.message.reply_text("🔍 뉴스 메타데이터(제목/날짜)를 추출 중입니다...")
 
-    # 2. 실제 URL 스크래핑 시도
-    news_scraper = context.bot_data["news_scraper"]
+    # 2. 뉴스 서비스 및 스크래퍼를 통한 데이터 추출
+    news_service = context.bot_data["news_service"]
     try:
-        scraped = await news_scraper.scrape(news_url)
-        if scraped and scraped.title:
-            title = scraped.title
-            doc_date = scraped.date
-        else:
-            await update.message.reply_text(
-                "⚠️ 보안상의 이유로 해당 뉴스 사이트의 접근을 차단했습니다.\n\n정상적인 뉴스 링크를 다시 입력해주세요."
-            )
+        # 뉴스 스크래핑 수행
+        scraped = await news_service.scraper.scrape(news_url)
+        if not scraped or not scraped.title:
+            await progress_msg.edit_text("⚠️ 해당 뉴스 링크에서 정보를 추출할 수 없습니다. 다른 링크를 시도해주세요.")
             return WAITING_FOR_NEWS_URL
+        
+        title = scraped.title
+        doc_date = scraped.date # 보드 저장용 (발행일 유지)
     except Exception as e:
         logger.error(f"스크래핑 에러: {e}")
-        await progress_msg.edit_text("❌ 링크를 분석하는 도중 서버 오류가 발생했습니다. 다시 입력해주세요.")
+        await progress_msg.edit_text("❌ 뉴스 분석 중 오류가 발생했습니다. 다시 입력해주세요.")
         return WAITING_FOR_NEWS_URL
 
-    # 3. MediaService 연동하여 뉴스 추가
+    # 3. MediaService 연동하여 뉴스 추가 (보드 업데이트 + 구글 드라이브 아카이브)
     media_service = context.bot_data["media_service"]
     success = False
     try:
+        # MediaService 내부에서 NewsService.save_news를 호출하여 드라이브 동기화까지 수행됨
         success = await asyncio.to_thread(
             media_service.add_stock_news,
             board_name=target_board,
@@ -183,30 +183,29 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             title=title,
             date=doc_date,
             url=news_url,
+            stock_name=target_name
         )
     except Exception as e:
         logger.error(f"주식 뉴스 저장 에러: {e}")
 
     # 4. 결과 응답
     if success:
-        # 기존 progress_msg를 업데이트
-        await progress_msg.edit_text("🔍 뉴스 메타데이터 추출 및 저장 중... 완료!")
-        # 사용자에게 새로운 메시지로 메인 키보드를 포함해 발송
+        await progress_msg.edit_text("✅ 뉴스 메타데이터 추출 및 구글 드라이브 아카이브 완료!")
         if update.message:
             await update.message.reply_text(
                 f"🎉 <b>{target_name}</b>에 뉴스가 성공적으로 저장되었습니다!\n\n"
                 f"📌 <b>제목</b>: {title}\n"
-                f"📅 <b>날짜</b>: {doc_date}\n"
-                f"🔗 <b>링크</b>: {news_url}\n\n"
+                f"📅 <b>저장일</b>: {datetime.now().strftime('%Y-%m-%d')}\n"
+                f"🔗 <a href='{news_url}'>기사 원문 보기</a>\n\n"
                 f"다른 뉴스를 추가하시려면 언제든 버튼을 눌러주세요.",
                 parse_mode="HTML",
                 reply_markup=get_main_keyboard(),
             )
     else:
-        await progress_msg.edit_text("🔍 뉴스 메타데이터 추출 및 저장 중... 에러 발생")
+        await progress_msg.edit_text("❌ 뉴스 저장 중 에러가 발생했습니다.")
         if update.message:
             await update.message.reply_text(
-                f"❌ 알 수 없는 에러가 발생하여 뉴스 저장에 실패했습니다. (티커: {target_ticker})",
+                f"알 수 없는 이유로 뉴스 저장에 실패했습니다. (티커: {target_ticker})",
                 reply_markup=get_main_keyboard(),
             )
 
