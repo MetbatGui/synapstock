@@ -12,10 +12,15 @@ def mock_storage():
     return MagicMock()
 
 @pytest.fixture
-def service(mock_repo, mock_storage):
+def mock_news_service():
+    return MagicMock()
+
+@pytest.fixture
+def service(mock_repo, mock_storage, mock_news_service):
     return StockMediaService(
         repository=mock_repo,
         storage=mock_storage,
+        news_service=mock_news_service,
         pdf_dir="data/pdf"
     )
 
@@ -37,16 +42,24 @@ class TestStockMediaService:
         mock_storage.put_file.assert_called_once()
         mock_repo.save.assert_called_once()
 
-    def test_add_stock_news_success(self, service, mock_repo):
-        """뉴스 정보를 보드 데이터에 추가해야 한다."""
+    def test_add_stock_news_success(self, service, mock_repo, mock_news_service):
+        """뉴스 정보를 보드 데이터에 추가하고 중앙 아카이브에도 저장해야 한다."""
         root = Node(name="Root", depth=0)
         root.stocks.append(Stock(name="삼성전자", ticker="005930"))
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
         
-        success = service.add_stock_news("테스트", "005930", "기사제목", "2024-01-01", "http://news/1")
+        success = service.add_stock_news("테스트", "005930", "기사제목", "2024-01-01", "http://news/1", stock_name="삼성전자")
         
         assert success is True
         assert len(root.stocks[0].news) == 1
         assert root.stocks[0].news[0]["title"] == "기사제목"
         mock_repo.save.assert_called_once()
+        
+        # NewsService 호출 확인
+        mock_news_service.save_news.assert_called_once_with(
+            title="기사제목",
+            url="http://news/1",
+            ticker="005930",
+            stock_name="삼성전자"
+        )
