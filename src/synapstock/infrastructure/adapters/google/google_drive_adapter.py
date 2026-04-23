@@ -11,7 +11,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_exception_type
 
 from synapstock.domain.ports import StoragePort
 
@@ -82,7 +82,11 @@ class GoogleDriveAdapter(StoragePort):
             logger.error("[GoogleDrive] 인증 실패", exc_info=True)
             raise RuntimeError(f"Google Drive 인증 실패: {e}")
 
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, max=10), 
+        stop=stop_after_attempt(3),
+        retry=retry_if_not_exception_type(ValueError)
+    )
     def _get_or_create_folder(self, folder_name: str, parent_id: str = "root") -> str:
         """폴더를 찾거나 생성합니다."""
         query = (
@@ -103,7 +107,11 @@ class GoogleDriveAdapter(StoragePort):
             file = self.drive_service.files().create(body=file_metadata, fields="id").execute()
             return cast(str, file.get("id", ""))
 
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, max=10), 
+        stop=stop_after_attempt(3),
+        retry=retry_if_not_exception_type(ValueError)
+    )
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
         """경로에 해당하는 파일/폴더의 ID를 찾습니다."""
         parts = path.strip("/").split("/")
@@ -195,7 +203,11 @@ class GoogleDriveAdapter(StoragePort):
             logger.error(f"[GoogleDrive] 파일 업로드 실패 ({path}): {e}")
             return False
 
-    @retry(wait=wait_exponential(multiplier=1, max=10), stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, max=10), 
+        stop=stop_after_attempt(3),
+        retry=retry_if_not_exception_type(ValueError)
+    )
     def _upload_file(
         self, data: io.BytesIO, path: str, mime_type: str, folder: str | None = None, root_id: str | None = None
     ):
@@ -235,18 +247,35 @@ class GoogleDriveAdapter(StoragePort):
             query = f"'{folder_id}' in parents and trashed = false"
             results = (
                 self.drive_service.files()
-                .list(q=query, fields="files(id, name, mimeType, size, createdTime)", pageSize=1000)
+                .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
                 .execute()
             )
 
             files = results.get("files", [])
             logger.info(f"[GoogleDrive] 폴더 내 파일 조회 성공: {len(files)}개 발견")
-            for f in files[:5]:
-                logger.info(f"  - 파일: {f['name']} (ID: {f['id']})")
             return cast(list[dict], files)
         except Exception as e:
             logger.error(f"[GoogleDrive] 리스트 조회 실패 ({folder_path}): {e}")
             return []
+
+    def list_files(self, folder: str) -> list[dict]:
+        """등록된 폴더 키워드를 사용하여 파일 목록을 조회합니다."""
+        return self.list_files_in_folder("", folder=folder)
+
+    def get_file_by_id(self, file_id: str) -> bytes | None:
+        """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다."""
+        try:
+            request = self.drive_service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            fh.seek(0)
+            return fh.read()
+        except Exception as e:
+            logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
+            return None
 
     def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
