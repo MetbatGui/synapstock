@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from synapstock.domain.models import Board, Node, Stock
 
-
 # ── 픽스처 ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture
@@ -115,9 +114,9 @@ class TestBoard:
         """
         board = Board(name="테마보드")
         sector = board.root.add_child("섹터A")
-        
+
         found = board.find_node("섹터A")
-        
+
         assert found is sector
 
     def test_board_add_node(self):
@@ -133,14 +132,14 @@ class TestBoard:
         """
         board = Board(name="IT")
         board.root.add_child("인터넷")
-        
+
         # 1. New node
         success = board.add_node("인터넷", "포털")
         internet = board.find_node("인터넷")
         assert success is True
         assert len(internet.nodes) == 1
         assert internet.nodes[0].name == "포털"
-        
+
         # 2. Duplicate
         success_dup = board.add_node("인터넷", "포털")
         assert success_dup is True
@@ -160,10 +159,10 @@ class TestBoard:
         sector = board.root.add_child("SectorA")
         sub = sector.add_child("SubSector1")
         sub.add_stock(Stock(name="Stock1", ticker="S1"))
-        
+
         # Act
         success = board.delete_node("SubSector1")
-        
+
         # Assert
         assert success is True
         assert board.find_node("SubSector1") is None
@@ -180,9 +179,9 @@ class TestBoard:
             삭제 결과가 False이며 루트 노드가 여전히 존재하는지 확인한다.
         """
         board = Board(name="IT")
-        
+
         success = board.delete_node("IT")
-        
+
         assert success is False
         assert board.root is not None
         assert board.root.name == "IT"

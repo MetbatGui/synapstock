@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from synapstock.application.services.query_service import BoardQueryService
-from synapstock.domain.models import Board, Node, Stock
+from synapstock.domain.models import Board, Stock
+
 
 @pytest.fixture
 def mock_repo():
@@ -24,9 +27,9 @@ class TestBoardQueryService:
     def test_list_boards(self, service, mock_repo):
         """보드 목록을 정상적으로 조회해야 한다."""
         mock_repo.list_boards.return_value = ["theme_a", "theme_b"]
-        
+
         boards = service.list_boards()
-        
+
         assert boards == ["theme_a", "theme_b"]
         mock_repo.list_boards.assert_called_once()
 
@@ -34,9 +37,9 @@ class TestBoardQueryService:
         """이름으로 보드를 로드해야 한다."""
         mock_board = Board(name="테스트")
         mock_repo.load.return_value = mock_board
-        
+
         board = service.load_board("theme_a")
-        
+
         assert board.name == "테스트"
         mock_repo.load.assert_called_with("theme_a")
 
@@ -44,18 +47,18 @@ class TestBoardQueryService:
         """보드 요약 정보를 조회해야 한다."""
         mock_repo.list_boards.return_value = ["theme_a"]
         mock_repo.load.return_value = Board(name="실제이름")
-        
+
         info = service.get_boards_info()
-        
+
         assert len(info) == 1
         assert info[0] == {"id": "theme_a", "name": "실제이름"}
 
     def test_search_ticker(self, service, mock_ticker_search):
         """티커 검색을 대행해야 한다."""
         mock_ticker_search.search.return_value = [{"name": "삼성전자", "ticker": "005930"}]
-        
+
         results = service.search_ticker("삼성")
-        
+
         assert len(results) == 1
         assert results[0]["ticker"] == "005930"
         mock_ticker_search.search.assert_called_with("삼성")
@@ -64,20 +67,20 @@ class TestBoardQueryService:
         """여러 보드를 순회하여 티커로 종목을 찾아야 한다."""
         # Arrange
         mock_repo.list_boards.return_value = ["theme_pc", "theme_mobile"]
-        
+
         # 보드 1: PC (삼성전자 없음)
         board_pc = Board(name="PC")
-        
+
         # 보드 2: Mobile (삼성전자 있음)
         board_mobile = Board(name="Mobile")
         samsung = Stock(name="삼성전자", ticker="005930")
         board_mobile.root.stocks.append(samsung)
-        
+
         mock_repo.load.side_effect = [board_pc, board_mobile]
-        
+
         # Act
         result = service.get_stock_by_ticker("005930")
-        
+
         # Assert
         assert result is not None
         stock, b_name, path = result
@@ -92,10 +95,10 @@ class TestBoardQueryService:
         board = Board(name="반도체")
         board.root.add_child("메모리").stocks.append(Stock(name="SK하이닉스", ticker="000660"))
         mock_repo.load.return_value = board
-        
+
         # Act
         flat_list = service.get_all_stocks_flat()
-        
+
         # Assert
         assert len(flat_list) == 1
         assert flat_list[0]["name"] == "SK하이닉스"
@@ -109,10 +112,10 @@ class TestBoardQueryService:
         board = Board(name="반도체")
         board.root.add_child("파운드리").stocks.append(Stock(name="삼성전자", ticker="005930"))
         mock_repo.load.return_value = board
-        
+
         # Act
         results = service.find_stocks_by_name("삼성")
-        
+
         # Assert
         assert len(results) == 1
         assert results[0]["name"] == "삼성전자"
@@ -128,10 +131,10 @@ class TestBoardQueryService:
         stock = Stock(name="LIG디펜스앤에어로스페이스", ticker="079550", aliases=["LIG넥스원"])
         board.root.add_child("미사일").stocks.append(stock)
         mock_repo.load.return_value = board
-        
+
         # Act: 구 사명으로 검색
         results = service.find_stocks_by_name("넥스원")
-        
+
         # Assert
         assert len(results) == 1
         assert results[0]["name"] == "LIG디펜스앤에어로스페이스"

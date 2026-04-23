@@ -1,13 +1,16 @@
 import logging
 from typing import Any, cast
-from synapstock.domain.statistics.models import (
-    DailyMarketRanking, DailyMarketRankingAnalysis, 
-    CeilingAnalysisReport, NewListing
-)
-from synapstock.application.services.ranking_service import RankingService
+
 from synapstock.application.services.ceiling_analysis_service import CeilingAnalysisService
 from synapstock.application.services.disclosure_analysis_service import DisclosureAnalysisService
 from synapstock.application.services.new_listing_service import NewListingService
+from synapstock.application.services.ranking_service import RankingService
+from synapstock.domain.statistics.models import (
+    CeilingAnalysisReport,
+    DailyMarketRanking,
+    DailyMarketRankingAnalysis,
+    NewListing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +34,12 @@ class StatisticsService:
     ):
         self._storage = storage
         self._query_service = query_service
-        
+
         # 도메인 서비스 초기화 및 의존성 주입
         self.ranking_svc = RankingService(storage, "", repository)
         self.ceiling_svc = CeilingAnalysisService(storage, "", ceiling_repository)
         self.ipo_svc = NewListingService(storage, "", repository) # IPO는 기본 레포지토리 공유 혹은 별도 지정
-        
+
         # 공시 서비스는 복합 레포지토리가 필요하므로 Facade에서 조율하거나 래퍼 전달
         # DisclosureAnalysisService 내부에서 repository들을 타입별로 처리할 수 있도록 래퍼 또는 직접 매핑 필요
         class MultiRepoWrapper:
@@ -49,7 +52,7 @@ class StatisticsService:
                 self.save_convertible_bond_data = cb.save_data if cb else lambda x: None
                 self.get_bw_data = bw.load_data if bw else lambda x: []
                 self.save_bw_data = bw.save_data if bw else lambda x: None
-                
+
         disclosure_repo = MultiRepoWrapper(
             capital_increase_repository, bonus_issue_repository,
             convertible_bond_repository, bw_repository
@@ -145,8 +148,8 @@ class StatisticsService:
 
     def sync_recent_data(self, limit: int = 5) -> int:
         """최근 랭킹 데이터를 동기화합니다."""
-        # RankingService.sync_data는 단일 날짜 또는 최신 날짜 동기화이므로 
-        # 여러 날짜를 하려면 별도 루프 필요할 수 있음. 
+        # RankingService.sync_data는 단일 날짜 또는 최신 날짜 동기화이므로
+        # 여러 날짜를 하려면 별도 루프 필요할 수 있음.
         # 여기서는 단순 위임 또는 최근 N일치 처리 로직 구현.
         # 기존 router는 count를 기대함.
         res = self.ranking_svc.sync_data()

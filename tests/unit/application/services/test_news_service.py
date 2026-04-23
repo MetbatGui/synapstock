@@ -1,10 +1,13 @@
-import pytest
 import hashlib
-from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from synapstock.application.services.news_service import NewsService
-from synapstock.domain.news.models import NewsBatch, NewsItem
 from synapstock.domain.models import ScrapedNews
+from synapstock.domain.news.models import NewsBatch, NewsItem
+
 
 @pytest.fixture
 def mock_repo():
@@ -32,18 +35,18 @@ class TestNewsService:
         """뉴스 저장 시 로컬 저장소와 구글 드라이브 동기화가 호출되어야 한다."""
         mock_repo.load_batch.return_value = None # 신규 배치 생성 상황
         mock_repo.save_batch.return_value = True
-        
+
         item = news_service.save_news(
             title="테스트 뉴스",
             url="http://example.com/1",
             ticker="005930",
             stock_name="삼성전자"
         )
-        
+
         assert item is not None
         assert item.title == "테스트 뉴스"
         assert item.ticker == "005930"
-        
+
         # 로컬 저장 확인
         mock_repo.save_batch.assert_called_once()
         # 구글 드라이브 동기화 확인
@@ -61,12 +64,12 @@ class TestNewsService:
             collected_at=datetime.now()
         )
         mock_repo.load_batch.return_value = NewsBatch(date=today, items=[existing_item])
-        
+
         item = news_service.save_news(
             title="중복 뉴스",
             url="http://example.com/1"
         )
-        
+
         assert item.id == existing_item.id
         mock_repo.save_batch.assert_not_called()
         mock_drive.put_file.assert_not_called()
@@ -81,9 +84,9 @@ class TestNewsService:
         )
         mock_repo.load_batch.return_value = None
         mock_repo.save_batch.return_value = True
-        
+
         item = await news_service.add_news_from_url("http://example.com/2")
-        
+
         assert item is not None
         assert item.title == "스크래핑된 뉴스"
         mock_scraper.scrape.assert_called_once_with("http://example.com/2")

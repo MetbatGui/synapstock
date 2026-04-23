@@ -38,10 +38,10 @@ class LocalCacheManager:
         """파일이 업데이트되었거나 캐시에 없는지 확인합니다."""
         key = f"{category}:{file_name}"
         cached_info = self.cache.get(key)
-        
+
         if not cached_info:
             return True
-        
+
         return cached_info.get("modified_time") != modified_time
 
     def update_cache_info(self, category: str, file_name: str, modified_time: str, extra: dict | None = None):

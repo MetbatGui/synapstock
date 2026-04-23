@@ -1,8 +1,9 @@
-import pytest
-import pandas as pd
 import io
+
+import pandas as pd
+
 from synapstock.infrastructure.parsers.excel.new_listing import NewListingParser
-from synapstock.domain.statistics.models import NewListing
+
 
 def test_new_listing_parser_with_sample_data():
     # 사용자가 제공한 샘플 데이터 기반의 엑셀 생성
@@ -30,19 +31,19 @@ def test_new_listing_parser_with_sample_data():
         "수익률(%)": [248.5]
     }
     df = pd.DataFrame(data)
-    
+
     # 엑셀 바이너리로 변환
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Sheet1')
     excel_content = output.getvalue()
-    
+
     parser = NewListingParser()
     results = parser.parse(excel_content)
-    
+
     assert len(results) == 1
     item = results[0]
-    
+
     assert item.name == "덕양에너젠"
     assert item.sector == "산소, 질소 및 기타 산업용 가스 제조업"
     assert item.offer_price == 10000
@@ -66,15 +67,15 @@ def test_new_listing_parser_finds_header_within_15_rows():
         header_row[i] = h
     data.append(header_row)
     data.append(["삼성전자", "2026.04.01", 50000, "1000:1", "10%", 60000, 70000, 55000, 65000, 30.0] + [""]*11)
-    
+
     df = pd.DataFrame(data)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, header=False, sheet_name='Sheet1')
     excel_content = output.getvalue()
-    
+
     parser = NewListingParser()
     results = parser.parse(excel_content)
-    
+
     assert len(results) == 1
     assert results[0].name == "삼성전자"

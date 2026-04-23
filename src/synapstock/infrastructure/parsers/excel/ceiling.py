@@ -24,7 +24,7 @@ class CeilingParser(BaseExcelParser):
         """엑셀 파일 내의 모든 유효한 시트를 파싱합니다."""
         excel = pd.ExcelFile(io.BytesIO(content))
         reports = []
-        
+
         for sheet_name in excel.sheet_names:
             # YYMMDD 형식의 시트만 처리
             if len(sheet_name) == 6 and sheet_name.isdigit():
@@ -35,16 +35,16 @@ class CeilingParser(BaseExcelParser):
                         reports.append(report)
                 except Exception as e:
                     logger.warning(f"시트 {sheet_name} 파싱 실패: {e}")
-                    
+
         return reports
 
     def parse_dataframe(self, df: pd.DataFrame, title: str, sheet_name: str) -> CeilingAnalysisReport:
         """단일 데이터프레임을 파싱하여 리포트 객체를 생성합니다."""
         date_strs, date_cols = self._extract_ceiling_dates(df)
-        
+
         # 시트 이름이 YYMMDD 형식인 경우 처리
         is_sheet_date_valid = len(sheet_name) == 6 and sheet_name.isdigit()
-        
+
         # 시트명 날짜가 컬럼에 없으면 강제로 추가 (시트 자체가 해당 날짜 리포트이므로)
         if is_sheet_date_valid and sheet_name not in date_strs:
             date_strs.append(sheet_name)
@@ -65,7 +65,7 @@ class CeilingParser(BaseExcelParser):
             end_date_str = self._format_date(sheet_name)
         else:
             end_date_str = self._format_date(date_strs[-1]) if date_strs else ""
-        
+
         return CeilingAnalysisReport(
             title=title,
             start_date=self._format_date(date_strs[0]) if date_strs else end_date_str,

@@ -1,8 +1,9 @@
+
 import pytest
-import json
-from pathlib import Path
+
 from synapstock.domain.news.models import NewsBatch, NewsItem
 from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
+
 
 @pytest.fixture
 def temp_news_dir(tmp_path):
@@ -25,14 +26,14 @@ class TestLocalNewsRepository:
             url="http://test.com"
         )
         batch = NewsBatch(date=date_str, items=[item])
-        
+
         # 저장
         assert repo.save_batch(batch) is True
-        
+
         # 파일 존재 확인
         expected_file = temp_news_dir / f"news_{date_str}.json"
         assert expected_file.exists()
-        
+
         # 로드
         loaded = repo.load_batch(date_str)
         assert loaded is not None
@@ -46,9 +47,9 @@ class TestLocalNewsRepository:
         (temp_news_dir / "news_2024-04-21.json").touch()
         (temp_news_dir / "news_2024-04-22.json").touch()
         (temp_news_dir / "other_file.txt").touch()
-        
+
         dates = repo.list_available_dates()
-        
+
         assert len(dates) == 2
         assert "2024-04-22" in dates
         assert "2024-04-21" in dates

@@ -1,5 +1,7 @@
 import pytest
+
 from synapstock.infrastructure.parsers.excel.base import BaseExcelParser
+
 
 class ConcreteParser(BaseExcelParser):
     def parse(self, content, **kwargs):

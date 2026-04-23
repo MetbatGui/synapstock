@@ -11,7 +11,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_not_exception_type
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from synapstock.domain.ports import StoragePort
 
@@ -83,7 +83,7 @@ class GoogleDriveAdapter(StoragePort):
             raise RuntimeError(f"Google Drive 인증 실패: {e}")
 
     @retry(
-        wait=wait_exponential(multiplier=1, max=10), 
+        wait=wait_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3),
         retry=retry_if_not_exception_type(ValueError)
     )
@@ -108,7 +108,7 @@ class GoogleDriveAdapter(StoragePort):
             return cast(str, file.get("id", ""))
 
     @retry(
-        wait=wait_exponential(multiplier=1, max=10), 
+        wait=wait_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3),
         retry=retry_if_not_exception_type(ValueError)
     )
@@ -204,7 +204,7 @@ class GoogleDriveAdapter(StoragePort):
             return False
 
     @retry(
-        wait=wait_exponential(multiplier=1, max=10), 
+        wait=wait_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3),
         retry=retry_if_not_exception_type(ValueError)
     )

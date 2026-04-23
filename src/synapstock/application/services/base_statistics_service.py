@@ -1,8 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Any
-import io
-import pandas as pd
+from typing import Any, Generic, TypeVar
+
 from synapstock.domain.statistics.models import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -21,9 +20,9 @@ class BaseStatisticsService(ABC, Generic[T]):
         pass
 
     def _sync_domain_data(
-        self, 
-        year_str: str | None = None, 
-        filename_pattern: str | None = None, 
+        self,
+        year_str: str | None = None,
+        filename_pattern: str | None = None,
         parser_func: Any = None,
         save_func: Any = None,
         folder_name: str | None = None,
@@ -43,14 +42,14 @@ class BaseStatisticsService(ABC, Generic[T]):
 
             # 유효한 엑셀 파일만 필터링
             valid_files = [f for f in files if f["name"].lower().endswith((".xlsx", ".xls")) and not f["name"].startswith("~$")]
-            
+
             if not valid_files:
                 logger.warning(f"[{self.get_service_name()}] 폴더({folder_name or 'Root'})에 유효한 엑셀 파일이 없습니다.")
                 return []
 
             # 2. 단계별 필터링 (키워드 -> 연도)
             target_files = valid_files
-            
+
             # 키워드 필터링 (주어진 경우)
             if filename_pattern:
                 filtered_by_pattern = [f for f in target_files if filename_pattern in f["name"]]
@@ -67,12 +66,12 @@ class BaseStatisticsService(ABC, Generic[T]):
 
             # 3. 최신 파일 선택 및 다운로드
             latest_file = sorted(target_files, key=lambda x: x["name"], reverse=True)[0]
-            
+
             if folder_name:
                 content = self.drive_adapter.get_file(latest_file["name"], folder=folder_name)
             else:
                 content = self.drive_adapter.download_file(latest_file["id"])
-            
+
             if not content:
                 logger.error(f"[{self.get_service_name()}] 파일을 다운로드할 수 없습니다: {latest_file['name']}")
                 return []
@@ -80,11 +79,11 @@ class BaseStatisticsService(ABC, Generic[T]):
             # 4. 파싱 및 저장
             result = parser_func(content, **kwargs)
             save_func(result)
-            
+
             # 결과가 리스트가 아닌 단일 객체일 경우 처리
             is_list = isinstance(result, list)
             items_count = len(result) if is_list else 1
-            
+
             logger.info(f"[{self.get_service_name()}] {latest_file['name']} 동기화 완료: {items_count}건")
             return result if is_list else [result]
         except Exception as e:

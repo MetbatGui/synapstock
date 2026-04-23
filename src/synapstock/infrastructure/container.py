@@ -89,7 +89,7 @@ class Container:
         self._convertible_bond_repo = LocalConvertibleBondRepository(self.config.convertible_bond_dir)
         self._bw_repo = LocalBondWithWarrantsRepository(self.config.bw_dir)
         self._market_data_repo = LocalMarketDataRepository(self.config.data_dir / "market" / "raw")
-        
+
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
         self._news_repo = LocalNewsRepository(self.config.news_dir)
 
@@ -105,7 +105,7 @@ class Container:
             financial=self._financial_adapter,
         )
         self._command_service = BoardCommandService(repository=self._repo)
-        
+
         from synapstock.application.services.news_service import NewsService
         self._news_service = NewsService(
             repository=self._news_repo,
@@ -115,8 +115,8 @@ class Container:
         )
 
         self._media_service = StockMediaService(
-            repository=self._repo, 
-            storage=self._pdf_storage, 
+            repository=self._repo,
+            storage=self._pdf_storage,
             news_service=self._news_service,
             pdf_dir=str(self.config.pdf_dir)
         )
@@ -228,7 +228,7 @@ class Container:
     @property
     def krx_adapter(self) -> NativeKrxAdapter:
         return self._krx_adapter
-        
+
     @property
     def news_service(self) -> "NewsService":
         return self._news_service

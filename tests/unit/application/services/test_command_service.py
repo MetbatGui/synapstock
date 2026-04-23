@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from synapstock.application.services.command_service import BoardCommandService
 from synapstock.domain.models import Board, Node, Stock
+
 
 @pytest.fixture
 def mock_repo():
@@ -19,9 +22,9 @@ class TestBoardCommandService:
         root = Node(name="Root", depth=0)
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
-        
+
         success = service.add_node("테스트", "Root", "NewNode")
-        
+
         assert success is True
         assert len(root.nodes) == 1
         assert root.nodes[0].name == "NewNode"
@@ -32,9 +35,9 @@ class TestBoardCommandService:
         root = Node(name="Root", depth=0)
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
-        
+
         success = service.add_stock("테스트", "Root", "삼성전자", "005930")
-        
+
         assert success is True
         assert len(root.stocks) == 1
         assert root.stocks[0].name == "삼성전자"
@@ -46,9 +49,9 @@ class TestBoardCommandService:
         child = root.add_child("Target")
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
-        
+
         success = service.delete_node("테스트", "Target")
-        
+
         assert success is True
         assert len(root.nodes) == 0
         mock_repo.save.assert_called_once()
@@ -59,9 +62,9 @@ class TestBoardCommandService:
         root.stocks.append(Stock(name="삼성전자", ticker="005930"))
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
-        
+
         success = service.delete_stock("테스트", "005930")
-        
+
         assert success is True
         assert len(root.stocks) == 0
         mock_repo.save.assert_called_once()

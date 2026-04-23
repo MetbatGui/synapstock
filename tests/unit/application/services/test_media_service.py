@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from synapstock.application.services.media_service import StockMediaService
 from synapstock.domain.models import Board, Node, Stock
+
 
 @pytest.fixture
 def mock_repo():
@@ -34,9 +37,9 @@ class TestStockMediaService:
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
         mock_storage.put_file.return_value = True
-        
+
         success = service.add_stock_report("테스트", "005930", b"PDF_CONTENT", "report.pdf")
-        
+
         assert success is True
         assert "data/pdf/report.pdf" in root.stocks[0].reports
         mock_storage.put_file.assert_called_once()
@@ -48,14 +51,14 @@ class TestStockMediaService:
         root.stocks.append(Stock(name="삼성전자", ticker="005930"))
         board = Board(name="테스트", root=root)
         mock_repo.load.return_value = board
-        
+
         success = service.add_stock_news("테스트", "005930", "기사제목", "2024-01-01", "http://news/1", stock_name="삼성전자")
-        
+
         assert success is True
         assert len(root.stocks[0].news) == 1
         assert root.stocks[0].news[0]["title"] == "기사제목"
         mock_repo.save.assert_called_once()
-        
+
         # NewsService 호출 확인
         mock_news_service.save_news.assert_called_once_with(
             title="기사제목",

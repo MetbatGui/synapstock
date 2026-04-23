@@ -4,10 +4,13 @@
 네트워크 순서보다는 비즈니스 논리(데이터 생성 유무 등)를 검증합니다.
 """
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
-from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
+
 from synapstock.domain.models import Board, Node, Stock
+from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
+
 
 @pytest.fixture
 def mock_session():
@@ -35,10 +38,10 @@ def test_list_boards(adapter, mock_session):
     mock_session.get.return_value.json.return_value = {
         "data": [{"name": "Board 1"}, {"name": "Board 2"}]
     }
-    
+
     # Act
     names = adapter.list_boards()
-    
+
     # Assert
     assert names == ["Board 1", "Board 2"]
     mock_session.get.assert_called_with("https://api.miro.com/v2/boards")
@@ -46,7 +49,7 @@ def test_list_boards(adapter, mock_session):
 def test_load_board(adapter, mock_session):
     board_name = "Test Board"
     board_id = "b123"
-    
+
     # 세션 호출별 응답 설정 (GET /boards, GET /items, GET /connectors)
     def side_effect(url, **kwargs):
         res = MagicMock()
@@ -67,7 +70,7 @@ def test_load_board(adapter, mock_session):
         return res
 
     mock_session.get.side_effect = side_effect
-    
+
     board = adapter.load(board_name)
 
     assert board.name == board_name
@@ -107,16 +110,16 @@ def test_save_board_logic(adapter, mock_session):
 
     mock_session.get.side_effect = get_side_effect
     mock_session.post.return_value.json.return_value = {"id": "new_id"}
-    
+
     adapter.save(board)
 
     # 초기화 확인: DELETE 호출됨?
     assert mock_session.delete.called
-    
+
     # 생성 확인: POST /shapes 호출됨? (현재 구현은 bulk가 아닌 개별 shapes 호출)
     shape_calls = [c for c in mock_session.post.call_args_list if "shapes" in c.args[0]]
     assert len(shape_calls) > 0 # 루트 등 다수 생성됨
-    
+
     # 커넥터 확인: POST /connectors 호출됨?
     conn_calls = [c for c in mock_session.post.call_args_list if "connectors" in c.args[0]]
     assert len(conn_calls) == 2 # (Root->NodeA, NodeA->Stock1)

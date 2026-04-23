@@ -1,9 +1,11 @@
-import pytest
 import json
-from unittest.mock import MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
 from synapstock.application.services.report_service import ReportService
-from synapstock.domain.models import Report
+
 
 @pytest.fixture
 def mock_cloud_storage():
@@ -40,9 +42,9 @@ class TestReportService:
             {"filename": "[SK하이닉스] 실적.pdf", "date": "2024-01-02"}
         ]
         mock_local_storage.get_file.side_effect = lambda path: json.dumps(list_data).encode("utf-8") if path == "list.json" else None
-        
+
         reports = service.get_reports_by_stock("삼성전자")
-        
+
         assert len(reports) == 1
         assert reports[0].stock == "삼성전자"
         assert reports[0].filename == "[삼성전자] 리서치.pdf"
@@ -59,9 +61,9 @@ class TestReportService:
             2. local_storage.put_file()이 호출되었는지 확인한다.
         """
         mock_cloud_storage.get_file.return_value = b'{"test": "data"}'
-        
+
         updated = service.sync_index()
-        
+
         assert "list.json" in updated
         assert "reports.json" in updated
         assert mock_cloud_storage.get_file.call_count >= 2
@@ -79,8 +81,8 @@ class TestReportService:
         """
         mock_local_storage.path_exists.return_value = False
         mock_cloud_storage.download_file.return_value = True
-        
+
         path = service.get_file_content_path("new_report.pdf")
-        
+
         assert path == Path("data/report/new_report.pdf")
         mock_cloud_storage.download_file.assert_called_once()

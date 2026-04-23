@@ -1,14 +1,21 @@
-import logging
-import pandas as pd
 import io
+import logging
 from functools import lru_cache
-from synapstock.domain.statistics.models import (
-    DailyMarketRanking, DailyMarketRankingAnalysis, AnalyzedRankingItem,
-    MarketType, SupplySubject, RankingItem, MonthlyMarketStats
-)
-from synapstock.infrastructure.parsers.excel import SupplyDemandParser
+
+import pandas as pd
+
 from synapstock.application.services.base_statistics_service import BaseStatisticsService
+from synapstock.domain.statistics.models import (
+    AnalyzedRankingItem,
+    DailyMarketRanking,
+    DailyMarketRankingAnalysis,
+    MarketType,
+    MonthlyMarketStats,
+    RankingItem,
+    SupplySubject,
+)
 from synapstock.infrastructure.adapters.local.cache_manager import LocalCacheManager
+from synapstock.infrastructure.parsers.excel import SupplyDemandParser
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +43,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 self.sync_data(date_str)
                 res = self.repository.load_ranking(date_str, market, subject)
             return res
-            
+
         rankings = self.repository.get_rankings(date_str)
         if not rankings:
             return self.sync_data(date_str)
@@ -61,11 +68,11 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
         """한 달간의 일별 데이터를 합산하여 월간 누적 수급 순위를 산출합니다."""
         available_dates = self.repository.list_available_dates(market, subject)
         target_dates = [d for d in available_dates if d.startswith(month)]
-        
+
         if not target_dates:
             from synapstock.domain.statistics.models import MonthlyMarketStats
             return MonthlyMarketStats(month=month, market=market, subject=subject, items=[])
-            
+
         # 종목별 순매수 금액 합산
         aggregation: dict[str, dict] = {}
         for d in target_dates:
@@ -75,11 +82,11 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 if item.name not in aggregation:
                     aggregation[item.name] = {"amount": 0, "ticker": item.ticker}
                 aggregation[item.name]["amount"] += item.amount
-        
+
         # 합산 금액 기준 내림차순 정렬 및 TOP 30 추출
         sorted_items = sorted(aggregation.items(), key=lambda x: x[1]["amount"], reverse=True)[:30]
-        
-        from synapstock.domain.statistics.models import MonthlyMarketStats, RankingItem
+
+        from synapstock.domain.statistics.models import MonthlyMarketStats
         items = []
         for i, (name, data) in enumerate(sorted_items, 1):
             items.append(RankingItem(
@@ -88,7 +95,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 amount=data["amount"],
                 ticker=data["ticker"]
             ))
-            
+
         return MonthlyMarketStats(month=month, market=market, subject=subject, items=items)
 
     def sync_data(self, date_str: str | None = None) -> list[DailyMarketRanking]:
@@ -109,24 +116,24 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
 
             all_files = []
             year_folders = [f for f in files if "년" in f["name"] and f["mimeType"] == "application/vnd.google-apps.folder"]
-            
+
             if year_folders:
                 # 연도 및 월 폴더 탐색
                 target_year = date_str[:4] if date_str else "2026"
                 target_month = date_str[5:7] if date_str else ""
-                
+
                 year_folder = next((f for f in year_folders if target_year in f["name"]), year_folders[0])
                 logger.info(f"[{self.get_service_name()}] 연도 서브폴더 탐색: {year_folder['name']}")
-                
+
                 sub_items = self.drive_adapter.list_files_in_folder("", root_id=year_folder["id"])
                 month_folders = [f for f in sub_items if "월" in f["name"] and f["mimeType"] == "application/vnd.google-apps.folder"]
-                
+
                 if month_folders:
                     if target_month:
                         month_folder = next((f for f in month_folders if target_month in f["name"]), month_folders[0])
                     else:
                         month_folder = sorted(month_folders, key=lambda x: x["name"], reverse=True)[0]
-                    
+
                     logger.info(f"[{self.get_service_name()}] 월 서브폴더 탐색: {month_folder['name']}")
                     all_files = self.drive_adapter.list_files_in_folder("", root_id=month_folder["id"])
                 else:
@@ -151,18 +158,18 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             # 3. 캐시 확인 및 동기화 수행
             all_rankings = []
             needs_sync = False
-            
+
             for file_info in target_files:
                 file_name = file_info["name"]
                 modified_time = file_info.get("modifiedTime", "")
-                
+
                 if self.cache_manager.needs_update("ranking", file_name, modified_time):
                     logger.info(f"[{self.get_service_name()}] 업데이트 발견: {file_name} (Modified: {modified_time})")
                     needs_sync = True
-                    
+
                     content = self.drive_adapter.get_file_by_id(file_info["id"])
                     if not content: continue
-                        
+
                     sheets = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
                     for sheet_name in sheets.keys():
                         try:
@@ -171,7 +178,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                             all_rankings.extend(rankings)
                         except Exception as e:
                             logger.warning(f"[{self.get_service_name()}] 시트 {sheet_name} 파싱 건너뜀: {e}")
-                    
+
                     self.cache_manager.update_cache_info("ranking", file_name, modified_time, {"file_id": file_info["id"]})
                 else:
                     logger.info(f"[{self.get_service_name()}] 캐시가 최신입니다: {file_name}")
@@ -182,7 +189,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                     self.repository.save_daily_ranking(r)
                 logger.info(f"[{self.get_service_name()}] {len(all_rankings)}건의 데이터가 동기화되었습니다.")
                 return all_rankings
-            
+
             return self.repository.get_rankings(date_str)
         except Exception as e:
             logger.error(f"[RankingService] 순위 동기화 실패: {e}", exc_info=True)
@@ -206,7 +213,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             prev_date = available_dates[current_idx + 1]
             prev_raw = self.repository.load_ranking(prev_date, market, subject)
             prev_map = {item.name: item.rank for item in prev_raw.items} if prev_raw else {}
-            
+
             analyzed_items = []
             for item in raw.items:
                 prev_rank = prev_map.get(item.name)
@@ -218,7 +225,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                     )
                 ))
             return DailyMarketRankingAnalysis(date=date, market=market, subject=subject, items=analyzed_items, previous_date=prev_date)
-        
+
         return DailyMarketRankingAnalysis(date=date, market=market, subject=subject, items=[AnalyzedRankingItem(**it.model_dump()) for it in raw.items])
 
     def _calculate_consecutive_days(self, name, dates, market, subject, limit: int = 30) -> int:

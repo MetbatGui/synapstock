@@ -1,6 +1,7 @@
 import logging
-from synapstock.infrastructure.parsers.excel import DisclosureParser
+
 from synapstock.application.services.base_statistics_service import BaseStatisticsService
+from synapstock.infrastructure.parsers.excel import DisclosureParser
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,10 @@ class DisclosureAnalysisService(BaseStatisticsService):
             "cb": ("CB", "convertible_bond", self.parser.parse_convertible_bond, getattr(self.repository, "save_convertible_bond_data", lambda x: None)),
             "bw": ("BW", "bw", self.parser.parse_bond_with_warrants, getattr(self.repository, "save_bw_data", lambda x: None))
         }
-        
+
         if dataType not in mapping:
             return []
-            
+
         pattern, folder, parser, saver = mapping[dataType]
         return self._sync_domain_data(
             year_str=year,

@@ -1,7 +1,10 @@
-import pytest
-import pandas as pd
 import io
+
+import pandas as pd
+import pytest
+
 from synapstock.infrastructure.parsers.excel.disclosure import DisclosureParser
+
 
 @pytest.fixture
 def parser():
@@ -23,9 +26,9 @@ def test_parse_paid_in_capital_increase(parser):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='2026')
-    
+
     results = parser.parse_paid_in_capital_increase(output.getvalue())
-    
+
     assert len(results) == 1
     assert results[0].name == "상상인"
     assert results[0].new_shares == 1000000
@@ -45,9 +48,9 @@ def test_parse_convertible_bond(parser):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='CB')
-    
+
     results = parser.parse_convertible_bond(output.getvalue())
-    
+
     assert len(results) == 1
     assert results[0].name == "현대차"
     assert results[0].bond_amount == 50000000000

@@ -1,7 +1,6 @@
 import hashlib
 import logging
 from datetime import datetime
-from typing import Optional
 
 from synapstock.domain.news.models import NewsBatch, NewsItem
 from synapstock.domain.ports import NewsScraperPort, StoragePort
@@ -16,17 +15,17 @@ class NewsService:
         self,
         repository: LocalNewsRepository,
         scraper: NewsScraperPort,
-        drive_adapter: Optional[StoragePort] = None,
-        news_folder_id: Optional[str] = None
+        drive_adapter: StoragePort | None = None,
+        news_folder_id: str | None = None
     ):
         self.repository = repository
         self.scraper = scraper
         self.drive_adapter = drive_adapter
         self.news_folder_id = news_folder_id
 
-    async def add_news_from_url(self, url: str, ticker: Optional[str] = None, stock_name: Optional[str] = None) -> Optional[NewsItem]:
+    async def add_news_from_url(self, url: str, ticker: str | None = None, stock_name: str | None = None) -> NewsItem | None:
         """URL로부터 뉴스를 스크래핑하여 아카이브에 추가하고 동기화합니다."""
-        
+
         # 1. 스크래핑 수행
         scraped = await self.scraper.scrape(url)
         if not scraped or not scraped.title:
@@ -41,9 +40,9 @@ class NewsService:
             stock_name=stock_name
         )
 
-    def save_news(self, title: str, url: str, ticker: Optional[str] = None, stock_name: Optional[str] = None) -> Optional[NewsItem]:
+    def save_news(self, title: str, url: str, ticker: str | None = None, stock_name: str | None = None) -> NewsItem | None:
         """이미 확보된 뉴스 정보를 아카이브에 저장하고 동기화합니다."""
-        
+
         # 1. NewsItem 생성 (저장 시각 및 URL 해시 기준)
         url_hash = hashlib.md5(url.encode()).hexdigest()
         item = NewsItem(
@@ -70,12 +69,12 @@ class NewsService:
         batch.items.append(item)
         if self.repository.save_batch(batch):
             logger.info(f"[NewsService] 뉴스 아카이브 저장 완료: {item.title}")
-            
+
             if self.drive_adapter and self.news_folder_id:
                 self._sync_to_drive(batch)
-            
+
             return item
-        
+
         return None
 
     def _sync_to_drive(self, batch: NewsBatch):
@@ -85,7 +84,7 @@ class NewsService:
 
         filename = f"news_{batch.date}.json"
         content = batch.model_dump_json(indent=2).encode("utf-8")
-        
+
         try:
             # StoragePort.put_file을 사용하여 업로드
             success = self.drive_adapter.put_file(
@@ -100,6 +99,6 @@ class NewsService:
         except Exception as e:
             logger.error(f"[NewsService] 구글 드라이브 동기화 중 오류: {e}")
 
-    def get_news_by_date(self, date_str: str) -> Optional[NewsBatch]:
+    def get_news_by_date(self, date_str: str) -> NewsBatch | None:
         """특정 날짜의 뉴스 배치를 조회합니다."""
         return self.repository.load_batch(date_str)

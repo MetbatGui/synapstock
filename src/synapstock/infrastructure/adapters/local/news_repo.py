@@ -1,9 +1,8 @@
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
-from synapstock.domain.news.models import NewsBatch, NewsItem
+from synapstock.domain.news.models import NewsBatch
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +29,14 @@ class LocalNewsRepository:
             logger.error(f"[NewsRepo] 파일 저장 실패 ({batch.date}): {e}")
             return False
 
-    def load_batch(self, date_str: str) -> Optional[NewsBatch]:
+    def load_batch(self, date_str: str) -> NewsBatch | None:
         """특정 날짜의 뉴스 배치를 로드합니다."""
         file_path = self._get_file_path(date_str)
         if not file_path.exists():
             return None
-        
+
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
                 return NewsBatch(**data)
         except Exception as e:

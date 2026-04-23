@@ -163,7 +163,7 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not scraped or not scraped.title:
             await progress_msg.edit_text("⚠️ 해당 뉴스 링크에서 정보를 추출할 수 없습니다. 다른 링크를 시도해주세요.")
             return WAITING_FOR_NEWS_URL
-        
+
         title = scraped.title
         doc_date = scraped.date # 보드 저장용 (발행일 유지)
     except Exception as e:

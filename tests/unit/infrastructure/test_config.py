@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
 from unittest.mock import patch
+
 from synapstock.infrastructure.config import AppConfig
+
 
 def test_config_load_default_paths():
     """기본 경로 설정이 올바르게 로드되는지 확인한다.
@@ -12,7 +14,7 @@ def test_config_load_default_paths():
     """
     with patch.dict(os.environ, {}, clear=True):
         config = AppConfig.load(load_env=False)
-        
+
         assert config.data_dir == Path("data")
         assert config.secrets_dir == Path("secrets")
         assert config.board_dir == Path("data/board")
@@ -31,10 +33,10 @@ def test_config_load_from_env():
         "GOOGLE_DRIVE_REPORT_FOLDER_ID": "report_id_789",
         "DATA_DIR": "custom_data"
     }
-    
+
     with patch.dict(os.environ, mock_env):
         config = AppConfig.load(load_env=False)
-        
+
         assert config.miro_token == "miro_token_123"
         assert config.telegram_token == "bot_token_456"
         assert config.report_folder_id == "report_id_789"

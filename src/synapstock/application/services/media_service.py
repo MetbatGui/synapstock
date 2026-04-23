@@ -46,14 +46,14 @@ class StockMediaService:
         success = cast(bool, board.root.find_and_add_news(ticker, news_entry))
         if success:
             self._repository.save(board)
-            
+
             # 중앙 뉴스 아카이브(구글 드라이브 포함)에 기록
             if self._news_service:
                 if not stock_name:
                     found = board.root.find_node(ticker)
                     if found:
                         stock_name = found.name
-                
+
                 # 저장일 기준으로 아카이브에 기록 (비동기가 아닌 동기 호출)
                 self._news_service.save_news(
                     title=title,
