@@ -9,7 +9,7 @@ from typing import cast
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from synapstock.presentation.web.core.dependencies import media_service, query_service
+from synapstock.presentation.web.core.dependencies import media_service, news_service, query_service
 
 router = APIRouter()
 

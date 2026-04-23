@@ -4,7 +4,13 @@
 웹 서버(FastAPI)와 텔레그램 봇 모두 이 컨테이너를 통해 싱글톤 인스턴스를 공유합니다.
 """
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from synapstock.application.services.news_service import NewsService
 
 from synapstock.application.services.analytics_service import AnalyticsService
 from synapstock.application.services.command_service import BoardCommandService
@@ -230,7 +236,7 @@ class Container:
         return self._krx_adapter
 
     @property
-    def news_service(self) -> "NewsService":
+    def news_service(self) -> NewsService:
         return self._news_service
 
 
