@@ -150,23 +150,12 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             newly_synced_count = 0
 
             for sheet_name in sheet_names:
-                # 시트 이름 정규화 (예: 1.2 -> 2026-01-02, 0102 -> 2026-01-02, 2026.1.2 -> 2026-01-02)
-                raw_name = sheet_name.replace(".", "-").replace("/", "-").strip()
-                parts = raw_name.split("-")
-                
-                date_norm = None
-                if len(parts) == 3: # YYYY-MM-DD
-                    y, m, d = parts
-                    date_norm = f"{y}-{int(m):02d}-{int(d):02d}"
-                elif len(parts) == 2: # M-D -> YYYY-MM-DD
-                    m, d = parts
-                    date_norm = f"{current_year}-{int(m):02d}-{int(d):02d}"
-                elif len(raw_name) == 8 and raw_name.isdigit(): # YYYYMMDD
-                    date_norm = f"{raw_name[:4]}-{raw_name[4:6]}-{raw_name[6:]}"
-                elif len(raw_name) == 4 and raw_name.isdigit(): # MMDD -> YYYYMMDD
-                    date_norm = f"{current_year}-{raw_name[:2]}-{raw_name[2:]}"
-                
-                if not date_norm:
+            for sheet_name in sheet_names:
+                # 시트 이름은 오직 MMDD 형식만 허용 (예: 0102)
+                sheet_name = sheet_name.strip()
+                if len(sheet_name) == 4 and sheet_name.isdigit():
+                    date_norm = f"{current_year}-{sheet_name[:2]}-{sheet_name[2:]}"
+                else:
                     continue
 
                 if date_norm not in existing_dates:
