@@ -152,7 +152,8 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 if not valid_files:
                     logger.warning(f"[{self.get_service_name()}] 유효한 랭킹 파일을 찾을 수 없습니다.")
                     return []
-                target_files = [sorted(valid_files, key=lambda x: x["name"], reverse=True)[0]]
+                # 파일명이 아닌 마지막 수정 시간(modifiedTime)을 기준으로 가장 최신 파일을 선택
+                target_files = [sorted(valid_files, key=lambda x: x.get("modifiedTime", x.get("createdTime", "")), reverse=True)[0]]
 
             # 3. 캐시 확인 및 동기화 수행
             all_rankings = []
