@@ -1,14 +1,23 @@
 """종목 관련 미디어(리포트, 뉴스) 관리를 담당하는 유즈케이스 레이어."""
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from synapstock.domain.ports import BoardRepositoryPort, StoragePort
+
+if TYPE_CHECKING:
+    from synapstock.application.services.news_service import NewsService
 
 
 class StockMediaService:
     """종목에 종속된 외부 미디어 리소스(PDF, 뉴스 URL)를 관리하는 서비스 클래스입니다. (UseCase - Media)"""
 
-    def __init__(self, repository: BoardRepositoryPort, storage: StoragePort, news_service: "NewsService" = None, pdf_dir: str = "data/pdf") -> None:
+    def __init__(
+        self,
+        repository: BoardRepositoryPort,
+        storage: StoragePort,
+        news_service: "NewsService" = None,
+        pdf_dir: str = "data/pdf",
+    ) -> None:
         """필요한 어댑터들로 서비스를 초기화합니다."""
         self._repository = repository
         self._storage = storage
@@ -38,7 +47,9 @@ class StockMediaService:
             self._repository.save(board)
         return success
 
-    def add_stock_news(self, board_name: str, ticker: str, title: str, date: str, url: str, stock_name: str = "") -> bool:
+    def add_stock_news(
+        self, board_name: str, ticker: str, title: str, date: str, url: str, stock_name: str = ""
+    ) -> bool:
         """종목에 뉴스 링크 정보를 추가합니다."""
         board = self._repository.load(board_name)
         news_entry = {"title": title, "date": date, "url": url}
@@ -50,9 +61,9 @@ class StockMediaService:
             # 중앙 뉴스 아카이브(구글 드라이브 포함)에 기록
             if self._news_service:
                 if not stock_name:
-                    found = board.root.find_node(ticker)
-                    if found:
-                        stock_name = found.name
+                    found_stock = board.find_stock(ticker)
+                    if found_stock:
+                        stock_name = found_stock.name
 
                 # 저장일 기준으로 아카이브에 기록 (비동기가 아닌 동기 호출)
                 self._news_service.save_news(

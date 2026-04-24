@@ -4,6 +4,7 @@ Naver Finance 자동완성, DART 공시, 재무 데이터, 뉴스 스크래핑 �
 종목과 관련된 조회 및 관리 엔드포인트를 제공합니다.
 """
 
+import asyncio
 from typing import cast
 
 from fastapi import APIRouter
@@ -174,7 +175,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = media_service.add_stock_news(board, ticker, title, date, url)
+        success = await asyncio.to_thread(media_service.add_stock_news, board, ticker, title, date, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -199,7 +200,7 @@ async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONRes
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = media_service.remove_stock_news(board, ticker, url)
+        success = await asyncio.to_thread(media_service.remove_stock_news, board, ticker, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or news not found"})
