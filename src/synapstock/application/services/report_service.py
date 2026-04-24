@@ -37,82 +37,113 @@ class ReportService:
         self._report_folder_id = report_folder_id
         self._report_dir = report_dir
 
-        # 로컬 디렉토리 보장
-        self._local_storage.ensure_directory(".")
         self._last_sync_time = 0
         self._sync_interval = 300  # 5분
 
-    def get_reports_by_stock(self, stock_name: str) -> list[Report]:
-        """지정된 종목의 리포트 목록을 조회한다."""
+    async def get_reports_by_stock(self, stock_name: str) -> list[Report]:
+        """지정된 종목의 리포트 목록을 조회한다.
+
+        Args:
+            stock_name (str): 리포트를 조회할 주식 종목 이름.
+
+        Returns:
+            list[Report]: 해당 종목과 연관된 리포트 객체 목록.
+        """
         if not stock_name:
             return []
 
         # 자동 동기화 체크
         if time.time() - self._last_sync_time > self._sync_interval:
-            self.sync_index()
+            await self.sync_index()
 
         stock_nfc = unicodedata.normalize("NFC", stock_name)
 
         # 1. list.json (UI 최적화 인덱스) 우선 확인
-        reports = self._load_from_list_json(stock_nfc)
+        reports = await self._load_from_list_json(stock_nfc)
         if reports:
             return reports
 
         # 2. reports.json (전문 인덱스) 확인
-        reports = self._load_from_reports_json(stock_nfc)
+        reports = await self._load_from_reports_json(stock_nfc)
         if reports:
             return reports
 
         # 3. 파일 시스템 스캔 폴백
-        return self._scan_local_files(stock_nfc)
+        return await self._scan_local_files(stock_nfc)
 
-    def get_report_counts(self) -> dict[str, int]:
-        """종목별 리포트 수량을 집계한다."""
+    def _extract_stock_from_filename(self, filename: str) -> str | None:
+        """파일 이름에서 종목명을 추출한다.
+
+        예: "[삼성전자] 리서치.pdf" -> "삼성전자"
+
+        Args:
+            filename (str): 종목명을 추출할 파일 이름.
+
+        Returns:
+            str | None: 추출된 종목명. 추출에 실패하면 None.
+        """
+        if "[" in filename and "]" in filename:
+            try:
+                return filename.split("[")[1].split("]")[0]
+            except IndexError:
+                return None
+        return None
+
+    async def get_report_counts(self) -> dict[str, int]:
+        """종목별 리포트 수량을 집계한다.
+
+        Returns:
+            dict[str, int]: 종목명을 키로 하고, 해당 종목의 리포트 개수를 값으로 하는 딕셔너리.
+        """
         counts: dict[str, int] = {}
 
         # 인덱스 파일 기반 집계 시도
-        list_data = self._local_storage.get_file("list.json")
+        list_data = await self._local_storage.get_file("list.json")
         if list_data:
             try:
                 data = json.loads(list_data.decode("utf-8"))
                 for r in data:
-                    filename = r.get("filename", "")
-                    if "[" in filename and "]" in filename:
-                        stock = filename.split("[")[1].split("]")[0]
+                    stock = self._extract_stock_from_filename(r.get("filename", ""))
+                    if stock:
                         counts[stock] = counts.get(stock, 0) + 1
                 return counts
             except Exception:
                 pass
 
         # 폴백: 파일 시스템 직접 스캔
-        files = self._local_storage.list_files_in_folder(".")
+        files = await self._local_storage.list_files_in_folder(".")
         for f in files:
             filename = unicodedata.normalize("NFC", f["name"])
-            if filename.lower().endswith(".pdf") and "[" in filename and "]" in filename:
-                try:
-                    stock = filename.split("[")[1].split("]")[0]
+            if filename.lower().endswith(".pdf"):
+                stock = self._extract_stock_from_filename(filename)
+                if stock:
                     counts[stock] = counts.get(stock, 0) + 1
-                except Exception:
-                    pass
         return counts
 
-    def sync_index(self) -> list[str]:
-        """클라우드 저장소에서 인덱스 파일들을 강제로 동기화한다."""
+    async def sync_index(self) -> list[str]:
+        """클라우드 저장소에서 인덱스 파일들을 강제로 동기화한다.
+
+        Returns:
+            list[str]: 클라우드에서 성공적으로 동기화(다운로드)된 인덱스 파일 이름 목록.
+        """
         updated = []
         logger.info("[ReportService] 클라우드 인덱스 동기화 시작 (folder: report)")
+
+        await self._local_storage.ensure_directory(".")
+
         try:
             # 1. list.json 동기화
-            list_data = self._cloud_storage.get_file("list.json", folder="report")
+            list_data = await self._cloud_storage.get_file("list.json", folder="report")
             if list_data:
-                self._local_storage.put_file("list.json", list_data)
+                await self._local_storage.put_file("list.json", list_data)
                 updated.append("list.json")
             else:
                 logger.warning("[ReportService] 클라우드에서 list.json을 찾을 수 없습니다.")
 
             # 2. reports.json 동기화
-            reports_data = self._cloud_storage.get_file("reports.json", folder="report")
+            reports_data = await self._cloud_storage.get_file("reports.json", folder="report")
             if reports_data:
-                self._local_storage.put_file("reports.json", reports_data)
+                await self._local_storage.put_file("reports.json", reports_data)
                 updated.append("reports.json")
             else:
                 logger.warning("[ReportService] 클라우드에서 reports.json을 찾을 수 없습니다.")
@@ -127,24 +158,41 @@ class ReportService:
 
         return updated
 
-    def get_file_content_path(self, filename: str) -> Path | None:
-        """파일의 로컬 경로를 반환한다. 로컬에 없으면 클라우드로부터 다운로드한다."""
+    async def get_file_content_path(self, filename: str) -> Path | None:
+        """파일의 로컬 경로를 반환한다. 로컬에 없으면 클라우드로부터 다운로드를 시도한다.
+
+        Args:
+            filename (str): 로컬 경로를 가져올 리포트 파일 이름.
+
+        Returns:
+            Path | None: 파일의 로컬 절대 경로. 다운로드에 실패하거나 올바르지 않은 파일명일 경우 None.
+        """
         # 1. 파일명 유효성 검사
         if not filename.lower().endswith(".pdf"):
             return None
 
         # 2. 로컬 존재 확인 및 다운로드
-        if not self._local_storage.path_exists(filename):
+        if not await self._local_storage.path_exists(filename):
             logger.info(f"[ReportService] 클라우드에서 파일 다운로드 시도 (folder: report): {filename}")
-            if not self._cloud_storage.download_file(filename, str(Path(self._report_dir) / filename), folder="report"):
+            if not await self._cloud_storage.download_file(
+                filename, str(Path(self._report_dir) / filename), folder="report"
+            ):
                 logger.error(f"[ReportService] 파일 다운로드 실패 (folder: report): {filename}")
                 return None
 
         # 3. 절대 경로 반환 (FastAPI 서빙용)
         return Path(self._report_dir) / filename
 
-    def _load_from_list_json(self, stock_nfc: str) -> list[Report]:
-        list_data = self._local_storage.get_file("list.json")
+    async def _load_from_list_json(self, stock_nfc: str) -> list[Report]:
+        """로컬의 list.json 파일에서 종목에 해당하는 리포트를 로드한다.
+
+        Args:
+            stock_nfc (str): NFC 정규화된 종목명.
+
+        Returns:
+            list[Report]: 해당 종목의 리포트 객체 목록.
+        """
+        list_data = await self._local_storage.get_file("list.json")
         if not list_data:
             return []
 
@@ -174,8 +222,16 @@ class ReportService:
             logger.error(f"Error loading list.json: {e}")
             return []
 
-    def _load_from_reports_json(self, stock_nfc: str) -> list[Report]:
-        index_data = self._local_storage.get_file("reports.json")
+    async def _load_from_reports_json(self, stock_nfc: str) -> list[Report]:
+        """로컬의 reports.json 파일에서 종목에 해당하는 리포트를 로드한다.
+
+        Args:
+            stock_nfc (str): NFC 정규화된 종목명.
+
+        Returns:
+            list[Report]: 해당 종목의 리포트 객체 목록.
+        """
+        index_data = await self._local_storage.get_file("reports.json")
         if not index_data:
             return []
 
@@ -200,10 +256,20 @@ class ReportService:
             logger.error(f"Error loading reports.json: {e}")
             return []
 
-    def _scan_local_files(self, stock_nfc: str) -> list[Report]:
+    async def _scan_local_files(self, stock_nfc: str) -> list[Report]:
+        """로컬 디렉토리를 직접 스캔하여 종목에 해당하는 리포트 파일을 찾는다.
+
+        인덱스 파일에 없는 경우 폴백(Fallback)으로 사용된다.
+
+        Args:
+            stock_nfc (str): NFC 정규화된 종목명.
+
+        Returns:
+            list[Report]: 해당 종목명 패턴을 포함하는 로컬 PDF 리포트 객체 목록.
+        """
         results = []
         search_patterns = [f"[{stock_nfc}]", stock_nfc]
-        files = self._local_storage.list_files_in_folder(".")
+        files = await self._local_storage.list_files_in_folder(".")
         for f in files:
             filename_nfc = unicodedata.normalize("NFC", f["name"])
             if filename_nfc.lower().endswith(".pdf") and any(p in filename_nfc for p in search_patterns):

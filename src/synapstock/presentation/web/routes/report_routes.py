@@ -23,7 +23,7 @@ async def get_local_reports(name: str):
         if not report_service:
             return []
 
-        reports = report_service.get_reports_by_stock(name)
+        reports = await report_service.get_reports_by_stock(name)
         return [
             {
                 "filename": r.filename,
@@ -45,7 +45,7 @@ async def get_report_counts():
     try:
         if not report_service:
             return {}
-        return report_service.get_report_counts()
+        return await report_service.get_report_counts()
     except Exception as e:
         logger.error(f"Error in get_report_counts: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
@@ -58,7 +58,7 @@ async def sync_reports_index():
         return JSONResponse(status_code=400, content={"message": "Cloud sync not configured"})
 
     try:
-        updated = report_service.sync_index()
+        updated = await report_service.sync_index()
         if updated:
             return {"status": "success", "message": f"Updated from cloud: {', '.join(updated)}"}
         return {"status": "error", "message": "Index files not found in cloud"}
@@ -74,7 +74,7 @@ async def serve_report_file(filename: str):
     if not report_service:
         return JSONResponse(status_code=400, content={"message": "Cloud sync not configured"})
 
-    local_path = report_service.get_file_content_path(filename)
+    local_path = await report_service.get_file_content_path(filename)
     if local_path:
         return FileResponse(local_path)
 
