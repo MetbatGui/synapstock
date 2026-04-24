@@ -284,20 +284,22 @@ class GoogleDriveAdapter(StoragePort):
         """등록된 폴더 키워드를 사용하여 파일 목록을 조회합니다."""
         return await self.list_files_in_folder("", folder=folder)
 
-    def get_file_by_id(self, file_id: str) -> bytes | None:
+    async def get_file_by_id(self, file_id: str) -> bytes | None:
         """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다."""
-        try:
-            request = self.drive_service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            fh.seek(0)
-            return fh.read()
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
-            return None
+        def _get():
+            try:
+                request = self.drive_service.files().get_media(fileId=file_id)
+                fh = io.BytesIO()
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                fh.seek(0)
+                return fh.read()
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
+                return None
+        return await asyncio.to_thread(_get)
 
     async def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
