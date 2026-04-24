@@ -1,7 +1,8 @@
 import logging
+
+from synapstock.application.services.base_statistics_service import BaseStatisticsService
 from synapstock.domain.statistics.models import NewListing
 from synapstock.infrastructure.parsers.excel import NewListingParser
-from synapstock.application.services.base_statistics_service import BaseStatisticsService
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class NewListingService(BaseStatisticsService[NewListing]):
             items = self.repository.get_new_listings(year)
             if items:
                 return items
-        
+
         return self.sync_data(year)
 
     def sync_data(self, year: str) -> list[NewListing]:

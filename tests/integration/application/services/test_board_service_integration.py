@@ -2,16 +2,16 @@
 
 import shutil
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
-from unittest.mock import MagicMock
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
-from synapstock.domain.models import Board, Stock
-from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.command_service import BoardCommandService
+from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.sync_service import BoardSyncService
-from synapstock.domain.ports import MindmapPort, TickerSearchPort, StoragePort
+from synapstock.domain.models import Board, Stock
+from synapstock.domain.ports import MindmapPort, TickerSearchPort
+from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
 
 FIXTURES_DIR = Path(__file__).parents[3] / "fixtures" / "folder_mindmap"
 
@@ -110,7 +110,7 @@ class TestBoardServiceIntegration:
         """서비스를 통해 종목 추가 후 저장하면 다시 로드할 때 반영되어야 한다."""
         query, command = mutable_services
         board = query.load_board("IT")
-        
+
         # 직접 도메인 모델 조작 후 command_service로 저장
         internet = next(n for n in board.root.nodes if n.name == "인터넷")
         internet.stocks.append(Stock(name="카카오뱅크", ticker="323410"))

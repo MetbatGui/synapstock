@@ -1,7 +1,9 @@
 import io
+
 import pandas as pd
-import pytest
+
 from synapstock.infrastructure.parsers.excel import DisclosureParser
+
 
 def test_parse_bond_with_warrants_real_example():
     # 사용자 제공 예시 데이터 (오텍)
@@ -35,18 +37,18 @@ def test_parse_bond_with_warrants_real_example():
         "상위접수번호": ["20251212000428"],
         "최초공시일": ["2025-12-12"]
     }
-    
+
     df = pd.DataFrame(data)
-    
+
     # 엑셀 바이너리 시뮬레이션
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name="Sheet1")
     content = output.getvalue()
-    
+
     parser = DisclosureParser()
     items = parser.parse_bond_with_warrants(content)
-    
+
     assert len(items) == 1
     bw = items[0]
     assert bw.name == "오텍"

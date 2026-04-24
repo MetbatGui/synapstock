@@ -1,9 +1,9 @@
-import os
-import pytest
 import logging
 import re
+
+import pytest
+
 from synapstock.infrastructure.container import Container
-from synapstock.domain.statistics.models import PaidInCapitalIncrease
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -11,30 +11,30 @@ logger = logging.getLogger(__name__)
 
 def test_actual_capital_increase_sync_robust():
     """실제 구글 드라이브 데이터를 활용하여 동기화 및 파싱 전 과정을 정밀 검증합니다."""
-    
+
     # 1. 환경 설정 및 컨테이너 초기화
     container = Container()
     stats_service = container.statistics_service
     config = container.config
-    
+
     if not config.capital_increase_folder_id:
         pytest.skip("GOOGLE_DRIVE_CAPITAL_INCREASE_FOLDER_ID 환경 변수가 설정되지 않았습니다.")
-    
+
     if not container.drive_adapter:
         pytest.skip("GoogleDriveAdapter가 초기화되지 않았습니다. (Token 파일 확인 필요)")
 
-    logger.info(f"\n" + "="*50)
+    logger.info("\n" + "="*50)
     logger.info(f"유상증자 정밀 통합 테스트 시작 (폴더 ID: {config.capital_increase_folder_id})")
     logger.info("="*50)
 
     # 2. 동기화 실행 (Listing -> Download -> Parsing -> Storage)
     # 개선된 헤더 자동 감지 로직이 포함된 파서가 동작합니다.
     items = stats_service.sync_capital_increase_data()
-    
+
     # 3. 데이터 실존성 및 건수 검증
     assert items is not None, "❌ 동기화 결과가 None입니다."
     assert len(items) > 0, "❌ 파싱된 데이터가 0건입니다. 엑셀 구조나 헤더 감지 로직을 확인하세요."
-    
+
     logger.info(f"✅ 총 {len(items)}건의 데이터를 성공적으로 파싱했습니다.")
 
     # 4. 연도별 분포 검증 (멀티 시트 파싱 확인)
@@ -55,14 +55,14 @@ def test_actual_capital_increase_sync_robust():
     # 6. 수치 정합성 전수 조사 (Math Logic Integrity)
     error_count = 0
     for i, item in enumerate(items):
-        expected_total = (item.fund_facility + item.fund_operation + 
-                         item.fund_acquisition_biz + item.fund_acquisition_sec + 
+        expected_total = (item.fund_facility + item.fund_operation +
+                         item.fund_acquisition_biz + item.fund_acquisition_sec +
                          item.fund_debt_repayment + item.fund_etc)
         if item.total_fund != expected_total:
             if error_count < 5: # 로그 폭주 방지
                 logger.error(f"❌ 금액 불일치 발견 [{item.date} {item.name}]: Expected {expected_total}, Got {item.total_fund}")
             error_count += 1
-    
+
     assert error_count == 0, f"❌ 총 {error_count}건의 자금 합계 불일치가 발견되었습니다."
     logger.info("✅ 모든 항목의 자금 조달 합계(total_fund) 정합성 확인 완료.")
 
@@ -77,11 +77,11 @@ def test_actual_capital_increase_sync_robust():
     mapped_count = sum(1 for item in items if item.ticker is not None)
     mapping_rate = (mapped_count / len(items)) * 100
     logger.info(f"📊 티커 매핑 통계: {mapped_count}/{len(items)} ({mapping_rate:.1f}%)")
-    
+
     # 9. 로컬 저장소 캐싱 확인
     repo_file = config.capital_increase_dir / "capital_increase_data.json"
     assert repo_file.exists(), "❌ 로컬 캐시 파일이 생성되지 않았습니다."
-    
+
     logger.info("="*50)
     logger.info("✨ 유상증자 정밀 통합 테스트 최종 통과!")
     logger.info("="*50)

@@ -4,16 +4,13 @@ Naver Finance 자동완성, DART 공시, 재무 데이터, 뉴스 스크래핑 �
 종목과 관련된 조회 및 관리 엔드포인트를 제공합니다.
 """
 
-import re
-from datetime import datetime
+import asyncio
 from typing import cast
 
-import requests
-from bs4 import BeautifulSoup, Tag
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from synapstock.presentation.web.core.dependencies import media_service, query_service
+from synapstock.presentation.web.core.dependencies import media_service, news_service, query_service
 
 router = APIRouter()
 
@@ -139,81 +136,22 @@ async def get_disclosures(ticker: str) -> list | JSONResponse:
 @router.get("/api/news/scrape", response_model=None)
 async def scrape_news(url: str) -> dict | JSONResponse:
     """뉴스 URL에서 제목과 날짜를 스크래핑하여 반환합니다.
-
-    `og:title`, `<title>` 순으로 제목을 추출하고,
-    `article:published_time` 등의 메타 태그를 우선 탐색하여 날짜를 추출합니다.
-    날짜를 찾지 못하면 오늘 날짜를 사용합니다.
-
-    Args:
-        url (str): 스크래핑할 뉴스 기사 URL.
-
-    Returns:
-        dict: 다음 키를 포함하는 딕셔너리:
-            - ``title`` (str): 추출된 뉴스 제목.
-            - ``date`` (str): ``YYYY-MM-DD`` 형식의 날짜.
-            - ``url`` (str): 요청한 원본 URL.
-
-    Raises:
-        JSONResponse (400): URL 접속에 실패한 경우 (HTTP 오류).
-        JSONResponse (500): 스크래핑 중 예외 발생 시.
+    NewsService를 사용하여 일관된 스크래핑 결과를 보장합니다.
     """
     if not (url.startswith("http://") or url.startswith("https://")):
         return JSONResponse(status_code=400, content={"message": "Invalid URL format"})
 
     try:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
+        # NewsService의 스크래퍼 어댑터 활용
+        scraped = await news_service.scraper.scrape(url)
+        if not scraped or not scraped.title:
+            return JSONResponse(status_code=400, content={"message": "뉴스 정보를 추출할 수 없습니다."})
+
+        return {
+            "title": scraped.title,
+            "date": scraped.date,
+            "url": url
         }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.encoding = response.apparent_encoding
-
-        if response.status_code != 200:
-            return JSONResponse(
-                status_code=400,
-                content={"message": f"URL 접속 실패: {response.status_code}"},
-            )
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # 1. 제목 추출
-        title = ""
-        og_title = soup.find("meta", property="og:title")
-        if isinstance(og_title, Tag):
-            title = str(og_title.get("content", ""))
-        if not title:
-            title_tag = soup.find("title")
-            if isinstance(title_tag, Tag):
-                title = title_tag.get_text().strip()
-
-        # 2. 날짜 추출
-        date_str = ""
-        date_tags = [
-            ("meta", {"property": "article:published_time"}),
-            ("meta", {"property": "og:pubdate"}),
-            ("meta", {"name": "pubdate"}),
-            ("meta", {"name": "date"}),
-        ]
-        for tag_name, attrs in date_tags:
-            tag = soup.find(tag_name, attrs)
-            if isinstance(tag, Tag):
-                content = str(tag.get("content", ""))
-                if content:
-                    date_match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", content)
-                    if date_match:
-                        date_str = date_match.group(1).replace(".", "-").replace("/", "-")
-                        break
-
-        if not date_str:
-            match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", response.text)
-            if match:
-                date_str = match.group(1).replace(".", "-").replace("/", "-")
-            else:
-                date_str = datetime.now().strftime("%Y-%m-%d")
-
-        return {"title": title, "date": date_str, "url": url}
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 
@@ -237,7 +175,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = media_service.add_stock_news(board, ticker, title, date, url)
+        success = await asyncio.to_thread(media_service.add_stock_news, board, ticker, title, date, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -262,7 +200,7 @@ async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONRes
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = media_service.remove_stock_news(board, ticker, url)
+        success = await asyncio.to_thread(media_service.remove_stock_news, board, ticker, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or news not found"})

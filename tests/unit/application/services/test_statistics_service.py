@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from synapstock.application.services.statistics_service import StatisticsService
+
 
 @pytest.fixture
 def mock_query_service():
@@ -46,10 +49,10 @@ class TestStatisticsService:
         # 1. 정식 명칭 매핑 확인
         assert ticker_map["LIG디펜스앤에어로스페이스"] == "079550"
         assert ticker_map["삼성전자"] == "005930"
-        
+
         # 2. 별칭 매핑 확인
         assert ticker_map["LIG넥스원"] == "079550"
-        
+
         # 3. 전체 개수 확인 (정식 2개 + 별칭 1개 = 3개)
         assert len(ticker_map) == 3
 
@@ -62,16 +65,16 @@ class TestStatisticsService:
     def test_normalize_item_name(self, service, mock_query_service):
         """별칭(LIG넥스원)이 들어왔을 때 정규 사명(LIG디펜스앤에어로스페이스)으로 치환되어야 한다."""
         from synapstock.domain.statistics.models import RankingItem
-        
+
         # Arrange
         item = RankingItem(rank=1, name="LIG넥스원", amount=1000, ticker=None)
         mock_query_service.search_ticker.return_value = [
             {"name": "LIG디펜스앤에어로스페이스", "ticker": "079550"}
         ]
-        
+
         # Act
         service._normalize_item_name(item)
-        
+
         # Assert
         assert item.name == "LIG디펜스앤에어로스페이스"
         assert item.ticker == "079550"
@@ -80,17 +83,17 @@ class TestStatisticsService:
     def test_normalize_item_name_lowercase(self, service, mock_query_service):
         """소문자 별칭(lig넥스원)이 들어왔을 때도 정규 사명으로 치환되어야 한다."""
         from synapstock.domain.statistics.models import RankingItem
-        
+
         # Arrange
         item = RankingItem(rank=1, name="lig넥스원", amount=500, ticker=None)
         # 실제 NaverTickerSearchAdapter는 내부에서 정규화를 수행하여 반환함
         mock_query_service.search_ticker.return_value = [
             {"name": "LIG디펜스앤에어로스페이스", "ticker": "079550"}
         ]
-        
+
         # Act
         service._normalize_item_name(item)
-        
+
         # Assert
         assert item.name == "LIG디펜스앤에어로스페이스"
         assert item.ticker == "079550"
@@ -102,7 +105,7 @@ class TestStatisticsService:
         # Arrange: 모킹 설정
         mock_storage = service._storage
         mock_repo = service._convertible_bond_repo
-        
+
         # 1. 파일 목록 모킹
         mock_storage.list_files_in_folder.return_value = [
             {"name": "2026_CB_Analysis.xlsx"}
@@ -129,7 +132,7 @@ class TestStatisticsService:
         assert len(result) == 2
         assert result[0].ticker == "005930"
         assert result[1].ticker == "005380"
-        
+
         # 저장소 호출 확인
         mock_repo.save_data.assert_called_once_with(result)
         mock_storage.get_file.assert_called_once_with("2026_CB_Analysis.xlsx", folder="convertible_bond")
@@ -138,15 +141,15 @@ class TestStatisticsService:
         """캐시가 있으면 동기화 없이 캐시를 반환하고, 없으면 동기화를 수행해야 한다."""
         from synapstock.domain.statistics.models import ConvertibleBond
         mock_repo = service._convertible_bond_repo
-        
+
         # 1. 캐시가 있는 경우
         cached_data = [ConvertibleBond(date="2026-01-01", name="캐시종목", bond_amount=100, rcp_no="c1")]
         mock_repo.load_data.return_value = cached_data
-        
+
         service.sync_convertible_bond_data = MagicMock()
-        
+
         result = service.get_convertible_bond_data()
-        
+
         assert result == cached_data
         service.sync_convertible_bond_data.assert_not_called()
 
@@ -154,9 +157,9 @@ class TestStatisticsService:
         mock_repo.load_data.return_value = []
         sync_result = [ConvertibleBond(date="2026-01-01", name="동기종목", bond_amount=200, rcp_no="s1")]
         service.sync_convertible_bond_data.return_value = sync_result
-        
+
         result = service.get_convertible_bond_data()
-        
+
         assert result == sync_result
         service.sync_convertible_bond_data.assert_called_once()
 
@@ -167,7 +170,7 @@ class TestStatisticsService:
         # Arrange
         mock_storage = service._storage
         mock_repo = service._bw_repo
-        
+
         mock_storage.list_files_in_folder.return_value = [{"name": "2026_BW_Analysis.xlsx"}]
         mock_storage.get_file.return_value = b"fake_excel_content"
 
@@ -193,12 +196,12 @@ class TestStatisticsService:
         """BW 데이터 요청 시 캐시가 있으면 반환하고, 없으면 동기화해야 한다."""
         from synapstock.domain.statistics.models import BondWithWarrants
         mock_repo = service._bw_repo
-        
+
         # 1. 캐시 히트
         cached = [BondWithWarrants(date="2026-01-05", name="캐시BW", rcp_no="c1")]
         mock_repo.load_data.return_value = cached
         service.sync_bw_data = MagicMock()
-        
+
         assert service.get_bw_data() == cached
         service.sync_bw_data.assert_not_called()
 
@@ -206,6 +209,6 @@ class TestStatisticsService:
         mock_repo.load_data.return_value = []
         sync_val = [BondWithWarrants(date="2026-01-05", name="동기BW", rcp_no="s1")]
         service.sync_bw_data.return_value = sync_val
-        
+
         assert service.get_bw_data() == sync_val
         service.sync_bw_data.assert_called_once()

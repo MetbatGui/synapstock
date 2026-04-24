@@ -55,6 +55,17 @@ class Node(BaseModel):
                 return found
         return None
 
+    def find_stock(self, ticker: str) -> Stock | None:
+        """티커로 하위 종목을 재귀적으로 검색한다."""
+        for stock in self.stocks:
+            if stock.ticker == ticker:
+                return stock
+        for child in self.nodes:
+            found = child.find_stock(ticker)
+            if found:
+                return found
+        return None
+
     def add_stock(self, stock: Stock) -> bool:
         """중복 체크 후 종목을 추가한다. 이미 존재하면 True(성공)를 반환한다."""
         if any(s.ticker == stock.ticker for s in self.stocks):
@@ -210,6 +221,10 @@ class Board(BaseModel):
     def find_node(self, name: str) -> Node | None:
         """보드 내에서 이름으로 노드를 검색한다."""
         return self.root.find_node(name)
+
+    def find_stock(self, ticker: str) -> Stock | None:
+        """보드 내에서 티커로 종목을 검색한다."""
+        return self.root.find_stock(ticker)
 
     def add_node(self, parent_name: str, node_name: str) -> bool:
         """특정 노드 하위에 새 노드를 추가한다."""

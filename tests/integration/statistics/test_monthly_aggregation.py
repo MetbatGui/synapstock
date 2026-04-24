@@ -1,26 +1,34 @@
-import pytest
 from unittest.mock import MagicMock
-from synapstock.domain.statistics.models import DailyMarketRanking, RankingItem, MarketType, SupplySubject, MonthlyMarketStats
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
-from synapstock.application.services.statistics_service import StatisticsService
+
+import pytest
+
 from synapstock.application.services.query_service import BoardQueryService
+from synapstock.application.services.statistics_service import StatisticsService
+from synapstock.domain.statistics.models import (
+    DailyMarketRanking,
+    MarketType,
+    RankingItem,
+    SupplySubject,
+)
+from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
+
 
 @pytest.fixture
 def monthly_stats_setup(tmp_path):
     """월간 통계 테스트를 위한 서비스 및 종속성 셋업."""
     repo_dir = tmp_path / "stats"
     repo = LocalStatisticsRepository(data_root=str(repo_dir))
-    
+
     # QueryService 모킹 (로컬 티커 맵 빌드 테스트용)
     mock_query_service = MagicMock(spec=BoardQueryService)
-    
+
     # 보드에 등록된 샘플 종목 데이터 설정
     mock_query_service.get_all_stocks_flat.return_value = [
         {"name": "삼성전자", "ticker": "005930"},
         {"name": "SK하이닉스", "ticker": "000660"},
         {"name": "카카오", "ticker": "035720"}
     ]
-    
+
     service = StatisticsService(repository=repo, query_service=mock_query_service)
     return repo, service, mock_query_service
 
@@ -29,7 +37,7 @@ def test_monthly_aggregation_accumulation(monthly_stats_setup):
     repo, service, _ = monthly_stats_setup
     market = MarketType.KOSPI
     subject = SupplySubject.FOREIGN
-    
+
     # 2026-04-01: 삼성전자 100, SK하이닉스 50
     day1 = DailyMarketRanking(
         date="2026-04-01", market=market, subject=subject,
@@ -47,18 +55,18 @@ def test_monthly_aggregation_accumulation(monthly_stats_setup):
         ]
     )
     service.save_rankings([day1, day2])
-    
+
     # 4월 월간 집계 수행
     result = service.get_monthly_ranking("2026-04", market, subject)
-    
+
     assert result.month == "2026-04"
     items = {item.name: item.amount for item in result.items}
-    
+
     # 합산 결과 확인
     assert items["삼성전자"] == 300
     assert items["SK하이닉스"] == 50
     assert items["카카오"] == 150
-    
+
     # 상위 종목 순 정렬 확인
     assert result.items[0].name == "삼성전자"
     assert result.items[1].name == "카카오"
@@ -69,7 +77,7 @@ def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
     repo, service, mock_query_service = monthly_stats_setup
     market = MarketType.KOSPI
     subject = SupplySubject.FOREIGN
-    
+
     day = DailyMarketRanking(
         date="2026-04-01", market=market, subject=subject,
         items=[
@@ -78,17 +86,17 @@ def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
         ]
     )
     service.save_rankings([day])
-    
+
     result = service.get_monthly_ranking("2026-04", market, subject)
-    
+
     items = {item.name: item for item in result.items}
-    
+
     # 보드에 있는 종목은 티커가 매핑되어야 함
     assert items["삼성전자"].ticker == "005930"
-    
+
     # 보드에 없는 종목은 티커가 None이어야 함 (최적화 로직에 의해 외부 API 호출 안 함)
     assert items["미등록종목"].ticker is None
-    
+
     # QueryService의 get_all_stocks_flat이 한 번만 호출되었는지 확인 (최적화 확인)
     assert mock_query_service.get_all_stocks_flat.call_count == 1
     # 개별 종목 검색 API(search_ticker)는 호출되지 않아야 함
@@ -97,9 +105,9 @@ def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
 def test_monthly_aggregation_empty_data(monthly_stats_setup):
     """데이터가 없는 월에 대한 처리 검증."""
     _, service, _ = monthly_stats_setup
-    
+
     result = service.get_monthly_ranking("2099-12", MarketType.KOSPI, SupplySubject.FOREIGN)
-    
+
     assert result.items == []
     assert result.month == "2099-12"
 
@@ -108,14 +116,14 @@ def test_monthly_aggregation_sorting_and_limit(monthly_stats_setup):
     repo, service, _ = monthly_stats_setup
     market = MarketType.KOSPI
     subject = SupplySubject.FOREIGN
-    
+
     # 50개의 종목 데이터 생성
     items = [RankingItem(rank=i+1, name=f"Stock{i:02d}", amount=500-i) for i in range(50)]
     day = DailyMarketRanking(date="2026-04-01", market=market, subject=subject, items=items)
     service.save_rankings([day])
-    
+
     result = service.get_monthly_ranking("2026-04", market, subject)
-    
+
     assert len(result.items) == 30
     assert result.items[0].name == "Stock00"
     assert result.items[0].amount == 500

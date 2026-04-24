@@ -1,7 +1,8 @@
+
 import pytest
-from pathlib import Path
-import shutil
+
 from synapstock.infrastructure.adapters.local.file_storage import LocalFileStorageAdapter
+
 
 @pytest.fixture
 def temp_storage_dir(tmp_path):
@@ -30,10 +31,10 @@ class TestLocalFileStorageAdapter:
         """
         data = b"hello world"
         path = "test.txt"
-        
+
         storage.put_file(path, data)
         read_data = storage.get_file(path)
-        
+
         assert read_data == data
 
     def test_ensure_directory(self, storage):
@@ -47,9 +48,9 @@ class TestLocalFileStorageAdapter:
             실제 디렉토리가 존재하고 path_exists()가 True인지 확인한다.
         """
         dir_path = "subdir/inner"
-        
+
         success = storage.ensure_directory(dir_path)
-        
+
         assert success is True
         assert storage.path_exists(dir_path) is True
 
@@ -65,9 +66,9 @@ class TestLocalFileStorageAdapter:
         """
         storage.put_file("folder/file1.txt", b"1")
         storage.put_file("folder/file2.txt", b"2")
-        
+
         files = storage.list_files_in_folder("folder")
-        
+
         assert len(files) == 2
         names = [f["name"] for f in files]
         assert "file1.txt" in names
@@ -85,9 +86,9 @@ class TestLocalFileStorageAdapter:
         """
         storage.put_file("source.txt", b"content")
         dest_path = tmp_path / "dest.txt"
-        
+
         success = storage.download_file("source.txt", str(dest_path))
-        
+
         assert success is True
         assert dest_path.exists()
         assert dest_path.read_bytes() == b"content"

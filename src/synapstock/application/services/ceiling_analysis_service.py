@@ -1,11 +1,13 @@
+import io
 import logging
 import re
-import io
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
+
+from synapstock.application.services.base_statistics_service import BaseStatisticsService
 from synapstock.domain.statistics.models import CeilingAnalysisReport
 from synapstock.infrastructure.parsers.excel import CeilingParser
-from synapstock.application.services.base_statistics_service import BaseStatisticsService
 
 logger = logging.getLogger(__name__)
 
@@ -23,26 +25,26 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
 
     def get_ceiling_analysis(self, date: str | None = None, force_sync: bool = False) -> CeilingAnalysisReport | None:
         """스마트 동기화 로직을 적용하여 상한가 리포트를 조회합니다."""
-        
+
         # 1. 날짜 기본값 설정 (오늘)
         if not date:
             date = datetime.now().strftime("%Y-%m-%d")
-            
+
         year = date[:4]
         try:
             parts = date.split('-')
             target_mmdd = f"{int(parts[1]):02d}-{int(parts[2]):02d}"
         except (IndexError, ValueError):
             target_mmdd = date[5:10]
-            
+
         # 2. 메타데이터 로드
         metadata = self.repository.load_metadata()
         last_synced_at = metadata.get("last_synced_at", "1970-01-01T00:00:00Z")
         latest_data_date = metadata.get("latest_data_date", "")
-        
+
         today_str = datetime.now().strftime("%Y-%m-%d")
         should_sync = force_sync
-        
+
         # 3. 클라우드 상태 체크 (수정 일자 확인)
         cloud_file_info = self._get_cloud_file_info(year)
         if cloud_file_info:
@@ -51,9 +53,9 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
             if modified_time > last_synced_at and latest_data_date != today_str:
                 logger.info(f"[{self.get_service_name()}] 클라우드 파일 갱신 감지. (Cloud: {modified_time} > Sync: {last_synced_at})")
                 should_sync = True
-        
+
         reports: list[CeilingAnalysisReport] = []
-        
+
         # 4. 동기화가 불필요한 경우 로컬 캐시 사용
         if not should_sync:
             report = self.repository.load_report(date)
@@ -80,11 +82,11 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
                     "last_synced_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "latest_data_date": new_latest_date
                 })
-        
+
         if not reports:
             logger.warning(f"[{self.get_service_name()}] 동기화된 리포트가 없습니다.")
             return None
-            
+
         # 6. 결과 필터링 및 반환 (정밀 매칭)
         # 1순위: 요청 날짜와 리포트 기준일(시트명)이 정확히 일치하는 경우
         for r in reports:
@@ -106,7 +108,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
                 if any(it.closing_prices[idx] > 0 for it in r.items if it.closing_prices):
                     logger.info(f"[{self.get_service_name()}] 보조 매칭 성공 (시트: {r.end_date}, 데이터: {target_mmdd})")
                     return self._slice_report_by_date(r, date, idx)
-                
+
         logger.warning(f"[{self.get_service_name()}] 모든 리포트에서 {target_mmdd}의 유효한 데이터를 찾을 수 없습니다.")
         return None
 
@@ -128,7 +130,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
             new_prices = item.closing_prices[:date_idx + 1]
             new_item = item.model_copy(update={"closing_prices": new_prices})
             new_items.append(new_item)
-            
+
         return report.model_copy(update={
             "end_date": target_date,
             "dates": new_dates,
@@ -139,7 +141,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
         """연간 단위의 상한가 분석 파일 내의 모든 시트 데이터를 한꺼번에 동기화하여 캐싱합니다."""
         year = date_str[:4]
         save_func = getattr(self.repository, "save_report", lambda x: None)
-        
+
         return self._sync_domain_data(
             year_str=year,
             filename_pattern="상한가",
@@ -152,28 +154,28 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
         """특정 연도 엑셀 파일의 시트명(YYMMDD)을 분석하여 날짜 목록을 반환합니다."""
         if not self.drive_adapter:
             return []
-            
+
         files = self.drive_adapter.list_files_in_folder("", folder="ceiling")
         target_files = [f for f in files if year in f["name"] and f["name"].lower().endswith((".xlsx", ".xls"))]
-        
+
         if not target_files:
             return []
-            
+
         latest_file = sorted(target_files, key=lambda x: x["name"], reverse=True)[0]
         content = self.drive_adapter.get_file(latest_file["name"], folder="ceiling")
-        
+
         if not content:
             return []
-            
+
         try:
             excel = pd.ExcelFile(io.BytesIO(content))
             sheet_names = excel.sheet_names
-            
+
             full_dates = []
             for sheet in sheet_names:
                 if len(sheet) == 6 and sheet.isdigit():
                     full_dates.append(f"20{sheet[:2]}-{sheet[2:4]}-{sheet[4:6]}")
-            
+
             return sorted(full_dates, reverse=True)
         except Exception as e:
             logger.error(f"[{self.get_service_name()}] 시트 목록 추출 실패: {e}")
@@ -183,7 +185,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
         """상한가 데이터가 존재하는 모든 연도 목록을 반환합니다."""
         if not self.drive_adapter:
             return []
-            
+
         files = self.drive_adapter.list_files_in_folder("", folder="ceiling")
         years = set()
         for f in files:
@@ -192,5 +194,5 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
                 match = re.search(r"20\d{2}", name)
                 if match:
                     years.add(match.group())
-        
+
         return sorted(list(years), reverse=True)

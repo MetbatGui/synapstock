@@ -119,7 +119,7 @@ class TestNode:
         grandchild = child.add_child("grandchild")
 
         found = root.find_node("grandchild")
-        
+
         assert found is grandchild
         assert found.name == "grandchild"
 
@@ -135,9 +135,9 @@ class TestNode:
         """
         node = Node(name="sector", depth=1)
         node.add_stock(Stock(name="Stock1", ticker="S1"))
-        
+
         node.add_stock(Stock(name="Stock1_Dup", ticker="S1"))
-        
+
         assert len(node.stocks) == 1
         assert node.stocks[0].name == "Stock1"
 
@@ -154,9 +154,9 @@ class TestNode:
         root = Node(name="root", depth=0)
         child = root.add_child("child")
         child.add_stock(Stock(name="Stock1", ticker="S1"))
-        
+
         success = root.find_and_remove_stock("S1")
-        
+
         assert success is True
         assert len(child.stocks) == 0
 
@@ -175,13 +175,13 @@ class TestNode:
         child = root.add_child("child")
         stock = Stock(name="Stock1", ticker="S1")
         child.add_stock(stock)
-        
+
         news = {"title": "Title", "date": "2024-01-01", "url": "http://test.com"}
-        
+
         # Add
         root.find_and_add_news("S1", news)
         assert len(child.stocks[0].news) == 1
-        
+
         # Remove
         root.find_and_remove_news("S1", "http://test.com")
         assert len(child.stocks[0].news) == 0
@@ -201,13 +201,13 @@ class TestNode:
         child = root.add_child("child")
         stock = Stock(name="Stock1", ticker="S1")
         child.add_stock(stock)
-        
+
         report_path = "data/pdf/report1.pdf"
-        
+
         # Add
         root.find_and_add_report("S1", report_path)
         assert len(child.stocks[0].reports) == 1
-        
+
         # Remove
         root.find_and_remove_report("S1", report_path)
         assert len(child.stocks[0].reports) == 0
