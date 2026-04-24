@@ -103,10 +103,14 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             if not self.drive_adapter:
                 return []
 
-            # 1. 고정된 폴더 구조 탐색 (2026년 -> 일별수급정리표)
-            target_year = "2026년"
+            # 1. 고정된 폴더 구조 탐색 (현재 연도 기준)
+            from datetime import datetime
+            now = datetime.now()
+            current_year = now.year
+            
+            target_year = f"{current_year}년"
             target_subfolder = "일별수급정리표"
-            target_filename = "2026일별수급순위정리표.xlsx"
+            target_filename = f"{current_year}일별수급순위정리표.xlsx"
 
             # 1.1 연도 폴더 찾기
             root_files = await self.drive_adapter.list_files_in_folder("", folder="sd")
