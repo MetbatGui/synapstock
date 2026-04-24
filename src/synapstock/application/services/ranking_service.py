@@ -150,13 +150,23 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             newly_synced_count = 0
 
             for sheet_name in sheet_names:
-                # 시트 이름이 날짜 형식(YYYY-MM-DD 또는 YYYYMMDD)인지 확인 및 정규화
-                date_norm = sheet_name.replace(".", "-").replace("/", "-").strip()
-                if len(date_norm) == 8 and date_norm.isdigit(): # YYYYMMDD -> YYYY-MM-DD
-                    date_norm = f"{date_norm[:4]}-{date_norm[4:6]}-{date_norm[6:]}"
+                # 시트 이름 정규화 (예: 1.2 -> 2026-01-02, 0102 -> 2026-01-02, 2026.1.2 -> 2026-01-02)
+                raw_name = sheet_name.replace(".", "-").replace("/", "-").strip()
+                parts = raw_name.split("-")
                 
-                # 날짜 형식이 아니면 건너뜀 (예: "종합", "설명" 등)
-                if not (len(date_norm) == 10 and date_norm[4] == "-" and date_norm[7] == "-"):
+                date_norm = None
+                if len(parts) == 3: # YYYY-MM-DD
+                    y, m, d = parts
+                    date_norm = f"{y}-{int(m):02d}-{int(d):02d}"
+                elif len(parts) == 2: # M-D -> YYYY-MM-DD
+                    m, d = parts
+                    date_norm = f"{current_year}-{int(m):02d}-{int(d):02d}"
+                elif len(raw_name) == 8 and raw_name.isdigit(): # YYYYMMDD
+                    date_norm = f"{raw_name[:4]}-{raw_name[4:6]}-{raw_name[6:]}"
+                elif len(raw_name) == 4 and raw_name.isdigit(): # MMDD -> YYYYMMDD
+                    date_norm = f"{current_year}-{raw_name[:2]}-{raw_name[2:]}"
+                
+                if not date_norm:
                     continue
 
                 if date_norm not in existing_dates:
