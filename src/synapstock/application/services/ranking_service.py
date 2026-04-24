@@ -108,7 +108,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 return []
 
             # 1. 파일 목록 조회 (계층형 구조 지원)
-            files = await self.drive_adapter.list_files(self.folder_id)
+            files = await self.drive_adapter.list_files_in_folder("", folder="sd")
             if not files:
                 logger.warning(f"[{self.get_service_name()}] 드라이브에서 파일을 찾을 수 없습니다.")
                 return []
@@ -124,7 +124,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 year_folder = next((f for f in year_folders if target_year in f["name"]), year_folders[0])
                 logger.info(f"[{self.get_service_name()}] 연도 서브폴더 탐색: {year_folder['name']}")
 
-                sub_items = await self.drive_adapter.list_files_in_folder("", root_id=year_folder["id"])
+                sub_items = await self.drive_adapter.list_files_in_folder("", root_id=year_folder["id"], folder="sd")
                 month_folders = [f for f in sub_items if "월" in f["name"] and f["mimeType"] == "application/vnd.google-apps.folder"]
 
                 if month_folders:
@@ -134,7 +134,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                         month_folder = sorted(month_folders, key=lambda x: x["name"], reverse=True)[0]
 
                     logger.info(f"[{self.get_service_name()}] 월 서브폴더 탐색: {month_folder['name']}")
-                    all_files = await self.drive_adapter.list_files_in_folder("", root_id=month_folder["id"])
+                    all_files = await self.drive_adapter.list_files_in_folder("", root_id=month_folder["id"], folder="sd")
                 else:
                     all_files = sub_items
             else:
