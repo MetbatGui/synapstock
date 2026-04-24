@@ -33,14 +33,14 @@ class NewsService:
             return None
 
         # 2. 저장 메서드 호출
-        return self.save_news(
+        return await self.save_news(
             title=scraped.title,
             url=url,
             ticker=ticker,
             stock_name=stock_name
         )
 
-    def save_news(self, title: str, url: str, ticker: str | None = None, stock_name: str | None = None) -> NewsItem | None:
+    async def save_news(self, title: str, url: str, ticker: str | None = None, stock_name: str | None = None) -> NewsItem | None:
         """이미 확보된 뉴스 정보를 아카이브에 저장하고 동기화합니다."""
 
         # 1. NewsItem 생성 (저장 시각 및 URL 해시 기준)
@@ -71,13 +71,13 @@ class NewsService:
             logger.info(f"[NewsService] 뉴스 아카이브 저장 완료: {item.title}")
 
             if self.drive_adapter and self.news_folder_id:
-                self._sync_to_drive(batch)
+                await self._sync_to_drive(batch)
 
             return item
 
         return None
 
-    def _sync_to_drive(self, batch: NewsBatch):
+    async def _sync_to_drive(self, batch: NewsBatch):
         """특정 배치를 구글 드라이브에 업로드합니다."""
         if not self.drive_adapter or not self.news_folder_id:
             return
@@ -87,7 +87,7 @@ class NewsService:
 
         try:
             # StoragePort.put_file을 사용하여 업로드
-            success = self.drive_adapter.put_file(
+            success = await self.drive_adapter.put_file(
                 path=filename,
                 data=content,
                 folder="news" # GoogleDriveAdapter에서 news 키워드로 매핑된 폴더 사용

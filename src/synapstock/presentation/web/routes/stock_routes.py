@@ -175,7 +175,7 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = await asyncio.to_thread(media_service.add_stock_news, board, ticker, title, date, url)
+        success = await media_service.add_stock_news(board, ticker, title, date, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -200,7 +200,7 @@ async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONRes
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = await asyncio.to_thread(media_service.remove_stock_news, board, ticker, url)
+        success = await media_service.remove_stock_news(board, ticker, url)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or news not found"})

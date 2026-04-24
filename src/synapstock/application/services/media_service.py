@@ -24,11 +24,11 @@ class StockMediaService:
         self._news_service = news_service
         self._pdf_dir = pdf_dir
 
-    def add_stock_report(self, board_name: str, ticker: str, file_content: bytes, filename: str) -> bool:
+    async def add_stock_report(self, board_name: str, ticker: str, file_content: bytes, filename: str) -> bool:
         """종목에 PDF 리포트 파일을 물리적으로 저장하고 보드 데이터에 링크를 기록합니다."""
         # 1. 파일 시스템 저장 (StoragePort 추상화 사용)
         target_path = f"{self._pdf_dir}/{filename}"
-        if not self._storage.put_file(target_path, file_content):
+        if not await self._storage.put_file(target_path, file_content):
             return False
 
         # 2. 보드 데이터 로드 및 업데이트
@@ -39,7 +39,7 @@ class StockMediaService:
             self._repository.save(board)
         return success
 
-    def remove_stock_report(self, board_name: str, ticker: str, report_path: str) -> bool:
+    async def remove_stock_report(self, board_name: str, ticker: str, report_path: str) -> bool:
         """종목에서 리포트 파일 링크를 제거합니다. (물리 파일 삭제는 정책에 따라 별도로 처리 가능)"""
         board = self._repository.load(board_name)
         success = cast(bool, board.root.find_and_remove_report(ticker, report_path))
@@ -47,7 +47,7 @@ class StockMediaService:
             self._repository.save(board)
         return success
 
-    def add_stock_news(
+    async def add_stock_news(
         self, board_name: str, ticker: str, title: str, date: str, url: str, stock_name: str = ""
     ) -> bool:
         """종목에 뉴스 링크 정보를 추가합니다."""
@@ -65,8 +65,8 @@ class StockMediaService:
                     if found_stock:
                         stock_name = found_stock.name
 
-                # 저장일 기준으로 아카이브에 기록 (비동기가 아닌 동기 호출)
-                self._news_service.save_news(
+                # 저장일 기준으로 아카이브에 기록 (비동기 호출)
+                await self._news_service.save_news(
                     title=title,
                     url=url,
                     ticker=ticker,
@@ -74,7 +74,7 @@ class StockMediaService:
                 )
         return success
 
-    def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
+    async def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
         """종목에서 특정 뉴스 링크를 제거합니다."""
         board = self._repository.load(board_name)
         success = cast(bool, board.root.find_and_remove_news(ticker, url))

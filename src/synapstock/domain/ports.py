@@ -133,23 +133,23 @@ class StoragePort(ABC):
     """
 
     @abstractmethod
-    def path_exists(self, path: str, **kwargs) -> bool:
+    async def path_exists(self, path: str, **kwargs) -> bool:
         """경로 존재 여부를 확인한다."""
 
     @abstractmethod
-    def ensure_directory(self, path: str, **kwargs) -> bool:
+    async def ensure_directory(self, path: str, **kwargs) -> bool:
         """디렉토리 존재를 보장(없으면 생성)한다."""
 
     @abstractmethod
-    def get_file(self, path: str, **kwargs) -> bytes | None:
+    async def get_file(self, path: str, **kwargs) -> bytes | None:
         """파일 내용을 바이너리 바이트로 가져온다."""
 
     @abstractmethod
-    def put_file(self, path: str, data: bytes, **kwargs) -> bool:
+    async def put_file(self, path: str, data: bytes, **kwargs) -> bool:
         """바이트 데이터를 파일로 저장한다."""
 
     @abstractmethod
-    def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
+    async def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
         """특정 폴더 내의 파일 목록을 조회한다.
 
         Returns:
@@ -157,7 +157,7 @@ class StoragePort(ABC):
         """
 
     @abstractmethod
-    def download_file(self, filename: str, local_path: str, **kwargs) -> bool:
+    async def download_file(self, filename: str, local_path: str, **kwargs) -> bool:
         """파일을 원자적으로(Atomic) 특정 경로에 다운로드한다."""
 
 
