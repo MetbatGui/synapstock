@@ -2,13 +2,17 @@ import logging
 import time
 from pathlib import Path
 
+import pytest
+
 from synapstock.infrastructure.container import Container
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_ranking_cache_integration():
+@pytest.mark.asyncio
+
+async def test_ranking_cache_integration():
     """랭킹 시스템 캐싱 및 데이터 무결성 통합 테스트."""
     # 1. 컨테이너 초기화
     container = Container()
@@ -22,7 +26,7 @@ def test_ranking_cache_integration():
     logger.info("--- 1차 동기화 시작 (네트워크 다운로드 발생 가능) ---")
     start_time = time.time()
     # 최근 2026-04-22 데이터로 테스트
-    res1 = ranking_svc.sync_data("2026-04-22")
+    res1 = await ranking_svc.sync_data("2026-04-22")
     duration1 = time.time() - start_time
 
     logger.info(f"1차 동기화 완료: {len(res1)}개 항목, 소요시간: {duration1:.2f}s")
@@ -33,7 +37,7 @@ def test_ranking_cache_integration():
     # 5. 2차 동기화 실행 (캐시 작동 확인)
     logger.info("\n--- 2차 동기화 시작 (캐시 적중 예상) ---")
     start_time = time.time()
-    res2 = ranking_svc.sync_data("2026-04-22")
+    res2 = await ranking_svc.sync_data("2026-04-22")
     duration2 = time.time() - start_time
 
     logger.info(f"2차 동기화 완료: {len(res2)}개 항목, 소요시간: {duration2:.2f}s")

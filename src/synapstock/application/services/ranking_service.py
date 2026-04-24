@@ -1,6 +1,5 @@
 import io
 import logging
-from functools import lru_cache
 
 import pandas as pd
 
@@ -11,7 +10,6 @@ from synapstock.domain.statistics.models import (
     DailyMarketRankingAnalysis,
     MarketType,
     MonthlyMarketStats,
-    RankingItem,
     SupplySubject,
 )
 from synapstock.infrastructure.adapters.local.cache_manager import LocalCacheManager
@@ -27,45 +25,57 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
         self.repository = local_repository
         self.parser = SupplyDemandParser()
         self.cache_manager = LocalCacheManager()
+        self._daily_cache = {}
+        self._monthly_cache = {}
 
     def get_service_name(self) -> str:
         return "RankingService"
 
-    @lru_cache(maxsize=32)
-    def get_daily_ranking(self, date_str: str, market: MarketType = None, subject: SupplySubject = None) -> list[DailyMarketRanking] | DailyMarketRanking | None:
+    async def get_daily_ranking(self, date_str: str, market: MarketType = None, subject: SupplySubject = None) -> list[DailyMarketRanking] | DailyMarketRanking | None:
         """로컬 저장소에서 당일 순위를 가져오고, 없으면 동기화합니다.
         
         기존 Facade와의 호환성을 위해 market, subject가 지정되면 단일 객체를 반환합니다.
         """
+        cache_key = f"{date_str}_{market}_{subject}"
+        if cache_key in self._daily_cache:
+            return self._daily_cache[cache_key]
+
         if market and subject:
             res = self.repository.load_ranking(date_str, market, subject)
             if not res:
-                self.sync_data(date_str)
+                await self.sync_data(date_str)
                 res = self.repository.load_ranking(date_str, market, subject)
+            if res:
+                self._daily_cache[cache_key] = res
             return res
 
         rankings = self.repository.get_rankings(date_str)
         if not rankings:
-            return self.sync_data(date_str)
+            rankings = await self.sync_data(date_str)
+        if rankings:
+            self._daily_cache[cache_key] = rankings
         return rankings
 
-    def get_daily_summary(self, date: str) -> dict:
+    async def get_daily_summary(self, date: str) -> dict:
         """해당 날짜의 4가지 조합(코스피/코스닥 x 외국인/기관) 수급 데이터를 요약하여 반환합니다."""
         summary = {
             "KOSPI": {
-                "FOREIGN": self.get_daily_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": self.get_daily_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION),
+                "FOREIGN": await self.get_daily_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
+                "INSTITUTION": await self.get_daily_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION),
             },
             "KOSDAQ": {
-                "FOREIGN": self.get_daily_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": self.get_daily_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION),
+                "FOREIGN": await self.get_daily_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
+                "INSTITUTION": await self.get_daily_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION),
             }
         }
         return summary
 
-    @lru_cache(maxsize=12)
-    def get_monthly_ranking(self, month: str, market: MarketType, subject: SupplySubject) -> MonthlyMarketStats:
+    async def get_monthly_ranking(self, month: str, market: MarketType, subject: SupplySubject) -> MonthlyMarketStats:
         """한 달간의 일별 데이터를 합산하여 월간 누적 수급 순위를 산출합니다."""
+        cache_key = f"{month}_{market}_{subject}"
+        if cache_key in self._monthly_cache:
+            return self._monthly_cache[cache_key]
+
         available_dates = self.repository.list_available_dates(market, subject)
         target_dates = [d for d in available_dates if d.startswith(month)]
 
@@ -83,9 +93,11 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             return MonthlyMarketStats(month=month, market=market, subject=subject, items=[])
 
         # 도메인 모델의 비즈니스 로직을 호출하여 합산 수행
-        return MonthlyMarketStats.aggregate_from_daily(month, daily_rankings)
+        res = MonthlyMarketStats.aggregate_from_daily(month, daily_rankings)
+        self._monthly_cache[cache_key] = res
+        return res
 
-    def sync_data(self, date_str: str | None = None) -> list[DailyMarketRanking]:
+    async def sync_data(self, date_str: str | None = None) -> list[DailyMarketRanking]:
         """엑셀 파일에서 순위 데이터를 파싱하고 동기화합니다.
         
         date_str이 없으면 드라이브에서 가장 최신 파일을 찾아 동기화합니다.
@@ -96,7 +108,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 return []
 
             # 1. 파일 목록 조회 (계층형 구조 지원)
-            files = self.drive_adapter.list_files(self.folder_id)
+            files = await self.drive_adapter.list_files(self.folder_id)
             if not files:
                 logger.warning(f"[{self.get_service_name()}] 드라이브에서 파일을 찾을 수 없습니다.")
                 return []
@@ -112,7 +124,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 year_folder = next((f for f in year_folders if target_year in f["name"]), year_folders[0])
                 logger.info(f"[{self.get_service_name()}] 연도 서브폴더 탐색: {year_folder['name']}")
 
-                sub_items = self.drive_adapter.list_files_in_folder("", root_id=year_folder["id"])
+                sub_items = await self.drive_adapter.list_files_in_folder("", root_id=year_folder["id"])
                 month_folders = [f for f in sub_items if "월" in f["name"] and f["mimeType"] == "application/vnd.google-apps.folder"]
 
                 if month_folders:
@@ -122,7 +134,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                         month_folder = sorted(month_folders, key=lambda x: x["name"], reverse=True)[0]
 
                     logger.info(f"[{self.get_service_name()}] 월 서브폴더 탐색: {month_folder['name']}")
-                    all_files = self.drive_adapter.list_files_in_folder("", root_id=month_folder["id"])
+                    all_files = await self.drive_adapter.list_files_in_folder("", root_id=month_folder["id"])
                 else:
                     all_files = sub_items
             else:
@@ -154,7 +166,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                     logger.info(f"[{self.get_service_name()}] 업데이트 발견: {file_name} (Modified: {modified_time})")
                     needs_sync = True
 
-                    content = self.drive_adapter.get_file_by_id(file_info["id"])
+                    content = await self.drive_adapter.get_file_by_id(file_info["id"])
                     if not content: continue
 
                     sheets = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
@@ -182,7 +194,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             logger.error(f"[RankingService] 순위 동기화 실패: {e}", exc_info=True)
             return []
 
-    def get_analyzed_ranking(self, date, market, subject) -> DailyMarketRankingAnalysis:
+    async def get_analyzed_ranking(self, date, market, subject) -> DailyMarketRankingAnalysis:
         """이전 거래일과 비교하여 순위 변동을 분석합니다."""
         raw = self.repository.load_ranking(date, market, subject)
         if not raw:
@@ -207,7 +219,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 analyzed_items.append(AnalyzedRankingItem(
                     **item.model_dump(),
                     prev_rank=prev_rank,
-                    consecutive_days=self._calculate_consecutive_days(
+                    consecutive_days=await self._calculate_consecutive_days(
                         item.name, available_dates[current_idx:], market, subject, limit=11
                     )
                 ))
@@ -215,7 +227,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
 
         return DailyMarketRankingAnalysis(date=date, market=market, subject=subject, items=[AnalyzedRankingItem(**it.model_dump()) for it in raw.items])
 
-    def _calculate_consecutive_days(self, name, dates, market, subject, limit: int = 30) -> int:
+    async def _calculate_consecutive_days(self, name, dates, market, subject, limit: int = 30) -> int:
         """종목이 연속으로 순위권에 머문 일수를 계산합니다."""
         count = 0
         for d in dates:

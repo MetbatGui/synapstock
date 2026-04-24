@@ -9,7 +9,9 @@ from synapstock.infrastructure.container import Container
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_actual_gdrive_sync():
+@pytest.mark.asyncio
+
+async def test_actual_gdrive_sync():
     """실제 구글 드라이브와 연동하여 최근 데이터를 동기화하는 테스트."""
     # 1. 컨테이너 초기화 (실제 설정 및 어댑터 로드)
     container = Container()
@@ -26,7 +28,7 @@ def test_actual_gdrive_sync():
 
     # 4. 동기화 실행 (최근 2일치)
     # sync_recent_data 내부에 list_files_in_folder와 sync_from_storage 호출 로직이 있음
-    synced_count = stats_service.sync_recent_data(limit=2)
+    synced_count = await stats_service.sync_recent_data(limit=2)
 
     logger.info(f"Sync completed. Total synced dates: {synced_count}")
 
@@ -41,7 +43,7 @@ def test_actual_gdrive_sync():
     # 6. 특정 날짜 데이터 로드 시도 (예: 가장 최근 날짜)
     if available_dates:
         latest_date = available_dates[0]
-        ranking = stats_service.get_daily_ranking(latest_date, MarketType.KOSPI, SupplySubject.FOREIGN)
+        ranking = await stats_service.get_daily_ranking(latest_date, MarketType.KOSPI, SupplySubject.FOREIGN)
         assert ranking is not None
         assert len(ranking.items) > 0
         logger.info(f"Successfully loaded ranking for {latest_date}. Item count: {len(ranking.items)}")

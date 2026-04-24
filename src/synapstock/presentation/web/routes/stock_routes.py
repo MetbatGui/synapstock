@@ -4,7 +4,6 @@ Naver Finance 자동완성, DART 공시, 재무 데이터, 뉴스 스크래핑 �
 종목과 관련된 조회 및 관리 엔드포인트를 제공합니다.
 """
 
-import asyncio
 from typing import cast
 
 from fastapi import APIRouter

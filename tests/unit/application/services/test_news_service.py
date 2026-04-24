@@ -19,7 +19,9 @@ def mock_scraper():
 
 @pytest.fixture
 def mock_drive():
-    return MagicMock()
+    mock = MagicMock()
+    mock.put_file = AsyncMock()
+    return mock
 
 @pytest.fixture
 def news_service(mock_repo, mock_scraper, mock_drive):
@@ -31,12 +33,13 @@ def news_service(mock_repo, mock_scraper, mock_drive):
     )
 
 class TestNewsService:
-    def test_save_news_success(self, news_service, mock_repo, mock_drive):
+    @pytest.mark.asyncio
+    async def test_save_news_success(self, news_service, mock_repo, mock_drive):
         """뉴스 저장 시 로컬 저장소와 구글 드라이브 동기화가 호출되어야 한다."""
         mock_repo.load_batch.return_value = None # 신규 배치 생성 상황
         mock_repo.save_batch.return_value = True
 
-        item = news_service.save_news(
+        item = await news_service.save_news(
             title="테스트 뉴스",
             url="http://example.com/1",
             ticker="005930",
@@ -52,7 +55,8 @@ class TestNewsService:
         # 구글 드라이브 동기화 확인
         mock_drive.put_file.assert_called_once()
 
-    def test_save_news_duplicate_ignore(self, news_service, mock_repo, mock_drive):
+    @pytest.mark.asyncio
+    async def test_save_news_duplicate_ignore(self, news_service, mock_repo, mock_drive):
         """이미 존재하는 뉴스는 중복 저장하지 않아야 한다."""
         url = "http://example.com/1"
         url_hash = hashlib.md5(url.encode()).hexdigest()
@@ -65,7 +69,7 @@ class TestNewsService:
         )
         mock_repo.load_batch.return_value = NewsBatch(date=today, items=[existing_item])
 
-        item = news_service.save_news(
+        item = await news_service.save_news(
             title="중복 뉴스",
             url="http://example.com/1"
         )

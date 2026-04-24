@@ -17,10 +17,10 @@ class NewListingService(BaseStatisticsService[NewListing]):
     def get_service_name(self) -> str:
         return "NewListingService"
 
-    def get_data(self, year: str, force_sync: bool = False) -> list[NewListing]:
+    async def get_data(self, year: str, force_sync: bool = False) -> list[NewListing]:
         """로컬에서 데이터를 조회하고, 없거나 force_sync=True이면 클라우드와 수동 동기화를 시도합니다."""
         if force_sync:
-            return self.sync_data(year)
+            return await self.sync_data(year)
 
         # 신규 상장은 특정 연도 조회가 아닌 전체 또는 연도별 저장을 지원할 수 있음
         # 레포지토리 인터페이스에 맞춰 호출
@@ -29,12 +29,12 @@ class NewListingService(BaseStatisticsService[NewListing]):
             if items:
                 return items
 
-        return self.sync_data(year)
+        return await self.sync_data(year)
 
-    def sync_data(self, year: str) -> list[NewListing]:
+    async def sync_data(self, year: str) -> list[NewListing]:
         """Base 클래스의 동기화 워크플로우를 사용하여 신규 상장 데이터를 업데이트합니다."""
         save_func = getattr(self.repository, "save_new_listings", lambda x: None)
-        return self._sync_domain_data(
+        return await self._sync_domain_data(
             year_str=year,
             filename_pattern="신규상장",
             parser_func=self.parser.parse,

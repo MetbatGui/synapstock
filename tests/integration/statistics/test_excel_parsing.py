@@ -6,7 +6,10 @@ from synapstock.domain.statistics.models import MarketType, SupplySubject
 from synapstock.infrastructure.parsers.excel import SupplyDemandParser
 
 
-def test_clean_stock_name():
+@pytest.mark.asyncio
+
+
+async def test_clean_stock_name():
     """종목명 정제 로직 테스트 ((쌍), (씽), (상) 등 제거 확인)"""
     parser = SupplyDemandParser()
     assert parser._clean_stock_name("삼성전자") == "삼성전자"
@@ -16,7 +19,9 @@ def test_clean_stock_name():
     assert parser._clean_stock_name("  현대차 (쌍)  ") == "현대차"
     assert parser._clean_stock_name("정상종목 (우)") == "정상종목 (우)" # 우 우선주는 제거하면 안됨
 
-def test_parse_real_daily_ranking():
+@pytest.mark.asyncio
+
+async def test_parse_real_daily_ranking():
     """테스트 픽스처의 일별 수급 엑셀 파일 파싱 테스트."""
     # 고정된 테스트용 픽스처 경로 사용
     file_path = os.path.join("tests", "fixtures", "statistics", "daily_ranking_20260407.xlsx")
@@ -49,7 +54,9 @@ def test_parse_real_daily_ranking():
     for item in kospi_for.items[:10]:
         print(f"Rank {item.rank}: {item.name} ({item.amount}) [신고가: {item.high_price_type}]")
 
-def test_parse_real_monthly_cumulative():
+@pytest.mark.asyncio
+
+async def test_parse_real_monthly_cumulative():
     """월간 누적 엑셀 파일 파싱 테스트."""
     parser = SupplyDemandParser()
 
@@ -88,9 +95,12 @@ def test_parse_real_monthly_cumulative():
     assert stats.items[0].rank == 1
     assert stats.items[2].name == "LG에너지솔루션"
 
-def test_statistics_service_caching(tmp_path):
+@pytest.mark.asyncio
+
+async def test_statistics_service_caching(tmp_path):
     """StatisticsService의 저장소 연독 및 캐싱 기능 테스트."""
-    from synapstock.application.services.statistics_service import DailyMarketRanking, RankingItem, StatisticsService
+    from synapstock.application.services.statistics_service import StatisticsService
+    from synapstock.domain.statistics.models import DailyMarketRanking, RankingItem
     from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
 
     repo_dir = tmp_path / "stats"
@@ -108,13 +118,15 @@ def test_statistics_service_caching(tmp_path):
     service.save_rankings([ranking])
 
     # 불러오기 (캐시 확인)
-    loaded = service.get_daily_ranking("2026-04-08", MarketType.KOSPI, SupplySubject.FOREIGN)
+    loaded = await service.get_daily_ranking("2026-04-08", MarketType.KOSPI, SupplySubject.FOREIGN)
 
     assert loaded is not None
     assert loaded.items[0].name == "테스트종목"
     assert (repo_dir / "2026-04-08_KOSPI_FOREIGN.json").exists()
 
-def test_parse_high_price_type():
+@pytest.mark.asyncio
+
+async def test_parse_high_price_type():
     """신고가 유형(high_price_type)이 정상 파싱되는지 검증하는 더미 엑셀 테스트."""
     parser = SupplyDemandParser()
     import io

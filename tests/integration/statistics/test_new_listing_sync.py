@@ -3,14 +3,17 @@ import pytest
 from synapstock.infrastructure.container import container
 
 
-def test_sync_new_listing_data_real():
+@pytest.mark.asyncio
+
+
+async def test_sync_new_listing_data_real():
     """구글 드라이브에서 실제 2026년 신규상장 데이터를 동기화하고 검증합니다."""
 
     service = container.statistics_service
 
     # 1. 동기화 수행
     # 이 메서드는 구글 드라이브의 'new_listing' 폴더에서 엑셀들을 읽어옴
-    items = service.sync_new_listing_data()
+    items = await service.sync_new_listing_data()
 
     if not items:
         pytest.skip("구글 드라이브에 신규상장 데이터가 없거나 접근할 수 없어 테스트를 건너뜁니다.")

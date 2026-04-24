@@ -9,7 +9,9 @@ from synapstock.infrastructure.container import Container
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_actual_capital_increase_sync_robust():
+@pytest.mark.asyncio
+
+async def test_actual_capital_increase_sync_robust():
     """실제 구글 드라이브 데이터를 활용하여 동기화 및 파싱 전 과정을 정밀 검증합니다."""
 
     # 1. 환경 설정 및 컨테이너 초기화
@@ -29,7 +31,7 @@ def test_actual_capital_increase_sync_robust():
 
     # 2. 동기화 실행 (Listing -> Download -> Parsing -> Storage)
     # 개선된 헤더 자동 감지 로직이 포함된 파서가 동작합니다.
-    items = stats_service.sync_capital_increase_data()
+    items = await stats_service.sync_capital_increase_data()
 
     # 3. 데이터 실존성 및 건수 검증
     assert items is not None, "❌ 동기화 결과가 None입니다."

@@ -16,10 +16,10 @@ class DisclosureAnalysisService(BaseStatisticsService):
     def get_service_name(self) -> str:
         return "DisclosureAnalysisService"
 
-    def get_data(self, dataType: str, year: str, force_sync: bool = False) -> list:
+    async def get_data(self, dataType: str, year: str, force_sync: bool = False) -> list:
         """데이터 타입별 조회를 처리합니다."""
         if force_sync:
-            return self.sync_data(dataType, year)
+            return await self.sync_data(dataType, year)
 
         fetcher = {
             "capital_increase": getattr(self.repository, "get_capital_increase_data", lambda x: []),
@@ -29,10 +29,10 @@ class DisclosureAnalysisService(BaseStatisticsService):
         }
         items = fetcher.get(dataType, lambda x: [])(year)
         if not items:
-            return self.sync_data(dataType, year)
+            return await self.sync_data(dataType, year)
         return items
 
-    def sync_data(self, dataType: str, year: str) -> list:
+    async def sync_data(self, dataType: str, year: str) -> list:
         """각 공시 정보별 동기화 로직을 실행합니다."""
         mapping = {
             "capital_increase": ("증자", "capital_increase", self.parser.parse_paid_in_capital_increase, getattr(self.repository, "save_capital_increase_data", lambda x: None)),
@@ -45,7 +45,7 @@ class DisclosureAnalysisService(BaseStatisticsService):
             return []
 
         pattern, folder, parser, saver = mapping[dataType]
-        return self._sync_domain_data(
+        return await self._sync_domain_data(
             year_str=year,
             filename_pattern=pattern,
             parser_func=parser,

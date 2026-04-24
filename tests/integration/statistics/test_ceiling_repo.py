@@ -11,7 +11,9 @@ def temp_ceiling_repo(tmp_path):
     """임시 디렉토리를 사용하는 상한가 저장소 피처."""
     return LocalCeilingRepository(data_root=str(tmp_path))
 
-def test_save_and_load_ceiling_report(temp_ceiling_repo):
+@pytest.mark.asyncio
+
+async def test_save_and_load_ceiling_report(temp_ceiling_repo):
     # 1. 테스트 데이터 준비
     item = CeilingItem(
         name="테스트종목",
@@ -47,7 +49,9 @@ def test_save_and_load_ceiling_report(temp_ceiling_repo):
     assert latest is not None
     assert latest.end_date == "2026-01-05"
 
-def test_list_available_dates(temp_ceiling_repo):
+@pytest.mark.asyncio
+
+async def test_list_available_dates(temp_ceiling_repo):
     # 빈 데이터 확인
     assert temp_ceiling_repo.list_available_dates() == []
 

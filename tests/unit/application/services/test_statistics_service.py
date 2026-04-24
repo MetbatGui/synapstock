@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -62,153 +62,72 @@ class TestStatisticsService:
         ticker_map = service._build_local_ticker_map()
         assert ticker_map == {}
 
-    def test_normalize_item_name(self, service, mock_query_service):
-        """별칭(LIG넥스원)이 들어왔을 때 정규 사명(LIG디펜스앤에어로스페이스)으로 치환되어야 한다."""
+    def test_enrich_tickers(self, service, mock_query_service):
+        """_enrich_tickers를 통해 아이템 리스트의 티커가 보강되어야 한다."""
         from synapstock.domain.statistics.models import RankingItem
 
         # Arrange
-        item = RankingItem(rank=1, name="LIG넥스원", amount=1000, ticker=None)
-        mock_query_service.search_ticker.return_value = [
-            {"name": "LIG디펜스앤에어로스페이스", "ticker": "079550"}
+        mock_query_service.get_all_stocks_flat.return_value = [
+            {"name": "LIG디펜스앤에어로스페이스", "ticker": "079550", "aliases": ["LIG넥스원"]},
+            {"name": "삼성전자", "ticker": "005930", "aliases": []}
+        ]
+
+        items = [
+            RankingItem(rank=1, name="LIG넥스원", amount=1000, ticker=None),
+            RankingItem(rank=2, name="삼성전자", amount=500, ticker=None)
         ]
 
         # Act
-        service._normalize_item_name(item)
+        enriched_items = service._enrich_tickers(items)
 
         # Assert
-        assert item.name == "LIG디펜스앤에어로스페이스"
-        assert item.ticker == "079550"
-        mock_query_service.search_ticker.assert_called_once_with("LIG넥스원")
+        assert enriched_items[0].ticker == "079550"
+        assert enriched_items[1].ticker == "005930"
 
-    def test_normalize_item_name_lowercase(self, service, mock_query_service):
-        """소문자 별칭(lig넥스원)이 들어왔을 때도 정규 사명으로 치환되어야 한다."""
-        from synapstock.domain.statistics.models import RankingItem
+    @pytest.mark.asyncio
+    async def test_get_convertible_bond_data_delegation(self, service):
+        """CB 데이터 조회 시 disclosure_svc에 위임하고 티커를 보강해야 한다."""
+        from synapstock.domain.statistics.models import ConvertibleBond
 
         # Arrange
-        item = RankingItem(rank=1, name="lig넥스원", amount=500, ticker=None)
-        # 실제 NaverTickerSearchAdapter는 내부에서 정규화를 수행하여 반환함
-        mock_query_service.search_ticker.return_value = [
-            {"name": "LIG디펜스앤에어로스페이스", "ticker": "079550"}
-        ]
+        mock_disclosure_svc = MagicMock()
+        mock_disclosure_svc.get_data = AsyncMock()
+        service.disclosure_svc = mock_disclosure_svc
 
-        # Act
-        service._normalize_item_name(item)
-
-        # Assert
-        assert item.name == "LIG디펜스앤에어로스페이스"
-        assert item.ticker == "079550"
-
-    def test_sync_convertible_bond_data_success(self, service, mock_query_service):
-        """구글 드라이브에서 파일을 가져와 파싱하고 티커 정보를 보강하여 저장해야 한다."""
-        from synapstock.domain.statistics.models import ConvertibleBond
-
-        # Arrange: 모킹 설정
-        mock_storage = service._storage
-        mock_repo = service._convertible_bond_repo
-
-        # 1. 파일 목록 모킹
-        mock_storage.list_files_in_folder.return_value = [
-            {"name": "2026_CB_Analysis.xlsx"}
-        ]
-        mock_storage.get_file.return_value = b"fake_excel_content"
-
-        # 2. 파서 결과 모킹 (티커가 없는 상태)
         mock_items = [
-            ConvertibleBond(date="2026-01-01", name="삼성전자", bond_amount=1000, rcp_no="1"),
-            ConvertibleBond(date="2026-01-02", name="현대차", bond_amount=2000, rcp_no="2")
+            ConvertibleBond(date="2026-01-01", name="삼성전자", bond_amount=1000, rcp_no="1")
         ]
-        service._disclosure_parser.parse_convertible_bond = MagicMock(return_value=mock_items)
-
-        # 3. 티커 맵 모킹
-        mock_query_service.get_all_stocks_flat.return_value = [
-            {"name": "삼성전자", "ticker": "005930", "aliases": []},
-            {"name": "현대차", "ticker": "005380", "aliases": []}
-        ]
+        mock_disclosure_svc.get_data.return_value = mock_items
+        service._enrich_tickers = MagicMock(return_value=mock_items)
 
         # Act
-        result = service.sync_convertible_bond_data()
+        result = await service.get_convertible_bond_data(force_sync=True, year="2026")
 
         # Assert
-        assert len(result) == 2
-        assert result[0].ticker == "005930"
-        assert result[1].ticker == "005380"
+        mock_disclosure_svc.get_data.assert_called_once_with("cb", "2026", force_sync=True)
+        service._enrich_tickers.assert_called_once_with(mock_items)
+        assert result == mock_items
 
-        # 저장소 호출 확인
-        mock_repo.save_data.assert_called_once_with(result)
-        mock_storage.get_file.assert_called_once_with("2026_CB_Analysis.xlsx", folder="convertible_bond")
-
-    def test_get_convertible_bond_data_caching(self, service):
-        """캐시가 있으면 동기화 없이 캐시를 반환하고, 없으면 동기화를 수행해야 한다."""
-        from synapstock.domain.statistics.models import ConvertibleBond
-        mock_repo = service._convertible_bond_repo
-
-        # 1. 캐시가 있는 경우
-        cached_data = [ConvertibleBond(date="2026-01-01", name="캐시종목", bond_amount=100, rcp_no="c1")]
-        mock_repo.load_data.return_value = cached_data
-
-        service.sync_convertible_bond_data = MagicMock()
-
-        result = service.get_convertible_bond_data()
-
-        assert result == cached_data
-        service.sync_convertible_bond_data.assert_not_called()
-
-        # 2. 캐시가 없는 경우
-        mock_repo.load_data.return_value = []
-        sync_result = [ConvertibleBond(date="2026-01-01", name="동기종목", bond_amount=200, rcp_no="s1")]
-        service.sync_convertible_bond_data.return_value = sync_result
-
-        result = service.get_convertible_bond_data()
-
-        assert result == sync_result
-        service.sync_convertible_bond_data.assert_called_once()
-
-    def test_sync_bw_data_success(self, service, mock_query_service):
-        """BW 데이터를 구글 드라이브에서 가져와 티커를 보강하고 저장해야 한다."""
+    @pytest.mark.asyncio
+    async def test_get_bw_data_delegation(self, service):
+        """BW 데이터 조회 시 disclosure_svc에 위임하고 티커를 보강해야 한다."""
         from synapstock.domain.statistics.models import BondWithWarrants
 
         # Arrange
-        mock_storage = service._storage
-        mock_repo = service._bw_repo
-
-        mock_storage.list_files_in_folder.return_value = [{"name": "2026_BW_Analysis.xlsx"}]
-        mock_storage.get_file.return_value = b"fake_excel_content"
+        mock_disclosure_svc = MagicMock()
+        mock_disclosure_svc.get_data = AsyncMock()
+        service.disclosure_svc = mock_disclosure_svc
 
         mock_items = [
-            BondWithWarrants(date="2026-01-05", name="오텍", rcp_no="bw1", bond_amount=20000000000),
+            BondWithWarrants(date="2026-01-05", name="오텍", rcp_no="bw1", bond_amount=20000000000)
         ]
-        service._disclosure_parser.parse_bond_with_warrants = MagicMock(return_value=mock_items)
-
-        mock_query_service.get_all_stocks_flat.return_value = [
-            {"name": "오텍", "ticker": "067170", "aliases": []}
-        ]
+        mock_disclosure_svc.get_data.return_value = mock_items
+        service._enrich_tickers = MagicMock(return_value=mock_items)
 
         # Act
-        result = service.sync_bw_data()
+        result = await service.get_bw_data(force_sync=False, year="2026")
 
         # Assert
-        assert len(result) == 1
-        assert result[0].ticker == "067170"
-        mock_repo.save_data.assert_called_once_with(result)
-        mock_storage.get_file.assert_called_once_with("2026_BW_Analysis.xlsx", folder="bw")
-
-    def test_get_bw_data_caching(self, service):
-        """BW 데이터 요청 시 캐시가 있으면 반환하고, 없으면 동기화해야 한다."""
-        from synapstock.domain.statistics.models import BondWithWarrants
-        mock_repo = service._bw_repo
-
-        # 1. 캐시 히트
-        cached = [BondWithWarrants(date="2026-01-05", name="캐시BW", rcp_no="c1")]
-        mock_repo.load_data.return_value = cached
-        service.sync_bw_data = MagicMock()
-
-        assert service.get_bw_data() == cached
-        service.sync_bw_data.assert_not_called()
-
-        # 2. 캐시 미스
-        mock_repo.load_data.return_value = []
-        sync_val = [BondWithWarrants(date="2026-01-05", name="동기BW", rcp_no="s1")]
-        service.sync_bw_data.return_value = sync_val
-
-        assert service.get_bw_data() == sync_val
-        service.sync_bw_data.assert_called_once()
+        mock_disclosure_svc.get_data.assert_called_once_with("bw", "2026", force_sync=False)
+        service._enrich_tickers.assert_called_once_with(mock_items)
+        assert result == mock_items

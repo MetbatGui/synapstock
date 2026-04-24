@@ -93,7 +93,7 @@ class MonthlyMarketStats(BaseModel):
 
         market = rankings[0].market
         subject = rankings[0].subject
-        
+
         # 종목별 금액 합산
         aggregation: dict[str, dict] = {}
         for r in rankings:

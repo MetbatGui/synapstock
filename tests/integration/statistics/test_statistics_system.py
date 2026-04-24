@@ -38,7 +38,9 @@ def test_container(tmp_path):
 
     return container
 
-def test_statistics_flow_with_cache(test_container):
+@pytest.mark.asyncio
+
+async def test_statistics_flow_with_cache(test_container):
     """StatisticsService를 통한 데이터 조회 및 캐시 활용 흐름 테스트."""
     stats_service = test_container.statistics_service
     repo = test_container._statistics_repo
@@ -62,7 +64,7 @@ def test_statistics_flow_with_cache(test_container):
     repo.save_daily_ranking(mock_ranking)
 
     # 3. 분석 요청
-    result = stats_service.get_analyzed_ranking(date, market, subject)
+    result = await stats_service.get_analyzed_ranking(date, market, subject)
 
     assert result is not None
     assert result.date == date
@@ -70,11 +72,13 @@ def test_statistics_flow_with_cache(test_container):
     assert result.items[0].name == "Samsung"
 
     # 4. 요약 정보 요청 (StatisticsService에 추가할 메서드)
-    summary = stats_service.get_daily_summary(date)
+    summary = await stats_service.get_daily_summary(date)
     assert "KOSPI" in summary
     assert summary["KOSPI"]["FOREIGN"].date == date
 
-def test_available_dates_delegation(test_container):
+@pytest.mark.asyncio
+
+async def test_available_dates_delegation(test_container):
     """StatisticsService를 통한 사용 가능한 날짜 목록 조회 테스트."""
     stats_service = test_container.statistics_service
     repo = test_container._statistics_repo
