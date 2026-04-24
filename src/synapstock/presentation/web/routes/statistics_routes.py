@@ -110,7 +110,7 @@ async def sync_statistics():
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
         count = await statistics_service.sync_recent_data(limit=5)
-        return {"status": "success", "message": f"{count}일치 데이터가 동기화되었습니다.", "synced_count": count}
+        return {"status": "success", "message": f"{count}건의 데이터가 처리되었습니다.", "synced_count": count}
     except Exception as e:
         logger.error(f"Error in sync_statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
