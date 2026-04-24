@@ -57,15 +57,15 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
         return rankings
 
     async def get_daily_summary(self, date: str) -> dict:
-        """해당 날짜의 4가지 조합(코스피/코스닥 x 외국인/기관) 수급 데이터를 요약하여 반환합니다."""
+        """해당 날짜의 4가지 조합(코스피/코스닥 x 외국인/기관) 수급 분석 데이터를 요약하여 반환합니다."""
         summary = {
             "KOSPI": {
-                "FOREIGN": await self.get_daily_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": await self.get_daily_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION),
+                "FOREIGN": await self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.FOREIGN),
+                "INSTITUTION": await self.get_analyzed_ranking(date, MarketType.KOSPI, SupplySubject.INSTITUTION),
             },
             "KOSDAQ": {
-                "FOREIGN": await self.get_daily_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": await self.get_daily_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION),
+                "FOREIGN": await self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.FOREIGN),
+                "INSTITUTION": await self.get_analyzed_ranking(date, MarketType.KOSDAQ, SupplySubject.INSTITUTION),
             }
         }
         return summary
