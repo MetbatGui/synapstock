@@ -148,11 +148,22 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                     logger.warning(f"[{self.get_service_name()}] {date_str} 날짜의 파일을 찾을 수 없습니다.")
                     return []
             else:
-                valid_files = [f for f in all_files if f["name"].lower().endswith((".xlsx", ".xls"))]
-                if not valid_files:
+            else:
+                # 1. 엑셀 파일 필터링
+                excel_files = [f for f in all_files if f["name"].lower().endswith((".xlsx", ".xls"))]
+                if not excel_files:
                     logger.warning(f"[{self.get_service_name()}] 유효한 랭킹 파일을 찾을 수 없습니다.")
                     return []
-                # 파일명이 아닌 마지막 수정 시간(modifiedTime)을 기준으로 가장 최신 파일을 선택
+                
+                # 2. '수급' 또는 '순매수' 키워드가 포함된 파일 우선 순위 부여
+                keywords = ["수급", "순매수", "정리표"]
+                valid_files = [f for f in excel_files if any(k in f["name"] for k in keywords)]
+                
+                # 키워드 매칭 파일이 없으면 전체 엑셀 파일 대상
+                if not valid_files:
+                    valid_files = excel_files
+                
+                # 3. 마지막 수정 시간(modifiedTime)을 기준으로 가장 최신 파일을 선택
                 target_files = [sorted(valid_files, key=lambda x: x.get("modifiedTime", x.get("createdTime", "")), reverse=True)[0]]
 
             # 3. 캐시 확인 및 동기화 수행
