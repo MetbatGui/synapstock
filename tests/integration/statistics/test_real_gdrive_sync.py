@@ -48,16 +48,21 @@ async def test_actual_gdrive_sync():
     if available_dates:
         assert synced_count_2 > 0, "캐시가 최신이어도 데이터를 올바르게 반환해야 합니다."
 
-    # 6. 특정 날짜 데이터 로드 시도 (사용자 요청: 1월 2일 데이터 확인)
-    # 이제 위에서 전체 동기화가 되었으므로 개별 날짜 조회가 가능해야 함
-    target_date = "2026-01-02"
-    ranking = await stats_service.get_daily_ranking(target_date, MarketType.KOSPI, SupplySubject.FOREIGN)
+    # 6. 특정 날짜 데이터 로드 및 분석 검증 (연속 매수 일수 포함)
+    target_date = "2026-04-24" # 가장 최근 날짜
+    # get_daily_ranking은 원본 데이터를, get_analyzed_ranking은 분석(연속매수 등) 데이터를 반환함
+    analysis = await stats_service.get_analyzed_ranking(target_date, MarketType.KOSPI, SupplySubject.FOREIGN)
     
-    if ranking:
-        assert len(ranking.items) > 0
-        logger.info(f"Successfully verified data for {target_date}. Item count: {len(ranking.items)}")
+    if analysis:
+        assert len(analysis.items) > 0
+        logger.info(f"Analysis results for {target_date}:")
+        for item in analysis.items[:5]: # 상위 5개만 출력
+            logger.info(f" - {item.name}: Rank {item.rank}, Consecutive: {item.consecutive_days} days")
+        
+        # 최소한 1일 이상은 나와야 함
+        assert any(item.consecutive_days >= 1 for item in analysis.items)
     else:
-        logger.warning(f"Data for {target_date} not found in repository.")
+        logger.warning(f"Analysis for {target_date} not found.")
 
 if __name__ == "__main__":
     import asyncio
