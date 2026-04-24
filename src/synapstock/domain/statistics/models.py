@@ -76,6 +76,46 @@ class MonthlyMarketStats(BaseModel):
     subject: SupplySubject
     items: list[RankingItem]
 
+    @classmethod
+    def aggregate_from_daily(cls, month: str, rankings: list[DailyMarketRanking]) -> "MonthlyMarketStats":
+        """여러 일별 랭킹 데이터를 합산하여 월간 통계를 생성합니다.
+        
+        Args:
+            month: 기준 월 (YYYY-MM).
+            rankings: 합산할 일별 랭킹 리스트.
+            
+        Returns:
+            합산된 MonthlyMarketStats 인스턴스.
+        """
+        if not rankings:
+            # 빈 리스트일 경우 기본값 반환 (첫 번째 인자의 마켓/주체 정보가 없으므로 호출자 책임)
+            raise ValueError("rankings list cannot be empty for aggregation")
+
+        market = rankings[0].market
+        subject = rankings[0].subject
+        
+        # 종목별 금액 합산
+        aggregation: dict[str, dict] = {}
+        for r in rankings:
+            for item in r.items:
+                if item.name not in aggregation:
+                    aggregation[item.name] = {"amount": 0, "ticker": item.ticker}
+                aggregation[item.name]["amount"] += item.amount
+
+        # 금액 기준 내림차순 정렬 및 TOP 30 추출
+        sorted_items = sorted(aggregation.items(), key=lambda x: x[1]["amount"], reverse=True)[:30]
+
+        items = []
+        for i, (name, data) in enumerate(sorted_items, 1):
+            items.append(RankingItem(
+                rank=i,
+                name=name,
+                amount=data["amount"],
+                ticker=data["ticker"]
+            ))
+
+        return cls(month=month, market=market, subject=subject, items=items)
+
 
 class AnalyzedRankingItem(RankingItem):
     """순위 변동성 분석 정보가 포함된 확장 종목 모델.

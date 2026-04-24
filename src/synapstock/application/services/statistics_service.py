@@ -103,7 +103,10 @@ class StatisticsService:
         return self.ranking_svc.get_daily_summary(date)
 
     def get_monthly_ranking(self, month: str, market: Any, subject: Any) -> Any:
-        return self.ranking_svc.get_monthly_ranking(month, market, subject)
+        result = self.ranking_svc.get_monthly_ranking(month, market, subject)
+        if result and result.items:
+            self._enrich_tickers(result.items)
+        return result
 
     # --- 상한가 분석 (Price Stats) ---
     def get_ceiling_analysis(self, date: str, force_sync: bool = False) -> CeilingAnalysisReport | None:

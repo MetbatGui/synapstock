@@ -70,33 +70,20 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
         target_dates = [d for d in available_dates if d.startswith(month)]
 
         if not target_dates:
-            from synapstock.domain.statistics.models import MonthlyMarketStats
             return MonthlyMarketStats(month=month, market=market, subject=subject, items=[])
 
-        # 종목별 순매수 금액 합산
-        aggregation: dict[str, dict] = {}
+        # 일별 데이터 로드
+        daily_rankings = []
         for d in target_dates:
             ranking = self.repository.load_ranking(d, market, subject)
-            if not ranking: continue
-            for item in ranking.items:
-                if item.name not in aggregation:
-                    aggregation[item.name] = {"amount": 0, "ticker": item.ticker}
-                aggregation[item.name]["amount"] += item.amount
+            if ranking:
+                daily_rankings.append(ranking)
 
-        # 합산 금액 기준 내림차순 정렬 및 TOP 30 추출
-        sorted_items = sorted(aggregation.items(), key=lambda x: x[1]["amount"], reverse=True)[:30]
+        if not daily_rankings:
+            return MonthlyMarketStats(month=month, market=market, subject=subject, items=[])
 
-        from synapstock.domain.statistics.models import MonthlyMarketStats
-        items = []
-        for i, (name, data) in enumerate(sorted_items, 1):
-            items.append(RankingItem(
-                rank=i,
-                name=name,
-                amount=data["amount"],
-                ticker=data["ticker"]
-            ))
-
-        return MonthlyMarketStats(month=month, market=market, subject=subject, items=items)
+        # 도메인 모델의 비즈니스 로직을 호출하여 합산 수행
+        return MonthlyMarketStats.aggregate_from_daily(month, daily_rankings)
 
     def sync_data(self, date_str: str | None = None) -> list[DailyMarketRanking]:
         """엑셀 파일에서 순위 데이터를 파싱하고 동기화합니다.
