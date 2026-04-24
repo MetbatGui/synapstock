@@ -150,7 +150,6 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             newly_synced_count = 0
 
             for sheet_name in sheet_names:
-            for sheet_name in sheet_names:
                 # 시트 이름은 오직 MMDD 형식만 허용 (예: 0102)
                 sheet_name = sheet_name.strip()
                 if len(sheet_name) == 4 and sheet_name.isdigit():
