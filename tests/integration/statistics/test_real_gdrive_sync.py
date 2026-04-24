@@ -39,6 +39,14 @@ async def test_actual_gdrive_sync():
 
     # 최소한 하나 이상의 날짜가 매칭되어야 함 (드라이브에 파일이 있다면)
     # assert synced_count >= 0  # 일단 실행 여부 확인
+    if available_dates:
+        assert synced_count > 0, "데이터가 존재하면 첫 동기화 반환값도 > 0이어야 합니다."
+
+    # 5.5 캐시 히트(이미 최신인 경우) 검증을 위한 2차 동기화 실행
+    synced_count_2 = await stats_service.sync_recent_data(limit=2)
+    logger.info(f"Second Sync completed (Cache hit test). Total synced dates: {synced_count_2}")
+    if available_dates:
+        assert synced_count_2 > 0, "캐시가 최신이어도 데이터를 올바르게 반환해야 합니다."
 
     # 6. 특정 날짜 데이터 로드 시도 (예: 가장 최근 날짜)
     if available_dates:

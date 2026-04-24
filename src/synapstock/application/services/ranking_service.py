@@ -189,7 +189,12 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 logger.info(f"[{self.get_service_name()}] {len(all_rankings)}건의 데이터가 동기화되었습니다.")
                 return all_rankings
 
-            return self.repository.get_rankings(date_str)
+            if not date_str:
+                dates = self.repository.list_available_dates(MarketType.KOSPI, SupplySubject.FOREIGN)
+                if dates:
+                    date_str = dates[0]
+
+            return self.repository.get_rankings(date_str) if date_str else []
         except Exception as e:
             logger.error(f"[RankingService] 순위 동기화 실패: {e}", exc_info=True)
             return []
