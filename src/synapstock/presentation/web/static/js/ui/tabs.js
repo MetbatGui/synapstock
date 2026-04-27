@@ -116,27 +116,4 @@ export function initHistoryState(loadStockDashboard) {
     });
 }
 
-/**
- * 재무 사이드바(`#financial-sidebar`)의 토글 및 닫기 버튼 이벤트를 초기화합니다.
- *
- * @returns {void}
- */
-export function initFinancialSidebar() {
-    const sidebar = document.getElementById('financial-sidebar');
-    const toggleBtn = document.getElementById('toggle-financial-sidebar');
-    const closeBtn = document.getElementById('close-financial-sidebar');
 
-    if (toggleBtn) {
-        toggleBtn.onclick = () => {
-            sidebar.classList.toggle('open');
-            toggleBtn.classList.toggle('sidebar-open');
-        };
-    }
-
-    if (closeBtn) {
-        closeBtn.onclick = () => {
-            sidebar.classList.remove('open');
-            toggleBtn.classList.remove('sidebar-open');
-        };
-    }
-}

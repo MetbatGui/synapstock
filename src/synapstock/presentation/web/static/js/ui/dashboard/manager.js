@@ -6,7 +6,7 @@ import { addLogEntry } from '../tabs.js';
 import { fetchDisclosures } from './disclosure.js';
 import { fetchReports } from './reports.js';
 import { fetchNews } from './news.js';
-import { fetchFinancials } from './financials.js';
+import { fetchFinancials } from './financials.js?v=1.4';
 
 /**
  * 티커 심볼로 종목 기본 정보(이름, 리포트 목록, 뉴스 목록)를 서버에서 조회합니다.

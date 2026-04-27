@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/static/css/animations.css?v=1.2">
     <link rel="stylesheet" href="/static/css/components.css?v=1.2">
     <link rel="stylesheet" href="/static/css/mindmap.css?v=1.2">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.2">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.3">
     <link rel="stylesheet" href="/static/css/statistics.css?v=1.2">
     <link rel="stylesheet" href="/static/css/capital_increase.css?v=1.2">
     <link rel="stylesheet" href="/static/css/bonus_issue.css?v=1.2">
@@ -19,7 +19,8 @@
     <link rel="stylesheet" href="/static/css/new_listing.css?v=1.3">
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
+    <!-- Chart.js for Financial Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <body class="dark-theme">
     <nav class="navbar">
@@ -36,12 +37,25 @@
 
     <!-- 재무 데이터 개폐식 사이드바 -->
     <aside id="financial-sidebar" class="financial-sidebar">
-        <div class="sidebar-content">
-            <div class="sidebar-header">
-                <h3>💰 분기 매출 현황</h3>
+        <div class="sidebar-content" style="display: flex; flex-direction: column; height: 100%;">
+            <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3>💰 분기 매출 현황 <span style="font-size: 0.8rem; color: #9ca3af; font-weight: normal; margin-left: 10px;">(단위: 억원)</span></h3>
+                <div class="view-toggle">
+                    <span class="toggle-label">List</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="financial-view-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Chart</span>
+                </div>
             </div>
-            <div id="financial-list-sidebar" class="financial-list">
-                <div class="empty-state">종목을 선택해 주세요</div>
+            <div class="financial-content-area" style="flex: 1; min-height: 0; position: relative;">
+                <div id="financial-list-sidebar" class="financial-list" style="height: 100%; overflow-y: auto;">
+                    <div class="empty-state">종목을 선택해 주세요</div>
+                </div>
+                <div id="financial-chart-container" style="display: none;">
+                    <canvas id="financial-chart"></canvas>
+                </div>
             </div>
         </div>
     </aside>
@@ -203,7 +217,7 @@
     <!-- 스크립트 연동 -->
     <!-- hidden file input for report upload -->
     <input type="file" id="report-upload-input" accept=".pdf" style="display: none;">
-    <script type="module" src="/static/js/app.js"></script>
+    <script type="module" src="/static/js/app.js?v=1.4"></script>
 </body>
 
 </html>
