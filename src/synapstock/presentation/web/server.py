@@ -127,9 +127,15 @@ async def startup_event():
     logger = logging.getLogger(__name__)
     logger.info("[Startup] SynapStock 서버 시작 중...")
 
-    # 리포트 인덱스 동기화 (Background)
-    logger.info("[Startup] 리포트 인덱스 동기화 태스크 시작 (Google Drive)")
+    # 리포트 및 뉴스 인덱스 동기화 (Background)
+    logger.info("[Startup] 인덱스 동기화 태스크 시작 (Google Drive)")
+    from synapstock.presentation.web.core.dependencies import (
+        sync_indices_if_needed,
+        sync_news_archive,
+    )
+
     asyncio.create_task(sync_indices_if_needed(force=True))
+    asyncio.create_task(sync_news_archive())
 
     logger.info("[Startup] 서버 초기화 완료.")
 

@@ -21,7 +21,6 @@ class Stock(BaseModel):
     ticker: str
     aliases: list[str] = []
     reports: list[str] = []
-    news: list[dict[str, str]] = []  # [{"title": "...", "date": "...", "url": "..."}]
 
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"
@@ -43,7 +42,6 @@ class Node(BaseModel):
     depth: int
     nodes: list[Node] = []
     stocks: list[Stock] = []
-    news: list[dict[str, str]] = []  # [{"title": "...", "date": "...", "url": "..."}]
 
     def find_node(self, name: str) -> Node | None:
         """이름으로 하위 노드를 재귀적으로 검색한다."""
@@ -88,31 +86,7 @@ class Node(BaseModel):
                 return True
         return False
 
-    def find_and_add_news(self, ticker: str, news_entry: dict) -> bool:
-        """재귀적으로 종목을 찾아 뉴스를 추가한다."""
-        for s in self.stocks:
-            if s.ticker == ticker:
-                if not any(n["url"] == news_entry["url"] for n in s.news):
-                    s.news.append(news_entry)
-                return True
-        for child in self.nodes:
-            if child.find_and_add_news(ticker, news_entry):
-                return True
-        return False
 
-    def find_and_remove_news(self, ticker: str, url: str) -> bool:
-        """재귀적으로 종목을 찾아 특정 뉴스를 삭제한다."""
-        for s in self.stocks:
-            if s.ticker == ticker:
-                new_news = [n for n in s.news if n["url"] != url]
-                if len(new_news) < len(s.news):
-                    s.news = new_news
-                    return True
-                return False
-        for child in self.nodes:
-            if child.find_and_remove_news(ticker, url):
-                return True
-        return False
 
     def find_and_add_report(self, ticker: str, report_path: str) -> bool:
         """재귀적으로 종목을 찾아 리포트 경로를 추가한다."""

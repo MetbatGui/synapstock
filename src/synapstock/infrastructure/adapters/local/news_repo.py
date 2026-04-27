@@ -51,3 +51,14 @@ class LocalNewsRepository:
             date_str = f.stem.replace("news_", "")
             dates.append(date_str)
         return sorted(dates, reverse=True)
+
+    def get_file_mtime(self, date_str: str) -> float:
+        """로컬 뉴스 파일의 마지막 수정 시각(POSIX timestamp)을 반환합니다."""
+        file_path = self._get_file_path(date_str)
+        if not file_path.exists():
+            return 0.0
+        return file_path.stat().st_mtime
+
+    def get_all_batch_files(self) -> list[Path]:
+        """모든 뉴스 배치 파일 경로 목록을 반환합니다."""
+        return list(self.base_dir.glob("news_*.json"))

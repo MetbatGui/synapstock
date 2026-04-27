@@ -31,3 +31,9 @@ async def sync_indices_if_needed(force: bool = False):
         else:
             # ReportService 내부의 get_reports_by_stock 등이 자동 동기화를 관리함
             pass
+
+
+async def sync_news_archive():
+    """뉴스 아카이브를 구글 드라이브와 스마트 동기화합니다."""
+    if news_service:
+        await news_service.sync_from_drive()

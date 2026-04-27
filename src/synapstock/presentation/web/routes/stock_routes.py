@@ -38,11 +38,19 @@ async def get_stock_info(ticker: str) -> dict | JSONResponse:
 
         if result:
             stock_obj, b_name, path = result
+
+            # 중앙 뉴스 아카이브에서 해당 종목 뉴스 가져오기
+            archived_news = news_service.get_news_for_stock(ticker)
+            news_list = [
+                {"title": n.title, "url": n.url, "date": n.collected_at.strftime("%Y-%m-%d")}
+                for n in archived_news
+            ]
+
             return {
                 "ticker": ticker,
                 "name": stock_obj.name,
-                "reports": stock_obj.reports,
-                "news": stock_obj.news,
+                "reports": [r.split("/")[-1] for r in stock_obj.reports], # 파일명만 추출
+                "news": news_list,
                 "path": path,
             }
 

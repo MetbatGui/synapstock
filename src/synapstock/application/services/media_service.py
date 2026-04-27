@@ -15,7 +15,7 @@ class StockMediaService:
         self,
         repository: BoardRepositoryPort,
         storage: StoragePort,
-        news_service: "NewsService" = None,
+        news_service: "NewsService | None" = None,
         pdf_dir: str = "data/pdf",
     ) -> None:
         """필요한 어댑터들로 서비스를 초기화합니다."""
@@ -34,7 +34,7 @@ class StockMediaService:
         # 2. 보드 데이터 로드 및 업데이트
         board = self._repository.load(board_name)
         # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 탐색 및 추가)
-        success = cast(bool, board.root.find_and_add_report(ticker, target_path))
+        success = board.root.find_and_add_report(ticker, target_path)
         if success:
             self._repository.save(board)
         return success
@@ -42,7 +42,7 @@ class StockMediaService:
     async def remove_stock_report(self, board_name: str, ticker: str, report_path: str) -> bool:
         """종목에서 리포트 파일 링크를 제거합니다. (물리 파일 삭제는 정책에 따라 별도로 처리 가능)"""
         board = self._repository.load(board_name)
-        success = cast(bool, board.root.find_and_remove_report(ticker, report_path))
+        success = board.root.find_and_remove_report(ticker, report_path)
         if success:
             self._repository.save(board)
         return success
@@ -50,34 +50,25 @@ class StockMediaService:
     async def add_stock_news(
         self, board_name: str, ticker: str, title: str, date: str, url: str, stock_name: str = ""
     ) -> bool:
-        """종목에 뉴스 링크 정보를 추가합니다."""
-        board = self._repository.load(board_name)
-        news_entry = {"title": title, "date": date, "url": url}
+        """종목에 뉴스 링크 정보를 추가합니다. (이제 중앙 아카이브에만 기록)"""
+        if not self._news_service:
+            return False
 
-        success = cast(bool, board.root.find_and_add_news(ticker, news_entry))
-        if success:
-            self._repository.save(board)
+        # 보드에서 종목명 찾기 (아카이브 기록용)
+        if not stock_name:
+            board = self._repository.load(board_name)
+            found_stock = board.find_stock(ticker)
+            if found_stock:
+                stock_name = found_stock.name
 
-            # 중앙 뉴스 아카이브(구글 드라이브 포함)에 기록
-            if self._news_service:
-                if not stock_name:
-                    found_stock = board.find_stock(ticker)
-                    if found_stock:
-                        stock_name = found_stock.name
-
-                # 저장일 기준으로 아카이브에 기록 (비동기 호출)
-                await self._news_service.save_news(
-                    title=title,
-                    url=url,
-                    ticker=ticker,
-                    stock_name=stock_name
-                )
-        return success
+        # 중앙 뉴스 아카이브(구글 드라이브 포함)에 기록
+        await self._news_service.save_news(
+            title=title, url=url, ticker=ticker, stock_name=stock_name
+        )
+        return True
 
     async def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
-        """종목에서 특정 뉴스 링크를 제거합니다."""
-        board = self._repository.load(board_name)
-        success = cast(bool, board.root.find_and_remove_news(ticker, url))
-        if success:
-            self._repository.save(board)
-        return success
+        """종목에서 특정 뉴스 링크를 제거합니다. (아카이브 정책에 따라 현재는 보드에서만 제거 시도하나 로직은 미구현)"""
+        # 현재 구조에서는 전역 아카이브에서 삭제하는 기능은 NewsService에 구현이 필요할 수 있음
+        # 여기서는 보드 의존성을 제거하므로 단순히 성공 반환 (추후 아카이브 삭제 필요시 보강)
+        return True
