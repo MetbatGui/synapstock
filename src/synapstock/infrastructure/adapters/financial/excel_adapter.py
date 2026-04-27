@@ -2,9 +2,10 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from synapstock.domain.ports import FinancialDataPort
 
 
-class ExcelFinancialDataAdapter:
+class ExcelFinancialDataAdapter(FinancialDataPort):
     def __init__(self, file_path: Path):
         self.file_path = file_path
         self._sheets: dict[str, pd.DataFrame] = {}  # 시트별 캐시

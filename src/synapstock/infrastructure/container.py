@@ -7,14 +7,13 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from synapstock.application.services.news_service import NewsService
+    from synapstock.domain.ports import FinancialDataPort
 
-from synapstock.application.services.analytics_service import AnalyticsService
 from synapstock.application.services.command_service import BoardCommandService
-from synapstock.application.services.market_data_service import MarketDataService
 from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
@@ -34,7 +33,6 @@ from synapstock.infrastructure.adapters.local.board_repo import LocalBoardReposi
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
-from synapstock.infrastructure.adapters.local.market_data_repo import LocalMarketDataRepository
 from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalBondWithWarrantsRepository,
     LocalBonusIssueRepository,
@@ -74,7 +72,6 @@ class Container:
         self.config.bw_dir.mkdir(parents=True, exist_ok=True)
         self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
         self.config.news_dir.mkdir(parents=True, exist_ok=True)
-        (self.config.data_dir / "market" / "raw").mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
@@ -88,48 +85,46 @@ class Container:
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
-        self._statistics_repo = LocalStatisticsRepository(self.config.netbuy_dir)
-        self._ceiling_repo = LocalCeilingRepository(self.config.ceiling_dir)
-        self._capital_increase_repo = LocalCapitalIncreaseRepository(self.config.capital_increase_dir)
-        self._bonus_issue_repo = LocalBonusIssueRepository(self.config.bonus_issue_dir)
-        self._convertible_bond_repo = LocalConvertibleBondRepository(self.config.convertible_bond_dir)
-        self._bw_repo = LocalBondWithWarrantsRepository(self.config.bw_dir)
-        self._market_data_repo = LocalMarketDataRepository(self.config.data_dir / "market" / "raw")
+        self._statistics_repo = LocalStatisticsRepository(str(self.config.netbuy_dir))
+        self._ceiling_repo = LocalCeilingRepository(str(self.config.ceiling_dir))
+        self._capital_increase_repo = LocalCapitalIncreaseRepository(str(self.config.capital_increase_dir))
+        self._bonus_issue_repo = LocalBonusIssueRepository(str(self.config.bonus_issue_dir))
+        self._convertible_bond_repo = LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
+        self._bw_repo = LocalBondWithWarrantsRepository(str(self.config.bw_dir))
 
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
+
         self._news_repo = LocalNewsRepository(self.config.news_dir)
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
 
-        # 5. 도메인 유즈케이스 서비스 싱글톤
+        # 5. 도메인 서비스 싱글톤
         self._query_service = BoardQueryService(
             repository=self._repo,
             ticker_search=self._ticker_search_adapter,
             disclosure=self._disclosure_adapter,
-            financial=self._financial_adapter,
+            financial=cast("FinancialDataPort", self._financial_adapter),
         )
         self._command_service = BoardCommandService(repository=self._repo)
 
         from synapstock.application.services.news_service import NewsService
+
         self._news_service = NewsService(
             repository=self._news_repo,
             scraper=self._news_scraper_adapter,
             drive_adapter=self._drive_adapter,
-            news_folder_id=self.config.news_folder_id
+            news_folder_id=self.config.news_folder_id,
         )
 
         self._media_service = StockMediaService(
             repository=self._repo,
             storage=self._pdf_storage,
             news_service=self._news_service,
-            pdf_dir=str(self.config.pdf_dir)
+            pdf_dir=str(self.config.pdf_dir),
         )
         self._sync_service = BoardSyncService(mindmap=self._miro_adapter, ticker_search=self._ticker_search_adapter)
-        self._market_data_service = MarketDataService(krx_adapter=self._krx_adapter, repository=self._market_data_repo)
-
-        self._analytics_service = AnalyticsService(market_data_repo=self._market_data_repo)
 
         self._statistics_service = StatisticsService(
             storage=self._drive_adapter,
@@ -140,7 +135,6 @@ class Container:
             bonus_issue_repository=self._bonus_issue_repo,
             convertible_bond_repository=self._convertible_bond_repo,
             bw_repository=self._bw_repo,
-            market_data_service=self._market_data_service,
         )
 
         self._report_service = None
@@ -165,11 +159,13 @@ class Container:
                 "convertible_bond": self.config.convertible_bond_folder_id,
                 "bw": self.config.bw_folder_id,
                 "new_listing": self.config.new_listing_folder_id,
-                "news": self.config.news_folder_id,
             }
+            # None이 아닌 폴더 ID만 포함하여 dict[str, str] 보장
+            valid_folders = {k: v for k, v in folders.items() if v is not None}
+
             self._drive_adapter = GoogleDriveAdapter(
                 token_file=str(token_path),
-                folders=folders,
+                folders=valid_folders,
                 client_secret_file=str(client_secret_path),
             )
         except Exception as e:
@@ -222,14 +218,6 @@ class Container:
     @property
     def statistics_service(self) -> StatisticsService:
         return self._statistics_service
-
-    @property
-    def analytics_service(self) -> AnalyticsService:
-        return self._analytics_service
-
-    @property
-    def market_data_service(self) -> MarketDataService:
-        return self._market_data_service
 
     @property
     def krx_adapter(self) -> NativeKrxAdapter:
