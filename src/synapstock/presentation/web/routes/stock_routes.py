@@ -55,22 +55,21 @@ async def get_stock_info(ticker: str) -> dict | JSONResponse:
 
 
 @router.get("/api/stock/financials", response_model=None)
-async def get_financials(name: str) -> list | JSONResponse:
-    """특정 기업의 분기별 재무(매출) 데이터를 반환합니다.
+async def get_financials(name: str, metric: str = "매출액", period: str = "분기별") -> list | JSONResponse:
+    """특정 기업의 재무 데이터를 반환합니다 (지표 및 기간 선택 가능).
 
     Args:
         name (str): 조회할 기업명.
+        metric (str): 조회할 지표 (매출액, 영업이익, 당기순이익). 기본값 "매출액".
+        period (str): 조회 기간 (분기별, 연간). 기본값 "분기별".
 
     Returns:
-        list[dict]: 분기별 재무 데이터. 항목 예시: ``{"quarter": "2024Q3", "value": 98000000}``.
-
-    Raises:
-        JSONResponse (500): 조회 중 예외 발생 시.
+        list[dict]: 재무 데이터 목록.
     """
     try:
         if not name:
             return []
-        financials = query_service.get_financial_data(name)
+        financials = query_service.get_financial_data(name, metric, period)
         return cast(list, financials)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
@@ -146,11 +145,7 @@ async def scrape_news(url: str) -> dict | JSONResponse:
         if not scraped or not scraped.title:
             return JSONResponse(status_code=400, content={"message": "뉴스 정보를 추출할 수 없습니다."})
 
-        return {
-            "title": scraped.title,
-            "date": scraped.date,
-            "url": url
-        }
+        return {"title": scraped.title, "date": scraped.date, "url": url}
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
 

@@ -114,14 +114,16 @@ class FinancialDataPort(ABC):
     """재무 데이터 조회를 위한 추상 포트."""
 
     @abstractmethod
-    def get_financial_data(self, company_name: str) -> list[dict]:
-        """특정 기업의 분기별 재무 데이터를 가져온다.
+    def get_financial_data(self, company_name: str, metric: str = "매출액", period: str = "분기별") -> list[dict]:
+        """특정 기업의 재무 데이터를 가져온다.
 
         Args:
             company_name: 기업명.
+            metric: 조회할 지표 (매출액, 영업이익, 당기순이익 등).
+            period: 조회 기간 (분기별, 연간).
 
         Returns:
-            분기별 재무 정보 리스트 (분기, 수치 등).
+            재무 정보 리스트 (분기/연도, 수치 등).
         """
 
 
