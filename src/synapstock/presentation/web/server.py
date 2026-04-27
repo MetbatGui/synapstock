@@ -5,9 +5,17 @@
 """
 
 import asyncio
+import logging
 import os
 import threading
 from pathlib import Path
+
+# 애플리케이션 전체 기본 로깅 설정 (FastAPI 콘솔 출력용)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 import uvicorn
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect

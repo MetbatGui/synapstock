@@ -3,20 +3,23 @@ import pytest
 from synapstock.infrastructure.container import container
 
 
-def test_ceiling_service_full_workflow_integration():
+@pytest.mark.asyncio
+
+
+async def test_ceiling_service_full_workflow_integration():
     """상한가 분석 서비스의 전체 워크플로우(목록 조회 -> 동기화 -> 로컬 캐시) 통합 테스트."""
     # 1. 서비스 획득 (StatisticsService를 통한 접근)
     ceiling_svc = container.statistics_service.ceiling_svc
     repo = container.ceiling_repo
 
     # 2. 가용 연도 목록 조회
-    years = ceiling_svc.list_available_years()
+    years = await ceiling_svc.list_available_years()
     assert len(years) > 0
     print(f"\n[Test Result] 가용 연도: {years}")
 
     # 3. 최신 연도의 가용 날짜 목록 조회
     latest_year = years[0]
-    dates = ceiling_svc.list_available_dates(latest_year)
+    dates = await ceiling_svc.list_available_dates(latest_year)
     assert len(dates) > 0
     print(f"[Test Result] {latest_year}년 가용 날짜 수: {len(dates)}")
 
@@ -29,7 +32,7 @@ def test_ceiling_service_full_workflow_integration():
     if json_path.exists():
         os.remove(json_path)
 
-    report = ceiling_svc.get_ceiling_analysis(test_date)
+    report = await ceiling_svc.get_ceiling_analysis(test_date, force_sync=True)
 
     assert report is not None
     assert report.end_date == test_date
@@ -42,12 +45,14 @@ def test_ceiling_service_full_workflow_integration():
     if report.items:
         print(f"샘플 항목: {report.items[0].name} ({report.items[0].entry_tag})")
 
-def test_ceiling_cache_hit_integration():
+@pytest.mark.asyncio
+
+async def test_ceiling_cache_hit_integration():
     """드라이브 연결 없이 로컬 캐시에서 데이터를 정상적으로 가져오는지 확인."""
     ceiling_svc = container.statistics_service.ceiling_svc
 
     # 1. 캐시된 날짜 확인
-    dates = ceiling_svc.list_available_dates("2026")
+    dates = await ceiling_svc.list_available_dates("2026")
     if not dates:
         pytest.skip("테스트를 위한 캐시 데이터가 없습니다.")
 
@@ -58,7 +63,7 @@ def test_ceiling_cache_hit_integration():
     ceiling_svc.drive_adapter = None
 
     try:
-        report = ceiling_svc.get_ceiling_analysis(test_date)
+        report = await ceiling_svc.get_ceiling_analysis(test_date)
         assert report is not None
         assert report.end_date == test_date
         print(f"\n[Test Result] 캐시 히트 성공: {test_date}")

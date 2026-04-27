@@ -27,7 +27,7 @@ async def sync_indices_if_needed(force: bool = False):
     """(하위 호환성 유지) ReportService를 통해 동기화를 수행합니다."""
     if report_service:
         if force:
-            report_service.sync_index()
+            await report_service.sync_index()
         else:
             # ReportService 내부의 get_reports_by_stock 등이 자동 동기화를 관리함
             pass

@@ -47,7 +47,8 @@ def mock_board():
 
     return Board(name="theme_data", root=root)
 
-def test_search_path_and_add_news(mock_board):
+@pytest.mark.asyncio
+async def test_search_path_and_add_news(mock_board):
     """
     사용자가 '삼성전자'를 검색하여 종목 경로를 파악하고, 
     해당 종목에 뉴스 링크를 추가(POST)하는 일련의 워크플로우를 테스트합니다.
@@ -91,7 +92,7 @@ def test_search_path_and_add_news(mock_board):
 
     # 뉴스 추가 (경로 또는 티커 기반. StockMediaService.add_stock_news 이용)
     url_to_add = "https://news.example.com/123"
-    result = media_service.add_stock_news(
+    result = await media_service.add_stock_news(
         board_name="theme_data",
         ticker=target_ticker,
         title="삼성전자 어닝 서프라이즈",

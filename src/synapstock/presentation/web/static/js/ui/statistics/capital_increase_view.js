@@ -33,7 +33,7 @@ export const capitalIncreaseView = {
                             <tr>
                                 <th style="width: 140px;">공시일</th>
                                 <th>종목명</th>
-                                <th style="width: 200px;">증자방식</th>
+                                <th style="width: 280px;">증자방식</th>
                                 <th style="width: 100px; text-align:right;">조달금액</th>
                                 <th style="width: 120px; text-align:right;">배정비율</th>
                                 <th style="width: 130px; text-align:right;">납입일</th>

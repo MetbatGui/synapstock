@@ -228,4 +228,46 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // popstate 이벤트에서 통계 탭 뒤로가기/앞으로가기 완벽 지원
+    window.addEventListener('popstate', (event) => {
+        const currentPath = window.location.pathname;
+        if (currentPath.startsWith('/statistics')) {
+            switchTab('statistics-tab', false);
+            
+            // 내비게이션 상태 업데이트
+            document.querySelectorAll('.stats-nav-item').forEach(link => {
+                const href = link.getAttribute('href');
+                if (currentPath === href || (currentPath === '/statistics' && href === '/statistics')) {
+                    link.classList.add('active');
+                } else if (currentPath.startsWith(href) && href !== '/statistics') {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+
+            // 뷰 렌더링
+            const statsContainer = document.getElementById('statistics-container');
+            if (statsContainer) {
+                if (currentPath === '/statistics' || currentPath.includes('netbuy') || currentPath.includes('ranking')) {
+                    statisticsView.init(statsContainer);
+                } else if (currentPath.includes('month')) {
+                    statisticsMonthView.init(statsContainer);
+                } else if (currentPath.includes('ceiling')) {
+                    ceilingView.init(statsContainer);
+                } else if (currentPath.includes('capital-increase')) {
+                    capitalIncreaseView.render(statsContainer);
+                } else if (currentPath.includes('bonus-issue')) {
+                    bonusIssueView.render(statsContainer);
+                } else if (currentPath.includes('convertible-bond')) {
+                    convertibleBondView.render(statsContainer);
+                } else if (currentPath.includes('bond-with-warrants')) {
+                    bondWithWarrantsView.render(statsContainer);
+                } else if (currentPath.includes('new-listing')) {
+                    newListingView.render(statsContainer);
+                }
+            }
+        }
+    });
 });

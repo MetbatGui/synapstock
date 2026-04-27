@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -9,11 +9,22 @@ from synapstock.application.services.report_service import ReportService
 
 @pytest.fixture
 def mock_cloud_storage():
-    return MagicMock()
+    mock = MagicMock()
+    mock.get_file = AsyncMock()
+    mock.download_file = AsyncMock()
+    return mock
+
 
 @pytest.fixture
 def mock_local_storage():
-    return MagicMock()
+    mock = MagicMock()
+    mock.get_file = AsyncMock()
+    mock.put_file = AsyncMock()
+    mock.path_exists = AsyncMock()
+    mock.list_files_in_folder = AsyncMock()
+    mock.ensure_directory = AsyncMock()
+    return mock
+
 
 @pytest.fixture
 def service(mock_cloud_storage, mock_local_storage):
@@ -21,13 +32,15 @@ def service(mock_cloud_storage, mock_local_storage):
         cloud_storage=mock_cloud_storage,
         local_storage=mock_local_storage,
         report_folder_id="folder_id",
-        report_dir="data/report"
+        report_dir="data/report",
     )
+
 
 class TestReportService:
     """ReportService 단위 테스트."""
 
-    def test_get_reports_by_stock_from_list_json(self, service, mock_local_storage):
+    @pytest.mark.asyncio
+    async def test_get_reports_by_stock_from_list_json(self, service, mock_local_storage):
         """list.json 인덱스에서 종목 리포트를 올바르게 읽어와야 한다.
 
         Arrange:
@@ -39,17 +52,24 @@ class TestReportService:
         """
         list_data = [
             {"filename": "[삼성전자] 리서치.pdf", "date": "2024-01-01"},
-            {"filename": "[SK하이닉스] 실적.pdf", "date": "2024-01-02"}
+            {"filename": "[SK하이닉스] 실적.pdf", "date": "2024-01-02"},
         ]
-        mock_local_storage.get_file.side_effect = lambda path: json.dumps(list_data).encode("utf-8") if path == "list.json" else None
 
-        reports = service.get_reports_by_stock("삼성전자")
+        async def mock_get_file(path):
+            if path == "list.json":
+                return json.dumps(list_data).encode("utf-8")
+            return None
+
+        mock_local_storage.get_file.side_effect = mock_get_file
+
+        reports = await service.get_reports_by_stock("삼성전자")
 
         assert len(reports) == 1
         assert reports[0].stock == "삼성전자"
         assert reports[0].filename == "[삼성전자] 리서치.pdf"
 
-    def test_sync_index_downloads_from_cloud(self, service, mock_cloud_storage, mock_local_storage):
+    @pytest.mark.asyncio
+    async def test_sync_index_downloads_from_cloud(self, service, mock_cloud_storage, mock_local_storage):
         """sync_index()는 클라우드에서 인덱스를 가져와 로컬에 저장해야 한다.
 
         Arrange:
@@ -62,14 +82,15 @@ class TestReportService:
         """
         mock_cloud_storage.get_file.return_value = b'{"test": "data"}'
 
-        updated = service.sync_index()
+        updated = await service.sync_index()
 
         assert "list.json" in updated
         assert "reports.json" in updated
         assert mock_cloud_storage.get_file.call_count >= 2
         assert mock_local_storage.put_file.call_count >= 2
 
-    def test_get_file_content_path_triggers_download(self, service, mock_local_storage, mock_cloud_storage):
+    @pytest.mark.asyncio
+    async def test_get_file_content_path_triggers_download(self, service, mock_local_storage, mock_cloud_storage):
         """로컬에 파일이 없으면 클라우드에서 다운로드를 시도해야 한다.
 
         Arrange:
@@ -82,7 +103,7 @@ class TestReportService:
         mock_local_storage.path_exists.return_value = False
         mock_cloud_storage.download_file.return_value = True
 
-        path = service.get_file_content_path("new_report.pdf")
+        path = await service.get_file_content_path("new_report.pdf")
 
         assert path == Path("data/report/new_report.pdf")
         mock_cloud_storage.download_file.assert_called_once()

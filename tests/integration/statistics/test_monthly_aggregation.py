@@ -32,7 +32,9 @@ def monthly_stats_setup(tmp_path):
     service = StatisticsService(repository=repo, query_service=mock_query_service)
     return repo, service, mock_query_service
 
-def test_monthly_aggregation_accumulation(monthly_stats_setup):
+@pytest.mark.asyncio
+
+async def test_monthly_aggregation_accumulation(monthly_stats_setup):
     """여러 날짜의 데이터가 올바르게 합산되는지 검증."""
     repo, service, _ = monthly_stats_setup
     market = MarketType.KOSPI
@@ -57,7 +59,7 @@ def test_monthly_aggregation_accumulation(monthly_stats_setup):
     service.save_rankings([day1, day2])
 
     # 4월 월간 집계 수행
-    result = service.get_monthly_ranking("2026-04", market, subject)
+    result = await service.get_monthly_ranking("2026-04", market, subject)
 
     assert result.month == "2026-04"
     items = {item.name: item.amount for item in result.items}
@@ -72,7 +74,9 @@ def test_monthly_aggregation_accumulation(monthly_stats_setup):
     assert result.items[1].name == "카카오"
     assert result.items[2].name == "SK하이닉스"
 
-def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
+@pytest.mark.asyncio
+
+async def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
     """로컬 보드 데이터를 활용한 티커 매핑 최적화 로직 검증."""
     repo, service, mock_query_service = monthly_stats_setup
     market = MarketType.KOSPI
@@ -87,7 +91,7 @@ def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
     )
     service.save_rankings([day])
 
-    result = service.get_monthly_ranking("2026-04", market, subject)
+    result = await service.get_monthly_ranking("2026-04", market, subject)
 
     items = {item.name: item for item in result.items}
 
@@ -102,16 +106,20 @@ def test_monthly_aggregation_ticker_mapping(monthly_stats_setup):
     # 개별 종목 검색 API(search_ticker)는 호출되지 않아야 함
     assert mock_query_service.search_ticker.call_count == 0
 
-def test_monthly_aggregation_empty_data(monthly_stats_setup):
+@pytest.mark.asyncio
+
+async def test_monthly_aggregation_empty_data(monthly_stats_setup):
     """데이터가 없는 월에 대한 처리 검증."""
     _, service, _ = monthly_stats_setup
 
-    result = service.get_monthly_ranking("2099-12", MarketType.KOSPI, SupplySubject.FOREIGN)
+    result = await service.get_monthly_ranking("2099-12", MarketType.KOSPI, SupplySubject.FOREIGN)
 
     assert result.items == []
     assert result.month == "2099-12"
 
-def test_monthly_aggregation_sorting_and_limit(monthly_stats_setup):
+@pytest.mark.asyncio
+
+async def test_monthly_aggregation_sorting_and_limit(monthly_stats_setup):
     """매우 많은 종목이 있을 때 상위 30개까지만 정렬되어 반환되는지 확인."""
     repo, service, _ = monthly_stats_setup
     market = MarketType.KOSPI
@@ -122,7 +130,7 @@ def test_monthly_aggregation_sorting_and_limit(monthly_stats_setup):
     day = DailyMarketRanking(date="2026-04-01", market=market, subject=subject, items=items)
     service.save_rankings([day])
 
-    result = service.get_monthly_ranking("2026-04", market, subject)
+    result = await service.get_monthly_ranking("2026-04", market, subject)
 
     assert len(result.items) == 30
     assert result.items[0].name == "Stock00"

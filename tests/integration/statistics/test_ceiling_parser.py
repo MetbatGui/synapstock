@@ -5,15 +5,17 @@ from synapstock.infrastructure.container import container
 from synapstock.infrastructure.parsers.excel import CeilingParser
 
 
-def test_parse_real_ceiling_report_from_drive():
+@pytest.mark.asyncio
+
+
+async def test_parse_real_ceiling_report_from_drive():
     """구글 드라이브의 실데이터를 사용하여 상한가 분석 파서를 검증합니다."""
 
     # 1. 구글 드라이브에서 파일 가져오기
     drive = container.drive_adapter
     filename = "상한가분석(2026년).xlsx"
 
-    # 실데이터 존재 여부에 따라 테스트 통과 조건 설정
-    content = drive.get_file(filename, folder="ceiling")
+    content = await drive.get_file(filename, folder="ceiling")
 
     if content is None:
         pytest.skip(f"구글 드라이브에서 {filename} 파일을 찾을 수 없어 테스트를 건너뜁니다.")

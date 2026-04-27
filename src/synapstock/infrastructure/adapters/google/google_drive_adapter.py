@@ -1,5 +1,6 @@
 """Google Drive 저장소 어댑터"""
 
+import asyncio
 import io
 import logging
 import os
@@ -85,7 +86,7 @@ class GoogleDriveAdapter(StoragePort):
     @retry(
         wait=wait_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3),
-        retry=retry_if_not_exception_type(ValueError)
+        retry=retry_if_not_exception_type(ValueError),
     )
     def _get_or_create_folder(self, folder_name: str, parent_id: str = "root") -> str:
         """폴더를 찾거나 생성합니다."""
@@ -110,7 +111,7 @@ class GoogleDriveAdapter(StoragePort):
     @retry(
         wait=wait_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3),
-        retry=retry_if_not_exception_type(ValueError)
+        retry=retry_if_not_exception_type(ValueError),
     )
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
         """경로에 해당하는 파일/폴더의 ID를 찾습니다."""
@@ -161,52 +162,64 @@ class GoogleDriveAdapter(StoragePort):
 
         return current_parent_id
 
-    def get_file(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bytes | None:
+    async def get_file(
+        self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs
+    ) -> bytes | None:
         """Google Drive에서 바이너리 파일을 다운로드합니다."""
         logger.debug(f"[GoogleDrive] get_file 요청: {path} (folder={folder})")
-        try:
-            file_id = self._get_file_id(path, folder=folder, root_id=root_id)
-            if not file_id:
-                logger.warning(f"[GoogleDrive] 파일을 찾을 수 없음: {path}")
+
+        def _get():
+            try:
+                file_id = self._get_file_id(path, folder=folder, root_id=root_id)
+                if not file_id:
+                    logger.warning(f"[GoogleDrive] 파일을 찾을 수 없음: {path}")
+                    return None
+
+                request = self.drive_service.files().get_media(fileId=file_id)
+                fh = io.BytesIO()
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                fh.seek(0)
+                data = fh.read()
+                logger.info(f"[GoogleDrive] 파일 로드 성공: {path} ({len(data)} bytes)")
+                return data
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}", exc_info=True)
                 return None
 
-            request = self.drive_service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            fh.seek(0)
-            data = fh.read()
-            logger.info(f"[GoogleDrive] 파일 로드 성공: {path} ({len(data)} bytes)")
-            return data
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}", exc_info=True)
-            return None
+        return await asyncio.to_thread(_get)
 
-    def put_file(self, path: str, data: bytes, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
+    async def put_file(
+        self, path: str, data: bytes, folder: str | None = None, root_id: str | None = None, **kwargs
+    ) -> bool:
         """바이너리 데이터를 Google Drive에 직접 업로드합니다."""
-        try:
-            if path.endswith(".xlsx"):
-                mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            elif path.endswith(".csv"):
-                mime_type = "text/csv"
-            elif path.endswith(".pdf"):
-                mime_type = "application/pdf"
-            else:
-                mime_type = "application/octet-stream"
 
-            output = io.BytesIO(data)
-            self._upload_file(output, path, mime_type, folder=folder, root_id=root_id)
-            return True
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 업로드 실패 ({path}): {e}")
-            return False
+        def _put():
+            try:
+                if path.endswith(".xlsx"):
+                    mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                elif path.endswith(".csv"):
+                    mime_type = "text/csv"
+                elif path.endswith(".pdf"):
+                    mime_type = "application/pdf"
+                else:
+                    mime_type = "application/octet-stream"
+
+                output = io.BytesIO(data)
+                self._upload_file(output, path, mime_type, folder=folder, root_id=root_id)
+                return True
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 업로드 실패 ({path}): {e}")
+                return False
+
+        return await asyncio.to_thread(_put)
 
     @retry(
         wait=wait_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3),
-        retry=retry_if_not_exception_type(ValueError)
+        retry=retry_if_not_exception_type(ValueError),
     )
     def _upload_file(
         self, data: io.BytesIO, path: str, mime_type: str, folder: str | None = None, root_id: str | None = None
@@ -227,57 +240,68 @@ class GoogleDriveAdapter(StoragePort):
             file_metadata = {"name": filename, "parents": [parent_id]}
             self.drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-    def path_exists(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
-        return self._get_file_id(path, folder=folder, root_id=root_id) is not None
+    async def path_exists(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
+        return await asyncio.to_thread(self._get_file_id, path, folder=folder, root_id=root_id) is not None
 
-    def ensure_directory(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
-        try:
-            self._ensure_path_directories(path + "/dummy", folder=folder, root_id=root_id)
-            return True
-        except Exception:
-            return False
+    async def ensure_directory(
+        self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs
+    ) -> bool:
+        def _ensure():
+            try:
+                self._ensure_path_directories(path + "/dummy", folder=folder, root_id=root_id)
+                return True
+            except Exception:
+                return False
 
-    def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
+        return await asyncio.to_thread(_ensure)
+
+    async def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
         """특정 폴더 내의 파일 목록을 조회합니다 (재귀X, 단층)."""
-        try:
-            folder_id = self._get_file_id(folder_path, **kwargs)
-            if not folder_id:
+
+        def _list():
+            try:
+                folder_id = self._get_file_id(folder_path, **kwargs)
+                if not folder_id:
+                    return []
+
+                query = f"'{folder_id}' in parents and trashed = false"
+                results = (
+                    self.drive_service.files()
+                    .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
+                    .execute()
+                )
+
+                files = results.get("files", [])
+                logger.info(f"[GoogleDrive] 폴더 내 파일 조회 성공: {len(files)}개 발견")
+                return cast(list[dict], files)
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 리스트 조회 실패 ({folder_path}): {e}")
                 return []
 
-            query = f"'{folder_id}' in parents and trashed = false"
-            results = (
-                self.drive_service.files()
-                .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
-                .execute()
-            )
+        return await asyncio.to_thread(_list)
 
-            files = results.get("files", [])
-            logger.info(f"[GoogleDrive] 폴더 내 파일 조회 성공: {len(files)}개 발견")
-            return cast(list[dict], files)
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 리스트 조회 실패 ({folder_path}): {e}")
-            return []
-
-    def list_files(self, folder: str) -> list[dict]:
+    async def list_files(self, folder: str) -> list[dict]:
         """등록된 폴더 키워드를 사용하여 파일 목록을 조회합니다."""
-        return self.list_files_in_folder("", folder=folder)
+        return await self.list_files_in_folder("", folder=folder)
 
-    def get_file_by_id(self, file_id: str) -> bytes | None:
+    async def get_file_by_id(self, file_id: str) -> bytes | None:
         """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다."""
-        try:
-            request = self.drive_service.files().get_media(fileId=file_id)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            fh.seek(0)
-            return fh.read()
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
-            return None
+        def _get():
+            try:
+                request = self.drive_service.files().get_media(fileId=file_id)
+                fh = io.BytesIO()
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+                fh.seek(0)
+                return fh.read()
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
+                return None
+        return await asyncio.to_thread(_get)
 
-    def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
+    async def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
 
         기존에 드라이브에 있는 파일은 건너뛰고 없는 파일만 업로드합니다.
@@ -285,7 +309,7 @@ class GoogleDriveAdapter(StoragePort):
         logger.info(f"[GoogleDrive] PDF 동기화 시작: Local={local_dir} -> Drive={drive_folder_path}")
 
         # 1. Google Drive 파일 목록 가져오기
-        drive_files = self.list_files_in_folder(drive_folder_path)
+        drive_files = await self.list_files_in_folder(drive_folder_path)
         drive_file_names = {f["name"] for f in drive_files}
 
         # 2. 로컬 파일 목록 가져오기
@@ -309,7 +333,7 @@ class GoogleDriveAdapter(StoragePort):
 
             with open(local_path, "rb") as f:
                 data = f.read()
-                if self.put_file(drive_path, data):
+                if await self.put_file(drive_path, data):
                     logger.info(f"[GoogleDrive] 업로드 완료: {filename}")
                     count += 1
                 else:
@@ -317,67 +341,57 @@ class GoogleDriveAdapter(StoragePort):
 
         logger.info(f"[GoogleDrive] PDF 동기화 완료: {count}개 파일 업로드됨.")
 
-    def download_file(
+    async def download_file(
         self, filename: str, local_path: str | Path, folder: str | None = None, root_id: str | None = None
     ) -> bool:
-        """Google Drive에서 단일 파일을 원자적으로(Atomic) 다운로드합니다.
-
-        Args:
-            filename (str): 다운로드할 Google Drive 상의 파일명.
-            local_path (Union[str, Path]): 저장할 로컬 파일 경로.
-            folder (Optional[str]): 등록된 폴더 키워드.
-            root_id (Optional[str]): 대상 폴더 ID.
-
-        Returns:
-            bool: 다운로드 성공 여부.
-
-        Note:
-            - 임시 파일(.tmp)에 먼저 쓰고 완료 후 이름을 변경하여 깨진 파일 생성을 방지합니다.
-        """
+        """Google Drive에서 단일 파일을 원자적으로(Atomic) 다운로드합니다."""
         import os
         import tempfile
         from pathlib import Path
 
-        try:
-            target_root_id = root_id or self._get_root_id(folder)
-            results = (
-                self.drive_service.files()
-                .list(
-                    q=f"name = '{filename}' and '{target_root_id}' in parents and trashed = false",
-                    fields="files(id, name)",
-                )
-                .execute()
-            )
-            files = results.get("files", [])
-
-            if not files:
-                return False
-
-            file_id = files[0]["id"]
-            request = self.drive_service.files().get_media(fileId=file_id)
-
-            local_path = Path(local_path)
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-
-            temp_fd, temp_path = tempfile.mkstemp(dir=str(local_path.parent), suffix=".tmp")
-
+        def _download():
             try:
-                with os.fdopen(temp_fd, "wb") as f:
-                    downloader = MediaIoBaseDownload(f, request)
-                    done = False
-                    while not done:
-                        _, done = downloader.next_chunk()
+                target_root_id = root_id or self._get_root_id(folder)
+                results = (
+                    self.drive_service.files()
+                    .list(
+                        q=f"name = '{filename}' and '{target_root_id}' in parents and trashed = false",
+                        fields="files(id, name)",
+                    )
+                    .execute()
+                )
+                files = results.get("files", [])
 
-                os.replace(temp_path, local_path)
-                return True
+                if not files:
+                    return False
+
+                file_id = files[0]["id"]
+                request = self.drive_service.files().get_media(fileId=file_id)
+
+                local_path_obj = Path(local_path)
+                local_path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+                temp_fd, temp_path = tempfile.mkstemp(dir=str(local_path_obj.parent), suffix=".tmp")
+
+                try:
+                    with os.fdopen(temp_fd, "wb") as f:
+                        downloader = MediaIoBaseDownload(f, request)
+                        done = False
+                        while not done:
+                            _, done = downloader.next_chunk()
+
+                    os.replace(temp_path, local_path_obj)
+                    return True
+                except Exception as e:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    logger.error(f"[GoogleDrive] 다운로드 중 오류: {e}")
+                    return False
             except Exception as e:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                logger.error(f"[GoogleDrive] 다운로드 중 오류: {e}")
+                logger.error(f"[GoogleDrive] 파일 조회 중 오류: {e}")
                 return False
-        except Exception as e:
-            logger.error(f"[GoogleDrive] 파일 조회 중 오류: {e}")
-            return False
+
+        return await asyncio.to_thread(_download)
 
     def download_missing_reports(
         self, local_dir: str, report_list: list[dict], progress_callback: Callable[[str, float], Any] | None = None

@@ -19,7 +19,7 @@ class BaseStatisticsService(ABC, Generic[T]):
         """서비스 식별을 위한 이름을 반환합니다."""
         pass
 
-    def _sync_domain_data(
+    async def _sync_domain_data(
         self,
         year_str: str | None = None,
         filename_pattern: str | None = None,
@@ -36,9 +36,9 @@ class BaseStatisticsService(ABC, Generic[T]):
 
             # 1. 파일 목록 조회 및 기본 확장자 필터링
             if folder_name:
-                files = self.drive_adapter.list_files_in_folder("", folder=folder_name)
+                files = await self.drive_adapter.list_files_in_folder("", folder=folder_name)
             else:
-                files = self.drive_adapter.list_files(self.folder_id)
+                files = await self.drive_adapter.list_files(self.folder_id)
 
             # 유효한 엑셀 파일만 필터링
             valid_files = [f for f in files if f["name"].lower().endswith((".xlsx", ".xls")) and not f["name"].startswith("~$")]
@@ -68,9 +68,9 @@ class BaseStatisticsService(ABC, Generic[T]):
             latest_file = sorted(target_files, key=lambda x: x["name"], reverse=True)[0]
 
             if folder_name:
-                content = self.drive_adapter.get_file(latest_file["name"], folder=folder_name)
+                content = await self.drive_adapter.get_file(latest_file["name"], folder=folder_name)
             else:
-                content = self.drive_adapter.download_file(latest_file["id"])
+                content = await self.drive_adapter.download_file(latest_file["id"])
 
             if not content:
                 logger.error(f"[{self.get_service_name()}] 파일을 다운로드할 수 없습니다: {latest_file['name']}")

@@ -28,7 +28,7 @@ async def get_daily_ranking(
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        result = statistics_service.get_analyzed_ranking(date, market, subject)
+        result = await statistics_service.get_analyzed_ranking(date, market, subject)
         if not result:
             # 데이터가 없는 경우 404가 아닌 빈 결과 또는 메시지 반환 (UI 처리를 위해)
             return {
@@ -52,7 +52,7 @@ async def get_daily_summary(date: str = Query(..., description="조회 날짜 (Y
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        return statistics_service.get_daily_summary(date)
+        return await statistics_service.get_daily_summary(date)
     except Exception as e:
         logger.error(f"Error in get_daily_summary: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
@@ -68,14 +68,14 @@ async def get_monthly_summary(month: str = Query(..., description="조회 월 (Y
         return {
             "month": month,
             "KOSPI": {
-                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_monthly_ranking(
+                "FOREIGN": await statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.FOREIGN),
+                "INSTITUTION": await statistics_service.get_monthly_ranking(
                     month, MarketType.KOSPI, SupplySubject.INSTITUTION
                 ),
             },
             "KOSDAQ": {
-                "FOREIGN": statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.FOREIGN),
-                "INSTITUTION": statistics_service.get_monthly_ranking(
+                "FOREIGN": await statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.FOREIGN),
+                "INSTITUTION": await statistics_service.get_monthly_ranking(
                     month, MarketType.KOSDAQ, SupplySubject.INSTITUTION
                 ),
             },
@@ -109,8 +109,8 @@ async def sync_statistics():
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        count = statistics_service.sync_recent_data(limit=5)
-        return {"status": "success", "message": f"{count}일치 데이터가 동기화되었습니다.", "synced_count": count}
+        count = await statistics_service.sync_recent_data(limit=5)
+        return {"status": "success", "message": f"{count}건의 데이터가 처리되었습니다.", "synced_count": count}
     except Exception as e:
         logger.error(f"Error in sync_statistics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -126,7 +126,7 @@ async def get_ceiling_report(
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        result = statistics_service.get_ceiling_analysis(date, force_sync=force_sync)
+        result = await statistics_service.get_ceiling_analysis(date, force_sync=force_sync)
         if not result:
             return {"date": date, "items": [], "message": "No ceiling data available for this date"}
 
@@ -143,7 +143,7 @@ async def get_ceiling_years():
         if not statistics_service:
             return [datetime.now().strftime("%Y")]
 
-        return statistics_service.list_available_ceiling_years()
+        return await statistics_service.list_available_ceiling_years()
     except Exception as e:
         logger.error(f"Error in get_ceiling_years: {e}")
         return [datetime.now().strftime("%Y")]
@@ -156,7 +156,7 @@ async def get_ceiling_dates(year: str | None = Query(None, description="조회�
         if not statistics_service:
             return []
 
-        return statistics_service.list_available_ceiling_dates(year=year)
+        return await statistics_service.list_available_ceiling_dates(year=year)
     except Exception as e:
         logger.error(f"Error in get_ceiling_dates: {e}")
         return []
@@ -169,7 +169,7 @@ async def get_capital_increase(force_sync: bool = Query(False, description="강�
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        items = statistics_service.get_capital_increase_data(force_sync=force_sync)
+        items = await statistics_service.get_capital_increase_data(force_sync=force_sync)
         return {"count": len(items), "items": items}
     except Exception as e:
         logger.error(f"Error in get_capital_increase: {e}")
@@ -183,7 +183,7 @@ async def get_bonus_issue(force_sync: bool = Query(False, description="강제 �
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        items = statistics_service.get_bonus_issue_data(force_sync=force_sync)
+        items = await statistics_service.get_bonus_issue_data(force_sync=force_sync)
         return {"count": len(items), "items": items}
     except Exception as e:
         logger.error(f"Error in get_bonus_issue: {e}")
@@ -197,7 +197,7 @@ async def get_convertible_bond(force_sync: bool = Query(False, description="강�
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        items = statistics_service.get_convertible_bond_data(force_sync=force_sync)
+        items = await statistics_service.get_convertible_bond_data(force_sync=force_sync)
         return {"count": len(items), "items": items}
     except Exception as e:
         logger.error(f"Error in get_convertible_bond: {e}")
@@ -210,7 +210,7 @@ async def sync_convertible_bond():
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-        return statistics_service.sync_convertible_bond_data()
+        return await statistics_service.sync_convertible_bond_data()
     except Exception as e:
         logger.error(f"Error in sync_convertible_bond: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -223,7 +223,7 @@ async def get_bond_with_warrants(force_sync: bool = Query(False, description="�
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        items = statistics_service.get_bw_data(force_sync=force_sync)
+        items = await statistics_service.get_bw_data(force_sync=force_sync)
         return {"count": len(items), "items": items}
     except Exception as e:
         logger.error(f"Error in get_bond_with_warrants: {e}")
@@ -236,7 +236,7 @@ async def sync_bond_with_warrants():
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
-        return statistics_service.sync_bw_data()
+        return await statistics_service.sync_bw_data()
     except Exception as e:
         logger.error(f"Error in sync_bond_with_warrants: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -247,7 +247,7 @@ async def get_new_listing(force_sync: bool = Query(False, description="강제 �
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        items = statistics_service.get_new_listing_data(force_sync=force_sync)
+        items = await statistics_service.get_new_listing_data(force_sync=force_sync)
         return {"count": len(items), "items": items}
     except Exception as e:
         logger.error(f"Error in get_new_listing: {e}")

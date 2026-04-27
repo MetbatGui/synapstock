@@ -23,7 +23,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
     def get_service_name(self) -> str:
         return "CeilingAnalysisService"
 
-    def get_ceiling_analysis(self, date: str | None = None, force_sync: bool = False) -> CeilingAnalysisReport | None:
+    async def get_ceiling_analysis(self, date: str | None = None, force_sync: bool = False) -> CeilingAnalysisReport | None:
         """스마트 동기화 로직을 적용하여 상한가 리포트를 조회합니다."""
 
         # 1. 날짜 기본값 설정 (오늘)
@@ -46,7 +46,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
         should_sync = force_sync
 
         # 3. 클라우드 상태 체크 (수정 일자 확인)
-        cloud_file_info = self._get_cloud_file_info(year)
+        cloud_file_info = await self._get_cloud_file_info(year)
         if cloud_file_info:
             modified_time = cloud_file_info.get("modifiedTime", "")
             # 클라우드 파일이 동기화 시점보다 최신이고, 로컬 최신 데이터가 오늘 날짜가 아니면 갱신
@@ -74,7 +74,7 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
         # 5. 동기화 실행
         if should_sync:
             logger.info(f"[{self.get_service_name()}] 데이터 동기화 시작 (대상: {date})")
-            reports = self.sync_data(date)
+            reports = await self.sync_data(date)
             if reports:
                 # 메타데이터 업데이트
                 new_latest_date = sorted([r.end_date for r in reports], reverse=True)[0]
@@ -112,11 +112,11 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
         logger.warning(f"[{self.get_service_name()}] 모든 리포트에서 {target_mmdd}의 유효한 데이터를 찾을 수 없습니다.")
         return None
 
-    def _get_cloud_file_info(self, year: str) -> dict | None:
+    async def _get_cloud_file_info(self, year: str) -> dict | None:
         """클라우드에서 해당 연도의 파일 정보를 조회합니다."""
         if not self.drive_adapter:
             return None
-        files = self.drive_adapter.list_files_in_folder("", folder="ceiling")
+        files = await self.drive_adapter.list_files_in_folder("", folder="ceiling")
         target_files = [f for f in files if year in f["name"] and f["name"].lower().endswith((".xlsx", ".xls"))]
         if not target_files:
             return None
@@ -137,12 +137,12 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
             "items": new_items
         })
 
-    def sync_data(self, date_str: str) -> list[CeilingAnalysisReport]:
+    async def sync_data(self, date_str: str) -> list[CeilingAnalysisReport]:
         """연간 단위의 상한가 분석 파일 내의 모든 시트 데이터를 한꺼번에 동기화하여 캐싱합니다."""
         year = date_str[:4]
         save_func = getattr(self.repository, "save_report", lambda x: None)
 
-        return self._sync_domain_data(
+        return await self._sync_domain_data(
             year_str=year,
             filename_pattern="상한가",
             parser_func=self.parser.parse,
@@ -150,19 +150,19 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
             folder_name="ceiling"
         )
 
-    def list_available_dates(self, year: str) -> list[str]:
+    async def list_available_dates(self, year: str) -> list[str]:
         """특정 연도 엑셀 파일의 시트명(YYMMDD)을 분석하여 날짜 목록을 반환합니다."""
         if not self.drive_adapter:
             return []
 
-        files = self.drive_adapter.list_files_in_folder("", folder="ceiling")
+        files = await self.drive_adapter.list_files_in_folder("", folder="ceiling")
         target_files = [f for f in files if year in f["name"] and f["name"].lower().endswith((".xlsx", ".xls"))]
 
         if not target_files:
             return []
 
         latest_file = sorted(target_files, key=lambda x: x["name"], reverse=True)[0]
-        content = self.drive_adapter.get_file(latest_file["name"], folder="ceiling")
+        content = await self.drive_adapter.get_file(latest_file["name"], folder="ceiling")
 
         if not content:
             return []
@@ -181,12 +181,12 @@ class CeilingAnalysisService(BaseStatisticsService[CeilingAnalysisReport]):
             logger.error(f"[{self.get_service_name()}] 시트 목록 추출 실패: {e}")
             return []
 
-    def list_available_years(self) -> list[str]:
+    async def list_available_years(self) -> list[str]:
         """상한가 데이터가 존재하는 모든 연도 목록을 반환합니다."""
         if not self.drive_adapter:
             return []
 
-        files = self.drive_adapter.list_files_in_folder("", folder="ceiling")
+        files = await self.drive_adapter.list_files_in_folder("", folder="ceiling")
         years = set()
         for f in files:
             name = f["name"]
