@@ -21,6 +21,7 @@ class LocalStatisticsRepository:
 
     def save_daily_ranking(self, ranking: DailyMarketRanking):
         """일별 순위를 저장한다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         # 파일명 형식: 2026-04-07_KOSPI_FOREIGN.json
         market_val = ranking.market.value if hasattr(ranking.market, "value") else str(ranking.market)
         subject_val = ranking.subject.value if hasattr(ranking.subject, "value") else str(ranking.subject)
@@ -80,6 +81,7 @@ class LocalCeilingRepository:
 
     def save_metadata(self, metadata: dict):
         """동기화 메타데이터를 저장한다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         import json
         with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
@@ -105,6 +107,7 @@ class LocalCeilingRepository:
 
     def _save_single_report(self, report: CeilingAnalysisReport):
         """단일 리포트를 파일로 저장한다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         filename = f"ceiling_{report.end_date}.json"
         path = self.root / filename
         with open(path, "w", encoding="utf-8") as f:
@@ -152,6 +155,7 @@ class LocalCapitalIncreaseRepository:
 
     def save_data(self, items: list[PaidInCapitalIncrease]):
         """유상증자 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / "capital_increase_data.json"
         import json
 
@@ -181,6 +185,7 @@ class LocalBonusIssueRepository:
 
     def save_data(self, items: list[BonusIssue]):
         """무상증자 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / "bonus_issue_data.json"
         import json
 
@@ -210,6 +215,7 @@ class LocalConvertibleBondRepository:
 
     def save_data(self, items: list[ConvertibleBond]):
         """전환사채 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / "convertible_bond_data.json"
         import json
 
@@ -239,6 +245,7 @@ class LocalBondWithWarrantsRepository:
 
     def save_data(self, items: list[BondWithWarrants]):
         """신주인수권부사채 데이터 리스트를 로컬 전용 파일에 저장합니다."""
+        self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / "bw_data.json"
         import json
 

@@ -44,13 +44,13 @@ class StatisticsService:
         # DisclosureAnalysisService 내부에서 repository들을 타입별로 처리할 수 있도록 래퍼 또는 직접 매핑 필요
         class MultiRepoWrapper:
             def __init__(self, ci, bi, cb, bw):
-                self.get_capital_increase_data = ci.load_data if ci else lambda x: []
+                self.get_capital_increase_data = (lambda year=None: ci.load_data()) if ci else lambda x: []
                 self.save_capital_increase_data = ci.save_data if ci else lambda x: None
-                self.get_bonus_issue_data = bi.load_data if bi else lambda x: []
+                self.get_bonus_issue_data = (lambda year=None: bi.load_data()) if bi else lambda x: []
                 self.save_bonus_issue_data = bi.save_data if bi else lambda x: None
-                self.get_convertible_bond_data = cb.load_data if cb else lambda x: []
+                self.get_convertible_bond_data = (lambda year=None: cb.load_data()) if cb else lambda x: []
                 self.save_convertible_bond_data = cb.save_data if cb else lambda x: None
-                self.get_bw_data = bw.load_data if bw else lambda x: []
+                self.get_bw_data = (lambda year=None: bw.load_data()) if bw else lambda x: []
                 self.save_bw_data = bw.save_data if bw else lambda x: None
 
         disclosure_repo = MultiRepoWrapper(
