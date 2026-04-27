@@ -29,11 +29,11 @@ class BoardQueryService:
 
     def list_boards(self) -> list[str]:
         """저장소의 모든 보드 이름을 나열합니다."""
-        return cast(list[str], self._repository.list_boards())
+        return self._repository.list_boards()
 
     def load_board(self, name: str) -> Board:
         """이름으로 특정 보드 데이터를 로드합니다."""
-        return cast(Board, self._repository.load(name))
+        return self._repository.load(name)
 
     def get_boards_info(self) -> list[dict]:
         """모든 보드의 ID와 실제 이름을 조회합니다."""
@@ -50,7 +50,7 @@ class BoardQueryService:
 
     def search_ticker(self, query: str) -> list[dict[str, str]]:
         """종목 명칭으로 티커를 검색합니다."""
-        return cast(list[dict[str, str]], self._ticker_search.search(query))
+        return self._ticker_search.search(query)
 
     def get_disclosures(self, ticker: str) -> list[dict]:
         """특정 종목의 최근 공시 정보를 조회합니다."""
@@ -58,11 +58,11 @@ class BoardQueryService:
             return []
         return cast(list[dict], self._disclosure.get_recent_disclosures(ticker))
 
-    def get_financial_data(self, company_name: str) -> list[dict]:
+    def get_financial_data(self, company_name: str, metric: str = "매출액", period: str = "분기별") -> list[dict]:
         """특정 기업의 재무 데이터를 조회합니다."""
         if not self._financial:
             return []
-        return cast(list[dict], self._financial.get_financial_data(company_name))
+        return cast(list[dict], self._financial.get_financial_data(company_name, metric, period))
 
     def find_node_by_name(self, root: Node, name: str) -> Node | None:
         """노드 트리 내에서 특정 이름의 노드를 검색합니다."""

@@ -181,22 +181,28 @@
 .financial-sidebar {
     position: fixed;
     top: 70px;
-    right: -600px;
+    right: -100%; /* 너비가 변하므로 고정값 대신 % 사용 고려 */
     width: 600px;
     height: calc(100vh - 70px);
     background: rgba(17, 24, 39, 0.98);
     backdrop-filter: blur(35px);
     border-left: 4px solid var(--accent-blue);
     z-index: 95;
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: -15px 0 40px rgba(0, 0, 0, 0.6);
     padding: 40px 40px 40px 80px;
     display: none;
     flex-direction: column;
 }
 
-.financial-sidebar.active-tab { display: flex; }
+/* right가 -100%이므로, 600px 만큼만 들어오게 하려면? 
+   기존 로직 유지를 위해 right: -600px로 고정하고 확장 시에만 처리하는 것이 안전함 */
+.financial-sidebar {
+    right: -600px;
+}
 .financial-sidebar.open { transform: translateX(-600px); }
+
+.financial-sidebar.active-tab { display: flex; }
 
 .toggle-sidebar-btn {
     position: fixed;
@@ -243,4 +249,145 @@
     overflow-y: auto;
     flex: 1;
     padding-right: 15px;
+}
+
+/* View Toggle Switch */
+.view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.toggle-label {
+    font-size: 0.85rem;
+    color: #9ca3af;
+    font-weight: 600;
+    transition: color 0.3s;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    display: inline-block;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+input:checked + .toggle-slider {
+    background-color: var(--accent-blue, #00d2ff);
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.4);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+/* Sidebar Expansion */
+.financial-sidebar.expanded {
+    width: 80vw;
+    right: -80vw;
+}
+
+.financial-sidebar.expanded.open {
+    transform: translateX(-80vw);
+}
+
+.financial-sidebar.expanded ~ .toggle-sidebar-btn.sidebar-open {
+    right: 80vw;
+}
+
+/* 확장 시 차트 레이아웃 상세 조정 */
+.financial-sidebar.expanded .financial-content-area {
+    display: flex;
+    justify-content: flex-start; /* 좌측 정렬 */
+    align-items: center;
+}
+
+.financial-sidebar.expanded #financial-chart-container {
+    width: 75%; /* 사이드바 80vw 중 75% 차지 (전체 화면 기준 60%) */
+    height: 65%; /* 세로 높이 축소 */
+    padding-left: 0;
+}
+
+/* Financial Option Buttons */
+.financial-opt-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.financial-opt-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e5e7eb;
+}
+
+.financial-opt-btn.active {
+    background: var(--accent-blue, #00d2ff);
+    color: white;
+    border-color: var(--accent-blue, #00d2ff);
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+}
+
+.financial-select {
+    background: rgba(0, 0, 0, 0.4);
+    color: #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.financial-select:focus {
+    border-color: var(--accent-blue, #00d2ff);
+}
+
+/* 캔버스 사이즈 조절을 위한 컨테이너 */
+#financial-chart-container {
+    padding-top: 15px;
+    width: 100%;
+    height: 100%;
 }

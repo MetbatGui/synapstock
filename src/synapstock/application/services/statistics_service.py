@@ -14,9 +14,9 @@ from synapstock.domain.statistics.models import (
 
 logger = logging.getLogger(__name__)
 
+
 class StatisticsService:
     """통계 분석 도메인의 모든 기능을 조율하는 Facade 서비스.
-    
     기존의 모든 의존성(레포지토리 등)을 유지하며, 실제 로직은 전문 서비스로 위임합니다.
     """
 
@@ -30,7 +30,6 @@ class StatisticsService:
         bonus_issue_repository: Any = None,
         convertible_bond_repository: Any = None,
         bw_repository: Any = None,
-        market_data_service: Any = None,
     ):
         self._storage = storage
         self._query_service = query_service
@@ -38,7 +37,7 @@ class StatisticsService:
         # 도메인 서비스 초기화 및 의존성 주입
         self.ranking_svc = RankingService(storage, "", repository)
         self.ceiling_svc = CeilingAnalysisService(storage, "", ceiling_repository)
-        self.ipo_svc = NewListingService(storage, "", repository) # IPO는 기본 레포지토리 공유 혹은 별도 지정
+        self.ipo_svc = NewListingService(storage, "", repository)  # IPO는 기본 레포지토리 공유 혹은 별도 지정
 
         # 공시 서비스는 복합 레포지토리가 필요하므로 Facade에서 조율하거나 래퍼 전달
         # DisclosureAnalysisService 내부에서 repository들을 타입별로 처리할 수 있도록 래퍼 또는 직접 매핑 필요
@@ -54,8 +53,7 @@ class StatisticsService:
                 self.save_bw_data = bw.save_data if bw else lambda x: None
 
         disclosure_repo = MultiRepoWrapper(
-            capital_increase_repository, bonus_issue_repository,
-            convertible_bond_repository, bw_repository
+            capital_increase_repository, bonus_issue_repository, convertible_bond_repository, bw_repository
         )
         self.disclosure_svc = DisclosureAnalysisService(storage, "", disclosure_repo)
 
@@ -73,7 +71,8 @@ class StatisticsService:
                     ticker_map[name] = ticker
                     aliases = stock.get("aliases", [])
                     for alias in aliases:
-                        if alias: ticker_map[alias] = ticker
+                        if alias:
+                            ticker_map[alias] = ticker
             return ticker_map
         except Exception as e:
             logger.error(f"[StatisticsService] 티커 맵 생성 실패: {e}")
@@ -87,7 +86,9 @@ class StatisticsService:
                 item.ticker = ticker_map[item.name]
         return items
 
-    async def get_daily_ranking(self, date_str: str, market: Any = None, subject: Any = None) -> list[DailyMarketRanking] | DailyMarketRanking | None:
+    async def get_daily_ranking(
+        self, date_str: str, market: Any = None, subject: Any = None
+    ) -> list[DailyMarketRanking] | DailyMarketRanking | None:
         return await self.ranking_svc.get_daily_ranking(date_str, market, subject)
 
     def save_rankings(self, rankings: list[DailyMarketRanking]):
