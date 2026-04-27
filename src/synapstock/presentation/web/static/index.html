@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/static/css/animations.css?v=1.2">
     <link rel="stylesheet" href="/static/css/components.css?v=1.2">
     <link rel="stylesheet" href="/static/css/mindmap.css?v=1.2">
-    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.3">
+    <link rel="stylesheet" href="/static/css/dashboard.css?v=1.5">
     <link rel="stylesheet" href="/static/css/statistics.css?v=1.2">
     <link rel="stylesheet" href="/static/css/capital_increase.css?v=1.2">
     <link rel="stylesheet" href="/static/css/bonus_issue.css?v=1.2">
@@ -38,8 +38,8 @@
     <!-- 재무 데이터 개폐식 사이드바 -->
     <aside id="financial-sidebar" class="financial-sidebar">
         <div class="sidebar-content" style="display: flex; flex-direction: column; height: 100%;">
-            <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3>💰 분기 매출 현황 <span style="font-size: 0.8rem; color: #9ca3af; font-weight: normal; margin-left: 10px;">(단위: 억원)</span></h3>
+            <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 id="financial-title">💰 분기 매출 현황 <span style="font-size: 0.8rem; color: #9ca3af; font-weight: normal; margin-left: 10px;">(단위: 억원)</span></h3>
                 <div class="view-toggle">
                     <span class="toggle-label">List</span>
                     <label class="toggle-switch">
@@ -47,6 +47,21 @@
                         <span class="toggle-slider"></span>
                     </label>
                     <span class="toggle-label">Chart</span>
+                </div>
+            </div>
+            
+            <!-- 지표 및 기간 선택 컨트롤 -->
+            <div class="financial-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <div class="metric-selector" style="display: flex; gap: 5px;">
+                    <button class="financial-opt-btn active" data-metric="매출액">매출액</button>
+                    <button class="financial-opt-btn" data-metric="영업이익">영업이익</button>
+                    <button class="financial-opt-btn" data-metric="당기순이익">순이익</button>
+                </div>
+                <div class="period-selector">
+                    <select id="financial-period-select" class="financial-select">
+                        <option value="분기별">분기별</option>
+                        <option value="연간">연간</option>
+                    </select>
                 </div>
             </div>
             <div class="financial-content-area" style="flex: 1; min-height: 0; position: relative;">
@@ -217,7 +232,7 @@
     <!-- 스크립트 연동 -->
     <!-- hidden file input for report upload -->
     <input type="file" id="report-upload-input" accept=".pdf" style="display: none;">
-    <script type="module" src="/static/js/app.js?v=1.4"></script>
+    <script type="module" src="/static/js/app.js?v=1.8"></script>
 </body>
 
 </html>

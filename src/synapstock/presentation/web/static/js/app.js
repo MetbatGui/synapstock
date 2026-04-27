@@ -15,7 +15,7 @@ import {
 } from './ui/dashboard/manager.js';
 import { initNewsEvents, triggerNewsAdd, fetchNews } from './ui/dashboard/news.js';
 import { uploadReport, triggerReportUpload } from './ui/dashboard/reports.js';
-import { initFinancialSidebar } from './ui/dashboard/financials.js?v=1.4';
+import { initFinancialSidebar } from './ui/dashboard/financials.js?v=1.8';
 import { statisticsView } from './ui/statistics/statistics_view.js';
 import { statisticsMonthView } from './ui/statistics/statistics_month_view.js';
 import { ceilingView } from './ui/statistics/ceiling_view.js';

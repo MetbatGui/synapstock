@@ -343,6 +343,48 @@ input:checked + .toggle-slider:before {
     padding-left: 0;
 }
 
+/* Financial Option Buttons */
+.financial-opt-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.financial-opt-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e5e7eb;
+}
+
+.financial-opt-btn.active {
+    background: var(--accent-blue, #00d2ff);
+    color: white;
+    border-color: var(--accent-blue, #00d2ff);
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
+}
+
+.financial-select {
+    background: rgba(0, 0, 0, 0.4);
+    color: #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.financial-select:focus {
+    border-color: var(--accent-blue, #00d2ff);
+}
+
 /* 캔버스 사이즈 조절을 위한 컨테이너 */
 #financial-chart-container {
     padding-top: 15px;
