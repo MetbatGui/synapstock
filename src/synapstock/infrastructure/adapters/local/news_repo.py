@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from pathlib import Path
 
 from synapstock.domain.news.models import NewsBatch
@@ -67,3 +68,28 @@ class LocalNewsRepository:
             f for f in self.base_dir.glob("news_*.json") 
             if f.name != "news_metadata.json"
         ]
+
+    def save_raw_file(self, filename: str, content: bytes, mtime: float | None = None) -> None:
+        """파일 내용을 저장하고 선택적으로 수정 시각을 설정합니다."""
+        file_path = self.base_dir / filename
+        with open(file_path, "wb") as f:
+            f.write(content)
+        if mtime is not None:
+            os.utime(file_path, (mtime, mtime))
+
+    def load_sync_metadata(self) -> dict:
+        """동기화 메타데이터를 로드합니다."""
+        metadata_path = self.base_dir / "news_metadata.json"
+        if not metadata_path.exists():
+            return {}
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def save_sync_metadata(self, metadata: dict) -> None:
+        """동기화 메타데이터를 저장합니다."""
+        metadata_path = self.base_dir / "news_metadata.json"
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)

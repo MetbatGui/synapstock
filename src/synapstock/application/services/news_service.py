@@ -82,21 +82,18 @@ class NewsService:
                 
                 date_str = filename.replace("news_", "").replace(".json", "")
                 
-                # 시각 변환 (Z 대응)
-                drive_mtime = datetime.fromisoformat(drive_mtime_str.replace("Z", "+00:00")).timestamp()
+                # 시각 변환 및 로컬 비교 (개선 B)
+                drive_mtime = self._parse_drive_mtime(drive_mtime_str)
                 local_mtime = self.repository.get_file_mtime(date_str)
 
                 # 드라이브가 더 최신이거나 로컬에 없으면 다운로드
                 if drive_mtime > local_mtime + 1.0:
-                    logger.info(f"[NewsService] 다운로드 대상 발견: {filename} (Drive: {drive_mtime_str})")
+                    logger.info(f"[NewsService] 다운로드 대상 발견: {filename}")
                     content = await self.drive_adapter.get_file(filename, folder="news")
                     
                     if content:
-                        local_path = self.repository._get_file_path(date_str)
-                        with open(local_path, "wb") as f:
-                            f.write(content)
-                        # 로컬 파일 시각을 드라이브 시각과 맞춤 (다음 비교를 위해)
-                        os.utime(local_path, (drive_mtime, drive_mtime))
+                        # Repository를 통한 저장 및 시각 설정 (개선 A)
+                        self.repository.save_raw_file(filename, content, mtime=drive_mtime)
                         logger.info(f"[NewsService] 다운로드 완료: {filename}")
                         download_count += 1
                     else:
@@ -112,22 +109,23 @@ class NewsService:
         except Exception as e:
             logger.error(f"[NewsService] 동기화 중 치명적 오류: {e}", exc_info=True)
 
+    def _parse_drive_mtime(self, mtime_str: str) -> float:
+        """드라이브의 ISO 시각 문자열을 timestamp로 변환합니다. (개선 B)"""
+        return datetime.fromisoformat(mtime_str.replace("Z", "+00:00")).timestamp()
+
     async def _update_local_metadata(self, drive_metadata: dict):
-        """로컬 뉴스 파일 상태를 기반으로 메타데이터를 갱신하고 드라이브에 업로드합니다."""
+        """로컬 뉴스 파일 상태를 기반으로 메타데이터를 갱신하고 드라이브에 업로드합니다. (개선 C)"""
         local_metadata = {}
         for file_path in self.repository.get_all_batch_files():
             filename = file_path.name
-            # ISO 포맷 시각 저장 (Z 포함)
             mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
             local_metadata[filename] = mtime.isoformat().replace("+00:00", "Z")
 
         # 드라이브 정보와 합침 (누락 방지)
         local_metadata.update(drive_metadata)
         
-        # 메타데이터 파일 저장 및 업로드
-        metadata_path = self.repository.base_dir / "news_metadata.json"
-        with open(metadata_path, "w", encoding="utf-8") as f:
-            json.dump(local_metadata, f, indent=2)
+        # Repository를 통해 메타데이터 영속화 (개선 C)
+        self.repository.save_sync_metadata(local_metadata)
             
         if self.drive_adapter:
             content = json.dumps(local_metadata, indent=2).encode("utf-8")
