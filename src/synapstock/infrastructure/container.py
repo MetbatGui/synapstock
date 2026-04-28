@@ -159,6 +159,7 @@ class Container:
                 "convertible_bond": self.config.convertible_bond_folder_id,
                 "bw": self.config.bw_folder_id,
                 "new_listing": self.config.new_listing_folder_id,
+                "news": self.config.news_folder_id,
             }
             # None이 아닌 폴더 ID만 포함하여 dict[str, str] 보장
             valid_folders = {k: v for k, v in folders.items() if v is not None}
