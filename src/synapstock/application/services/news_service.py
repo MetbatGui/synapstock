@@ -5,8 +5,7 @@ import os
 from datetime import datetime, timezone
 
 from synapstock.domain.news.models import NewsBatch, NewsItem
-from synapstock.domain.ports import NewsScraperPort, StoragePort
-from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
+from synapstock.domain.ports import NewsRepositoryPort, NewsScraperPort, StoragePort
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ class NewsService:
 
     def __init__(
         self,
-        repository: LocalNewsRepository,
+        repository: NewsRepositoryPort,
         scraper: NewsScraperPort,
         drive_adapter: StoragePort | None = None,
         news_folder_id: str | None = None,

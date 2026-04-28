@@ -4,10 +4,11 @@ import os
 from pathlib import Path
 
 from synapstock.domain.news.models import NewsBatch
+from synapstock.domain.ports import NewsRepositoryPort
 
 logger = logging.getLogger(__name__)
 
-class LocalNewsRepository:
+class LocalNewsRepository(NewsRepositoryPort):
     """뉴스 데이터를 로컬 파일 시스템에 JSON 형식으로 저장하는 Repository."""
 
     def __init__(self, base_dir: Path):

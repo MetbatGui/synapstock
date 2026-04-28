@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 from synapstock.domain.models import Board, ScrapedNews
+from synapstock.domain.news.models import NewsBatch, NewsItem
 
 
 class BoardRepositoryPort(ABC):
@@ -204,3 +205,39 @@ class PriceDataPort(ABC):
     @abstractmethod
     def get_price_info(self, ticker: str, date_str: str) -> dict | None:
         """특정 종목의 가격 및 신고가 정보를 가져온다."""
+
+
+class NewsRepositoryPort(ABC):
+    """뉴스 데이터 영속성을 위한 추상 포트."""
+
+    @abstractmethod
+    def save_batch(self, batch: NewsBatch) -> bool:
+        """뉴스 배치를 저장합니다."""
+
+    @abstractmethod
+    def load_batch(self, date_str: str) -> NewsBatch | None:
+        """특정 날짜의 뉴스 배치를 로드합니다."""
+
+    @abstractmethod
+    def list_available_dates(self) -> list[str]:
+        """데이터가 존재하는 모든 날짜 목록을 반환합니다."""
+
+    @abstractmethod
+    def get_file_mtime(self, date_str: str) -> float:
+        """특정 날짜 파일의 수정 시각을 반환합니다."""
+
+    @abstractmethod
+    def get_all_batch_files(self) -> list[Path]:
+        """모든 뉴스 배치 파일 경로 목록을 반환합니다."""
+
+    @abstractmethod
+    def save_raw_file(self, filename: str, content: bytes, mtime: float | None = None) -> None:
+        """파일 내용을 저장하고 선택적으로 수정 시각을 설정합니다."""
+
+    @abstractmethod
+    def load_sync_metadata(self) -> dict:
+        """동기화 메타데이터를 로드합니다."""
+
+    @abstractmethod
+    def save_sync_metadata(self, metadata: dict) -> None:
+        """동기화 메타데이터를 저장합니다."""
