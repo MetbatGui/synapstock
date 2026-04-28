@@ -1,6 +1,7 @@
+import json
 import hashlib
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch, ANY
 
 import pytest
 
@@ -20,7 +21,9 @@ def mock_scraper():
 @pytest.fixture
 def mock_drive():
     mock = MagicMock()
+    mock.get_file = AsyncMock()
     mock.put_file = AsyncMock()
+    mock.list_files_in_folder = AsyncMock()
     return mock
 
 @pytest.fixture
@@ -94,3 +97,35 @@ class TestNewsService:
         assert item is not None
         assert item.title == "스크래핑된 뉴스"
         mock_scraper.scrape.assert_called_once_with("http://example.com/2")
+
+    @pytest.mark.asyncio
+    async def test_sync_archive_with_metadata(self, news_service, mock_drive, mock_repo):
+        """메타데이터가 존재할 때 이를 기반으로 신규 파일만 다운로드해야 한다."""
+        # 1. 드라이브에 메타데이터와 신규 파일이 있다고 가정
+        drive_metadata = {
+            "news_2024-04-23.json": "2024-04-23T12:00:00Z",
+            "news_2024-04-24.json": "2024-04-24T12:00:00Z"
+        }
+        mock_drive.get_file.side_effect = [
+            json.dumps(drive_metadata).encode("utf-8"), # news_metadata.json
+            b"content_2024-04-24" # news_2024-04-24.json (신규)
+        ]
+        
+        # 2. 로컬에는 4월 23일 파일만 있고 24일은 없다고 가정
+        mock_repo.get_file_mtime.side_effect = lambda d: 1713873600.0 if d == "2024-04-23" else 0.0
+        mock_repo._get_file_path.return_value = "temp_path"
+        mock_repo.get_all_batch_files.return_value = [] # 메타데이터 갱신용
+
+        # 3. 실행 및 검증 (os.utime 등 파일 시스템 접근을 모킹)
+        mock_repo.base_dir = MagicMock() # metadata_path 생성용
+        with MagicMock() as mock_open, patch("os.utime"), patch("synapstock.application.services.news_service.open", mock_open):
+            await news_service.sync_from_drive()
+
+        # 메타데이터 확인 시도
+        mock_drive.get_file.assert_any_call("news_metadata.json", folder="news")
+        # 신규 파일만 다운로드 시도 (23일은 이미 있으므로 건너뜀)
+        mock_drive.get_file.assert_any_call("news_2024-04-24.json", folder="news")
+        assert mock_drive.get_file.call_count == 2
+        
+        # 메타데이터 업로드 확인 (마지막에 _update_local_metadata 호출됨)
+        mock_drive.put_file.assert_called_with("news_metadata.json", ANY, folder="news")

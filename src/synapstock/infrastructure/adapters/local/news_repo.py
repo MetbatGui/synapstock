@@ -47,6 +47,8 @@ class LocalNewsRepository:
         """데이터가 존재하는 모든 날짜 목록을 반환합니다."""
         dates = []
         for f in self.base_dir.glob("news_*.json"):
+            if f.name == "news_metadata.json":
+                continue
             # news_2024-04-23.json -> 2024-04-23 추출
             date_str = f.stem.replace("news_", "")
             dates.append(date_str)
@@ -60,5 +62,8 @@ class LocalNewsRepository:
         return file_path.stat().st_mtime
 
     def get_all_batch_files(self) -> list[Path]:
-        """모든 뉴스 배치 파일 경로 목록을 반환합니다."""
-        return list(self.base_dir.glob("news_*.json"))
+        """모든 뉴스 배치 파일 경로 목록을 반환합니다. (메타데이터 파일 제외)"""
+        return [
+            f for f in self.base_dir.glob("news_*.json") 
+            if f.name != "news_metadata.json"
+        ]

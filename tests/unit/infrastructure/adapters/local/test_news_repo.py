@@ -56,6 +56,29 @@ class TestLocalNewsRepository:
         # 역순 정렬 확인
         assert dates[0] == "2024-04-22"
 
+    def test_list_available_dates_excludes_metadata(self, repo, temp_news_dir):
+        """news_metadata.json 파일은 날짜 목록에서 제외되어야 한다."""
+        (temp_news_dir / "news_2024-04-21.json").touch()
+        (temp_news_dir / "news_metadata.json").touch()
+
+        dates = repo.list_available_dates()
+
+        assert "2024-04-21" in dates
+        assert "metadata" not in str(dates)
+        assert len(dates) == 1
+
+    def test_get_all_batch_files_excludes_metadata(self, repo, temp_news_dir):
+        """get_all_batch_files는 news_metadata.json을 제외해야 한다."""
+        (temp_news_dir / "news_2024-04-21.json").touch()
+        (temp_news_dir / "news_metadata.json").touch()
+
+        files = repo.get_all_batch_files()
+        
+        filenames = [f.name for f in files]
+        assert "news_2024-04-21.json" in filenames
+        assert "news_metadata.json" not in filenames
+        assert len(files) == 1
+
     def test_load_non_existent_batch(self, repo):
         """존재하지 않는 날짜 로드 시 None을 반환해야 한다."""
         assert repo.load_batch("1999-01-01") is None

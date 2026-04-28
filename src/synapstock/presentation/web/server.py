@@ -127,17 +127,24 @@ async def startup_event():
     logger = logging.getLogger(__name__)
     logger.info("[Startup] SynapStock 서버 시작 중...")
 
-    # 리포트 및 뉴스 인덱스 동기화 (Background)
-    logger.info("[Startup] 인덱스 동기화 태스크 시작 (Google Drive)")
+    # 리포트 및 뉴스 인덱스 동기화 (충돌 방지를 위해 백그라운드에서 순차 실행)
+    logger.info("[Startup] 인덱스 동기화 프로세스 시작 (Google Drive)")
     from synapstock.presentation.web.core.dependencies import (
         sync_indices_if_needed,
         sync_news_archive,
     )
 
-    asyncio.create_task(sync_indices_if_needed(force=True))
-    asyncio.create_task(sync_news_archive())
+    async def run_sync_sequentially():
+        try:
+            await sync_indices_if_needed(force=True)
+            await sync_news_archive()
+        except Exception as e:
+            logger.error(f"[Startup] 동기화 중 오류 발생: {e}")
 
-    logger.info("[Startup] 서버 초기화 완료.")
+    # 하나의 태스크로 묶어서 실행
+    asyncio.create_task(run_sync_sequentially())
+
+    logger.info("[Startup] 서버 초기화 완료 (동기화는 백그라운드에서 진행 중).")
 
 
 # ── 실행 헬퍼 ────────────────────────────────────────────────────────────────
