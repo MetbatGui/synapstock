@@ -19,11 +19,13 @@ import { initFinancialSidebar } from './ui/dashboard/financials.js?v=1.8';
 import { statisticsView } from './ui/statistics/statistics_view.js';
 import { statisticsMonthView } from './ui/statistics/statistics_month_view.js';
 import { ceilingView } from './ui/statistics/ceiling_view.js';
+import { consecutiveGrowthView } from './ui/statistics/consecutive_growth_view.js';
 import { capitalIncreaseView } from './ui/statistics/capital_increase_view.js';
 import { bonusIssueView } from './ui/statistics/bonus_issue_view.js';
 import { convertibleBondView } from './ui/statistics/convertible_bond_view.js';
 import { bondWithWarrantsView } from './ui/statistics/bond_with_warrants_view.js';
 import { newListingView } from './ui/statistics/new_listing_view.js';
+import { financialAnalysisView } from './ui/statistics/financial_analysis_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -170,6 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 bondWithWarrantsView.render(statsContainer);
             } else if (path.includes('new-listing')) {
                 newListingView.render(statsContainer);
+            } else if (path.includes('financial')) {
+                financialAnalysisView.init(statsContainer);
             }
         }
     }
@@ -211,6 +215,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     bondWithWarrantsView.render(statsContainer);
                 } else if (route === 'new-listing') {
                     newListingView.render(statsContainer);
+                } else if (route === 'growth') {
+                    consecutiveGrowthView.init(statsContainer);
+                } else if (route === 'financial') {
+                    financialAnalysisView.init(statsContainer);
                 }
             }
         });
@@ -266,6 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     bondWithWarrantsView.render(statsContainer);
                 } else if (currentPath.includes('new-listing')) {
                     newListingView.render(statsContainer);
+                } else if (currentPath.includes('financial')) {
+                    financialAnalysisView.init(statsContainer);
                 }
             }
         }
