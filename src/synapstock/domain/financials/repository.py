@@ -9,5 +9,9 @@ class FinancialRepository(Protocol):
         ...
 
     def get_latest_quarter(self, metric: FinancialMetric) -> str:
-        """해당 지표에서 데이터가 존재하는 가장 최신 분기명을 반환합니다."""
+        """가장 최신 분기 문자열을 반환합니다."""
+        ...
+
+    def get_all_quarters(self, metric: FinancialMetric) -> list[str]:
+        """선택 가능한 모든 분기 리스트를 반환합니다."""
         ...

@@ -14,20 +14,22 @@ class ExcelFinancialRepository(FinancialRepository):
             FinancialMetric.NET_INCOME: 2
         }
 
-    def get_latest_quarter(self, metric: FinancialMetric) -> str:
+    def get_all_quarters(self, metric: FinancialMetric) -> list[str]:
         sheet_idx = self._metric_sheet_map.get(metric)
         if sheet_idx is None:
-            return ""
-            
+            return []
         try:
-            # 엑셀 파일의 컬럼명만 먼저 읽기 (전체 로드 방지)
             df = pd.read_excel(self.file_path, sheet_name=sheet_idx, nrows=0)
-            # 첫 번째 컬럼(종목명)을 제외한 마지막 컬럼이 최신 분기
             if len(df.columns) > 1:
-                return str(df.columns[-1])
-            return ""
+                # 첫 번째 컬럼(종목명) 제외한 나머지 분기 목록을 역순(최신순)으로 반환
+                return [str(c) for c in reversed(df.columns[1:])]
+            return []
         except Exception:
-            return ""
+            return []
+
+    def get_latest_quarter(self, metric: FinancialMetric) -> str:
+        quarters = self.get_all_quarters(metric)
+        return quarters[0] if quarters else ""
 
     def load_all(self, metric: FinancialMetric) -> list[FinancialStatement]:
         sheet_idx = self._metric_sheet_map.get(metric)
