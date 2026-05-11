@@ -21,6 +21,7 @@ class Stock(BaseModel):
     ticker: str
     aliases: list[str] = []
     reports: list[str] = []
+    news: list[dict] = []
 
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"

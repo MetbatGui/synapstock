@@ -133,8 +133,21 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                 logger.warning(f"[{self.get_service_name()}] '{target_filename}' 파일을 찾을 수 없습니다.")
                 return []
 
+            # 1.4 파일 수정 날짜 체크 (자동 동기화 판단)
+            modified_time = target_file.get("modifiedTime", "")
+            needs_sync = self.cache_manager.needs_update("ranking", target_file["name"], modified_time)
+            
+            if not needs_sync:
+                # 수정 날짜가 동일하면 더 이상 진행할 필요 없음 (성능 최적화)
+                if date_str:
+                    return self.repository.get_rankings(date_str)
+                dates = self.repository.list_available_dates(MarketType.KOSPI, SupplySubject.FOREIGN)
+                return self.repository.get_rankings(dates[0]) if dates else []
+
+            logger.info(f"[{self.get_service_name()}] 파일 업데이트 감지 ({modified_time}). 신규 데이터 확인을 시작합니다.")
+
             # 2. 파일 다운로드 및 시트 목록 확인
-            logger.info(f"[{self.get_service_name()}] 대상 파일 발견: {target_file['name']}")
+            logger.info(f"[{self.get_service_name()}] 대상 파일 다운로드 중: {target_file['name']}")
             content = await self.drive_adapter.get_file_by_id(target_file["id"])
             if not content:
                 return []
@@ -142,8 +155,8 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             xl = pd.ExcelFile(io.BytesIO(content))
             sheet_names = xl.sheet_names
 
-            # 3. 로컬에 없는 날짜 필터링
-            # 기준: KOSPI/FOREIGN 데이터 존재 여부
+            # 3. 동기화할 날짜 결정
+            # 로컬에 이미 존재하는 날짜는 건너뜀 (과거 시트는 변경될 이유가 거의 없으므로 신규 추가만 수행)
             existing_dates = set(self.repository.list_available_dates(MarketType.KOSPI, SupplySubject.FOREIGN))
             
             all_rankings = []
@@ -158,7 +171,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                     continue
 
                 if date_norm not in existing_dates:
-                    logger.info(f"[{self.get_service_name()}] 누락된 날짜 발견, 파싱 시작: {date_norm} (시트: {sheet_name})")
+                    logger.info(f"[{self.get_service_name()}] 신규 날짜 발견, 동기화 시작: {date_norm} (시트: {sheet_name})")
                     try:
                         rankings = self.parser.parse_summary_table(content, sheet_name, date_norm)
                         if rankings:
@@ -169,10 +182,15 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
                     except Exception as e:
                         logger.error(f"[{self.get_service_name()}] 시트 {sheet_name} 파싱 실패: {e}")
 
-            if newly_synced_count > 0:
-                logger.info(f"[{self.get_service_name()}] 총 {newly_synced_count}일치 데이터가 새로 동기화되었습니다.")
-                # 캐시 매니저 업데이트 (파일 전체 기준)
-                self.cache_manager.update_cache_info("ranking", target_file["name"], target_file.get("modifiedTime", ""), {"file_id": target_file["id"]})
+            if newly_synced_count > 0 or needs_sync:
+                if newly_synced_count > 0:
+                    logger.info(f"[{self.get_service_name()}] 총 {newly_synced_count}일치 데이터가 새로 추가되었습니다.")
+                
+                # 캐시 매니저 업데이트 (수정 날짜 기록)
+                self.cache_manager.update_cache_info("ranking", target_file["name"], modified_time, {"file_id": target_file["id"]})
+                
+                if not all_rankings and date_str:
+                    return self.repository.get_rankings(date_str)
                 return all_rankings
 
             # 새로 동기화된 게 없으면 가장 최근 데이터 반환

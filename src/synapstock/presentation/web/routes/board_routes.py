@@ -5,11 +5,18 @@
 
 import asyncio
 import json
+import logging
 import threading
 from typing import cast
 
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
+
+from synapstock.domain.models import Board
+from synapstock.infrastructure.adapters.local.board_repository import LocalBoardRepository
+from synapstock.infrastructure.persistence.json_persistence import to_dict
+
+logger = logging.getLogger(__name__)
 
 from synapstock.presentation.web.core.dependencies import (
     command_service,
@@ -59,6 +66,7 @@ async def get_board_data(name: str) -> dict | JSONResponse:
 
         return cast(dict, to_dict(board.root))
     except Exception as e:
+        logger.error(f"Error loading board '{name}': {str(e)}")
         return JSONResponse(status_code=404, content={"message": str(e)})
 
 
