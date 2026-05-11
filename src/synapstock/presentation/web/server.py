@@ -30,6 +30,7 @@ from synapstock.presentation.web.routes import (
     report_routes,
     statistics_routes,
     stock_routes,
+    financial_routes,
 )
 
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ app.include_router(board_routes.router)
 app.include_router(stock_routes.router)
 app.include_router(report_routes.router)
 app.include_router(statistics_routes.router)
+app.include_router(financial_routes.router)
 
 
 # ── 페이지 라우트 ────────────────────────────────────────────────────────────

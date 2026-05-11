@@ -19,6 +19,7 @@ from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
+from synapstock.application.services.financial_service import FinancialService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
     DartDisclosureAdapter,
 )
@@ -33,6 +34,7 @@ from synapstock.infrastructure.adapters.local.board_repo import LocalBoardReposi
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
+from synapstock.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalBondWithWarrantsRepository,
     LocalBonusIssueRepository,
@@ -95,6 +97,7 @@ class Container:
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
         self._news_repo = LocalNewsRepository(self.config.news_dir)
+        self._financial_repo = ExcelFinancialRepository(str(self.config.data_dir / "financial_statements" / "재무제표.xlsx"))
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -136,6 +139,8 @@ class Container:
             convertible_bond_repository=self._convertible_bond_repo,
             bw_repository=self._bw_repo,
         )
+
+        self._financial_service = FinancialService(repository=self._financial_repo)
 
         self._report_service = None
         self._init_report_service()
@@ -227,6 +232,10 @@ class Container:
     @property
     def news_service(self) -> NewsService:
         return self._news_service
+
+    @property
+    def financial_service(self) -> FinancialService:
+        return self._financial_service
 
 
 # 전역 컨테이너 인스턴스 생성
