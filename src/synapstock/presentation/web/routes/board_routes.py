@@ -13,8 +13,6 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
 from synapstock.domain.models import Board
-from synapstock.infrastructure.adapters.local.board_repository import LocalBoardRepository
-from synapstock.infrastructure.persistence.json_persistence import to_dict
 
 logger = logging.getLogger(__name__)
 
