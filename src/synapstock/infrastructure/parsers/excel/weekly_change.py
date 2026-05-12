@@ -58,11 +58,23 @@ class WeeklyChangeParser(BaseExcelParser):
         return metadata
 
     def _find_value(self, row, keywords, default=None):
-        """여러 키워드 중 하나라도 포함된 컬럼의 값을 찾아 반환합니다."""
+        """유니코드 정규화를 적용하여 정밀 매칭 후 부분 매칭을 시도합니다."""
+        import unicodedata
+
+        # 1. 완전 일치 시도 (정규화 포함)
         for col in row.index:
-            col_str = str(col).replace(" ", "").replace("\n", "")
+            col_norm = unicodedata.normalize("NFC", str(col)).strip().replace(" ", "").replace("\n", "")
+            if col_norm in keywords:
+                return row[col]
+        
+        # 2. 부분 일치 시도
+        for col in row.index:
+            col_norm = unicodedata.normalize("NFC", str(col)).strip().replace(" ", "").replace("\n", "")
             for kw in keywords:
-                if kw in col_str:
+                if kw in col_norm:
+                    # '저가'가 '종가'로 매칭되는 것 방지
+                    if kw == "종가" and "저가" in col_norm:
+                        continue
                     return row[col]
         return default
 
@@ -71,46 +83,52 @@ class WeeklyChangeParser(BaseExcelParser):
         filename = kwargs.get("filename", "")
         metadata = self.extract_metadata_from_filename(filename)
         
-        # 파일명 날짜 우선 (없으면 인자값 사용)
         date = metadata["date"] if metadata["date"] != "Unknown" else kwargs.get("date", "Unknown")
         
         df = pd.read_excel(io.BytesIO(content))
         
-        # 컬럼 키워드 정의
-        name_kws = ["종목명", "종목", "Name"]
-        curr_kws = ["현재가", "종가", "Price", "Close"]
-        prev_kws = ["전주종가", "이전종가", "이전가", "Prev"]
-        rate_kws = ["등락률", "주간등락률", "Change"]
+        # 컬럼 키워드 (사용자 제공 형식 반영)
+        name_kws = ["종목명", "Name"]
+        curr_kws = ["종가", "현재가"]
+        base_kws = ["기준가", "시가", "전주종가"]
+        rate_kws = ["등락률", "주간등락률"]
+        ticker_kws = ["종목코드", "코드", "Ticker"]
 
         items = []
         for _, row in df.iterrows():
             try:
-                # 1. 종목명 추출
+                # 1. 종목명 및 티커 추출
                 raw_name = self._find_value(row, name_kws)
-                if raw_name is None: # 키워드로 못 찾으면 첫 번째 컬럼 사용
-                    raw_name = row.iloc[0]
-                
+                if raw_name is None: raw_name = row.iloc[0]
                 name = self._clean_stock_name(str(raw_name))
-                if not name or name == "nan" or "종목명" in name:
-                    continue
+                if not name or name == "nan" or "종목" in name: continue
+                
+                raw_ticker = self._find_value(row, ticker_kws)
+                ticker = str(raw_ticker).strip().zfill(6) if raw_ticker is not None else None
                     
-                # 2. 값 추출 및 정제
-                raw_curr = self._find_value(row, curr_kws, 0)
-                raw_prev = self._find_value(row, prev_kws, 0)
+                # 2. 값 추출
+                raw_curr = self._find_value(row, curr_kws)
+                raw_base = self._find_value(row, base_kws)
                 raw_rate = self._find_value(row, rate_kws, 0.0)
 
-                current_price = self.to_int(raw_curr)
-                prev_week_close = self.to_int(raw_prev)
-                
-                # 등락률 특수 처리 (+420.00% 등)
+                # 등락률 정제
                 if isinstance(raw_rate, str):
                     raw_rate = raw_rate.replace("+", "").replace("%", "").replace(",", "").strip()
                 change_rate = self.to_float(raw_rate)
                 
+                # 현재가(종가) 및 기준가(기준가/시가) 정제
+                current_price = self.to_int(raw_curr) if raw_curr is not None else 0
+                base_price = self.to_int(raw_base) if raw_base is not None else 0
+                
+                # 기준가가 0이면 등락률로 역산 (백업용)
+                if base_price == 0 and current_price > 0:
+                    base_price = int(round(current_price / (1 + change_rate / 100)))
+                
                 items.append(WeeklyChangeItem(
                     name=name,
+                    ticker=ticker,
                     current_price=current_price,
-                    prev_week_close=prev_week_close,
+                    prev_week_close=base_price,
                     change_rate=change_rate
                 ))
             except Exception as e:
