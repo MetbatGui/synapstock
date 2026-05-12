@@ -176,8 +176,8 @@ export const weeklyChangeView = {
                     <tr>
                         <th style="width: 60px;">순위</th>
                         <th>종목명</th>
-                        <th style="text-align: right;">현재가</th>
-                        <th style="text-align: right;">전주종가</th>
+                        <th style="text-align: right;">종가(종료일)</th>
+                        <th style="text-align: right;">기준가(시작일)</th>
                         <th style="text-align: center;">주간 등락률</th>
                     </tr>
                 </thead>
@@ -194,8 +194,8 @@ export const weeklyChangeView = {
                     <td class="col-name">
                         <span class="stock-name-text stock-link" data-name="${item.name}">${item.name}</span>
                     </td>
-                    <td style="text-align: right;">${item.current_price.toLocaleString()}원</td>
-                    <td style="text-align: right; color: #888;">${item.prev_week_close.toLocaleString()}원</td>
+                    <td style="text-align: right;">${item.close_price.toLocaleString()}원</td>
+                    <td style="text-align: right; color: #888;">${item.base_price.toLocaleString()}원</td>
                     <td style="text-align: center;">
                         <span class="change-badge ${changeClass}">${changeSign}${item.change_rate.toFixed(2)}%</span>
                     </td>

@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, computed_field
+from pydantic import AliasChoices, BaseModel, Field, computed_field
 
 
 class MarketType(StrEnum):
@@ -479,15 +479,15 @@ class WeeklyChangeItem(BaseModel):
     Attributes:
         name (str): 종목명.
         ticker (str | None): 종목 코드.
-        current_price (int): 현재가.
-        prev_week_close (int): 전주 금요일 종가.
+        close_price (int): 종료일 종가 (최근 가격).
+        base_price (int): 시작일 종가 (기준 가격).
         change_rate (float): 주간 등락률 (%).
     """
 
     name: str
     ticker: str | None = None
-    current_price: int = 0
-    prev_week_close: int = 0
+    close_price: int = Field(0, validation_alias=AliasChoices("close_price", "current_price"))
+    base_price: int = Field(0, validation_alias=AliasChoices("base_price", "prev_week_close"))
     change_rate: float = 0.0
 
 

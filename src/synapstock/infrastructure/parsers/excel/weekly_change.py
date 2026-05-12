@@ -127,8 +127,8 @@ class WeeklyChangeParser(BaseExcelParser):
                 items.append(WeeklyChangeItem(
                     name=name,
                     ticker=ticker,
-                    current_price=current_price,
-                    prev_week_close=base_price,
+                    close_price=current_price,
+                    base_price=base_price,
                     change_rate=change_rate
                 ))
             except Exception as e:
