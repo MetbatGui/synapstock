@@ -72,6 +72,19 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         logger.info(f"[{self.get_service_name()}] {latest_file['name']} 동기화 완료")
         return report
 
-    async def list_available_dates(self) -> list[str]:
-        """로컬 저장소의 가용 날짜 목록을 반환합니다."""
-        return self.repository.list_available_dates()
+    async def list_available_dates(self) -> list[dict[str, Any]]:
+        """로컬 저장소의 가용 날짜 및 메타데이터 목록을 반환합니다."""
+        dates = self.repository.list_available_dates()
+        results = []
+        for date in dates:
+            report = self.repository.load_report(date)
+            if report:
+                results.append({
+                    "date": report.date,
+                    "year": report.year,
+                    "month": report.month,
+                    "week_of_month": report.week_of_month,
+                    "week_num": report.week_num,
+                    "date_range": report.date_range
+                })
+        return results

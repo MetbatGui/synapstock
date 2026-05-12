@@ -26,6 +26,7 @@ import { convertibleBondView } from './ui/statistics/convertible_bond_view.js';
 import { bondWithWarrantsView } from './ui/statistics/bond_with_warrants_view.js';
 import { newListingView } from './ui/statistics/new_listing_view.js';
 import { financialAnalysisView } from './ui/statistics/financial_analysis_view.js';
+import { weeklyChangeView } from './ui/statistics/weekly_change_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -174,6 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 newListingView.render(statsContainer);
             } else if (path.includes('financial')) {
                 financialAnalysisView.init(statsContainer);
+            } else if (path.includes('weekly-change')) {
+                weeklyChangeView.init(statsContainer);
             }
         }
     }
@@ -219,6 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     consecutiveGrowthView.init(statsContainer);
                 } else if (route === 'financial') {
                     financialAnalysisView.init(statsContainer);
+                } else if (route === 'weekly-change') {
+                    weeklyChangeView.init(statsContainer);
                 }
             }
         });
@@ -276,6 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     newListingView.render(statsContainer);
                 } else if (currentPath.includes('financial')) {
                     financialAnalysisView.init(statsContainer);
+                } else if (currentPath.includes('weekly-change')) {
+                    weeklyChangeView.init(statsContainer);
                 }
             }
         }
