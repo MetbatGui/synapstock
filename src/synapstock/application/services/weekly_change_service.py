@@ -52,7 +52,7 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         return f"{monday.strftime('%m%d')}~{friday.strftime('%m%d')}"
 
     async def sync_data(self, date_str: str | None = None) -> WeeklyChangeReport | None:
-        """매니페스트 정보를 기반으로 하되, 파일명은 항상 월~금 기간으로 교정하여 동기화합니다."""
+        """매니페스트 정보를 기반으로 하되, 폴더명과 파일명을 교정하여 동기화합니다."""
         if not self.drive_adapter:
             return None
 
@@ -74,22 +74,20 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                 month = target_event.get("month")
                 week_num = target_event.get("week")
                 
-                # [중요] 매니페스트에 적힌 기간 대신, 무조건 월~금 기간으로 파일명 교정
+                # 파일명 교정 (월~금 고정)
                 full_range = self._get_full_week_range(year, week_num)
-                
-                # 기존 파일명에서 기간 부분(예: 0511~0512)을 찾아 교정된 기간(0511~0515)으로 치환
                 raw_filename = target_event.get("filename", "").replace(".parquet", ".xlsx")
                 import re
                 corrected_filename = re.sub(r"\d{4}~\d{4}", full_range, raw_filename)
                 
-                sub_path = f"{year}/{month:02d}"
+                # [중요] 드라이브 폴더 구조: {year}/{month:02d}월 (예: 2026/05월)
+                sub_path = f"{year}/{month:02d}월"
                 full_path = f"{sub_path}/{corrected_filename}"
                 
-                logger.info(f"[{self.get_service_name()}] 파일명 교정 후 핀포인트 동기화: {full_path}")
+                logger.info(f"[{self.get_service_name()}] 경로/파일명 교정 후 핀포인트 동기화: {full_path}")
                 content = await self.drive_adapter.get_file(full_path, folder="weekly_change")
                 
                 if content:
-                    # 저장 시에도 교정된 기간과 날짜(금요일)를 사용함
                     corrected_date = f"{year}-{full_range[5:7]}-{full_range[7:]}"
                     report = self.parser.parse(content, filename=corrected_filename, date=corrected_date)
                     self.repository.save_report(report)
@@ -99,10 +97,11 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         return await self._sync_data_fallback(date_str)
 
     async def _sync_data_fallback(self, date_str: str | None = None) -> WeeklyChangeReport | None:
-        """기존의 폴더 재귀 탐색 방식 (매니페스트 없을 때 사용)"""
+        """기존의 폴더 재귀 탐색 방식 (05월 구조 반영)"""
         search_paths = [""]
         if date_str and len(date_str) >= 7:
-            search_paths.insert(0, f"{date_str[:4]}/{date_str[5:7]}")
+            # 2026/05월 구조로 검색 시도
+            search_paths.insert(0, f"{date_str[:4]}/{date_str[5:7]}월")
 
         files = []
         for path in search_paths:
