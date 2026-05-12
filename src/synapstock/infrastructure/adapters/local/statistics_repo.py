@@ -274,57 +274,58 @@ class LocalWeeklyChangeRepository:
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def _get_report_path(self, date_str: str, year: int | None = None, month: int | None = None) -> Path:
-        """리포트 파일의 저장/조회 경로를 반환한다. (예: 2026년/05월/weekly_change_2026-05-08.json)"""
-        # 연/월 정보가 없으면 날짜 문자열에서 추출
+    def _get_report_path(self, date_str: str, year: int | None = None, month: int | None = None, date_range: str | None = None) -> Path:
+        """리포트 파일의 저장/조회 경로를 반환한다. (예: 2026년/05월/weekly_change_0511~0515.json)"""
         if not year or not month:
             if len(date_str) >= 10:
                 year = int(date_str[:4])
                 month = int(date_str[5:7])
         
+        # 파일명 결정: date_range가 있으면 사용, 없으면 date_str 사용
+        filename_part = date_range if date_range else date_str
+        
         if year and month:
             folder = self.root / f"{year}년" / f"{month:02d}월"
             folder.mkdir(parents=True, exist_ok=True)
-            return folder / f"weekly_change_{date_str}.json"
+            return folder / f"weekly_change_{filename_part}.json"
         
-        return self.root / f"weekly_change_{date_str}.json"
+        return self.root / f"weekly_change_{filename_part}.json"
 
     def save_report(self, report: WeeklyChangeReport):
-        """주간 등락률 리포트를 하위 폴더 구조에 맞춰 저장한다."""
-        path = self._get_report_path(report.date, report.year, report.month)
+        """주간 등락률 리포트를 기간(date_range) 기반 파일명으로 저장한다."""
+        path = self._get_report_path(report.date, report.year, report.month, report.date_range)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(report.model_dump_json(indent=2))
 
     def load_report(self, date: str) -> WeeklyChangeReport | None:
-        """특정 날짜의 주간 등락률 리포트를 불러온다 (하위 폴더 우선 검색)."""
-        # 1. 하위 폴더 형식으로 먼저 시도
-        path = self._get_report_path(date)
-        if not path.exists():
-            # 2. 루트 폴더에서 시도 (마이그레이션 대비)
-            path = self.root / f"weekly_change_{date}.json"
-            
-        if not path.exists():
-            # 3. 모든 하위 폴더에서 검색 (가장 유연함)
-            files = list(self.root.rglob(f"weekly_change_{date}.json"))
-            if not files:
-                return None
-            path = files[0]
-
-        with open(path, encoding="utf-8") as f:
-            from synapstock.domain.statistics.models import WeeklyChangeReport
-            return WeeklyChangeReport.model_validate_json(f.read())
+        """특정 날짜의 리포트를 불러온다. 파일명에 해당 날짜가 포함되어 있는지 검색한다."""
+        # 1. 모든 하위 폴더에서 weekly_change_*.json 파일을 찾음
+        files = list(self.root.rglob("weekly_change_*.json"))
+        
+        # 2. 날짜(예: 0515)가 파일명에 포함되어 있거나, 내부 데이터를 로드해서 확인
+        target_date_short = date.replace("-", "")[4:] # '2026-05-15' -> '0515'
+        
+        for path in files:
+            # 파일명에 0515가 포함되어 있는지 단순 체크 (예: 0511~0515)
+            if target_date_short in path.name or date in path.name:
+                with open(path, encoding="utf-8") as f:
+                    from synapstock.domain.statistics.models import WeeklyChangeReport
+                    report = WeeklyChangeReport.model_validate_json(f.read())
+                    if report.date == date:
+                        return report
+        return None
 
     def list_available_dates(self) -> list[str]:
-        """데이터가 존재하는 모든 날짜 목록을 반환한다 (재귀 검색)."""
+        """데이터가 존재하는 모든 날짜 목록을 반환한다."""
         files = self.root.rglob("weekly_change_*.json")
         dates = []
+        from synapstock.domain.statistics.models import WeeklyChangeReport
         for f in files:
             try:
-                # 파일명에서 날짜 부분 추출 (weekly_change_YYYY-MM-DD.json)
-                date_str = f.name.replace("weekly_change_", "").replace(".json", "")
-                if len(date_str) == 10:
-                    dates.append(date_str)
+                with open(f, encoding="utf-8") as json_file:
+                    report = WeeklyChangeReport.model_validate_json(json_file.read())
+                    dates.append(report.date)
             except Exception:
                 continue
         return sorted(list(set(dates)), reverse=True)
