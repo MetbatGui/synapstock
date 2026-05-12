@@ -41,14 +41,22 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
             logger.warning(f"[{self.get_service_name()}] 매니페스트 로드 실패: {e}")
         return None
 
+    def _get_full_week_range(self, year: int, week_num: int) -> str:
+        """연도와 주차를 바탕으로 해당 주의 월요일~금요일 날짜(MMDD~MMDD)를 계산합니다."""
+        import datetime
+        # ISO 주차 기준 계산
+        d = datetime.date(year, 1, 4)  # 1월 4일은 항상 첫 번째 주에 포함됨
+        target_date = d + datetime.timedelta(weeks=week_num - 1)
+        monday = target_date - datetime.timedelta(days=target_date.weekday())
+        friday = monday + datetime.timedelta(days=4)
+        return f"{monday.strftime('%m%d')}~{friday.strftime('%m%d')}"
+
     async def sync_data(self, date_str: str | None = None) -> WeeklyChangeReport | None:
-        """매니페스트 정보를 활용하여 데이터를 핀포인트로 동기화합니다."""
+        """매니페스트 정보를 기반으로 하되, 파일명은 항상 월~금 기간으로 교정하여 동기화합니다."""
         if not self.drive_adapter:
             return None
 
         manifest = await self._load_manifest()
-        
-        # 1. 매니페스트가 있으면 핀포인트 검색
         if manifest:
             target_event = None
             if date_str:
@@ -57,7 +65,6 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                         target_event = event
                         break
             else:
-                # 날짜 미지정 시 가장 최신 COMPLETED 이벤트 선택
                 completed = [e for e in manifest.values() if e.get("status") == "COMPLETED"]
                 if completed:
                     target_event = sorted(completed, key=lambda x: x.get("last_trading_day", ""), reverse=True)[0]
@@ -65,21 +72,29 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
             if target_event:
                 year = target_event.get("year")
                 month = target_event.get("month")
-                # 드라이브는 xlsx 형식을 사용하므로 확장자 치환
-                filename = target_event.get("filename", "").replace(".parquet", ".xlsx")
-                # 매니페스트의 연/월 정보로 하위 폴더 경로 구성
-                sub_path = f"{year}/{month:02d}"
-                full_path = f"{sub_path}/{filename}"
+                week_num = target_event.get("week")
                 
-                logger.info(f"[{self.get_service_name()}] 매니페스트 기반 핀포인트 동기화: {full_path}")
+                # [중요] 매니페스트에 적힌 기간 대신, 무조건 월~금 기간으로 파일명 교정
+                full_range = self._get_full_week_range(year, week_num)
+                
+                # 기존 파일명에서 기간 부분(예: 0511~0512)을 찾아 교정된 기간(0511~0515)으로 치환
+                raw_filename = target_event.get("filename", "").replace(".parquet", ".xlsx")
+                import re
+                corrected_filename = re.sub(r"\d{4}~\d{4}", full_range, raw_filename)
+                
+                sub_path = f"{year}/{month:02d}"
+                full_path = f"{sub_path}/{corrected_filename}"
+                
+                logger.info(f"[{self.get_service_name()}] 파일명 교정 후 핀포인트 동기화: {full_path}")
                 content = await self.drive_adapter.get_file(full_path, folder="weekly_change")
                 
                 if content:
-                    report = self.parser.parse(content, filename=filename, date=target_event.get("last_trading_day"))
+                    # 저장 시에도 교정된 기간과 날짜(금요일)를 사용함
+                    corrected_date = f"{year}-{full_range[5:7]}-{full_range[7:]}"
+                    report = self.parser.parse(content, filename=corrected_filename, date=corrected_date)
                     self.repository.save_report(report)
                     return report
 
-        # 2. 매니페스트가 없거나 실패한 경우 기존 재귀 탐색 수행 (Fallback)
         logger.info(f"[{self.get_service_name()}] 매니페스트 기반 탐색 실패, 기존 재귀 탐색 수행")
         return await self._sync_data_fallback(date_str)
 
