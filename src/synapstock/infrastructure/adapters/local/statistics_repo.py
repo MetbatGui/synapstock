@@ -274,34 +274,57 @@ class LocalWeeklyChangeRepository:
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
+    def _get_report_path(self, date_str: str, year: int | None = None, month: int | None = None) -> Path:
+        """리포트 파일의 저장/조회 경로를 반환한다. (예: 2026년/05월/weekly_change_2026-05-08.json)"""
+        # 연/월 정보가 없으면 날짜 문자열에서 추출
+        if not year or not month:
+            if len(date_str) >= 10:
+                year = int(date_str[:4])
+                month = int(date_str[5:7])
+        
+        if year and month:
+            folder = self.root / f"{year}년" / f"{month:02d}월"
+            folder.mkdir(parents=True, exist_ok=True)
+            return folder / f"weekly_change_{date_str}.json"
+        
+        return self.root / f"weekly_change_{date_str}.json"
+
     def save_report(self, report: WeeklyChangeReport):
-        """주간 등락률 리포트를 저장한다."""
-        self.root.mkdir(parents=True, exist_ok=True)
-        filename = f"weekly_change_{report.date}.json"
-        path = self.root / filename
+        """주간 등락률 리포트를 하위 폴더 구조에 맞춰 저장한다."""
+        path = self._get_report_path(report.date, report.year, report.month)
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(report.model_dump_json(indent=2))
 
     def load_report(self, date: str) -> WeeklyChangeReport | None:
-        """특정 날짜의 주간 등락률 리포트를 불러온다."""
-        filename = f"weekly_change_{date}.json"
-        path = self.root / filename
+        """특정 날짜의 주간 등락률 리포트를 불러온다 (하위 폴더 우선 검색)."""
+        # 1. 하위 폴더 형식으로 먼저 시도
+        path = self._get_report_path(date)
         if not path.exists():
-            return None
+            # 2. 루트 폴더에서 시도 (마이그레이션 대비)
+            path = self.root / f"weekly_change_{date}.json"
+            
+        if not path.exists():
+            # 3. 모든 하위 폴더에서 검색 (가장 유연함)
+            files = list(self.root.rglob(f"weekly_change_{date}.json"))
+            if not files:
+                return None
+            path = files[0]
 
         with open(path, encoding="utf-8") as f:
             from synapstock.domain.statistics.models import WeeklyChangeReport
             return WeeklyChangeReport.model_validate_json(f.read())
 
     def list_available_dates(self) -> list[str]:
-        """데이터가 존재하는 날짜 목록을 반환한다."""
-        files = self.root.glob("weekly_change_*.json")
+        """데이터가 존재하는 모든 날짜 목록을 반환한다 (재귀 검색)."""
+        files = self.root.rglob("weekly_change_*.json")
         dates = []
         for f in files:
             try:
-                # 'weekly_change_' (14자) 이후부터 '.json' 전까지 추출
-                date_str = f.name[14:-5]
-                dates.append(date_str)
+                # 파일명에서 날짜 부분 추출 (weekly_change_YYYY-MM-DD.json)
+                date_str = f.name.replace("weekly_change_", "").replace(".json", "")
+                if len(date_str) == 10:
+                    dates.append(date_str)
             except Exception:
                 continue
-        return sorted(dates, reverse=True)
+        return sorted(list(set(dates)), reverse=True)
