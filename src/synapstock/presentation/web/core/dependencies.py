@@ -22,6 +22,7 @@ news_scraper_adapter = container.news_scraper
 news_service = container.news_service
 statistics_service = container.statistics_service
 financial_service = container.financial_service
+weekly_change_service = container.weekly_change_service
 
 
 async def sync_indices_if_needed(force: bool = False):

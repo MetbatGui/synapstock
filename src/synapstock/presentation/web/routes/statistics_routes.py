@@ -10,11 +10,60 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from synapstock.domain.statistics.models import MarketType, SupplySubject
-from synapstock.presentation.web.core.dependencies import statistics_service
+from synapstock.presentation.web.core.dependencies import statistics_service, weekly_change_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
+
+
+@router.get("/weekly-change", response_model=None)
+async def get_weekly_change(
+    date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
+    force_sync: bool = Query(False, description="강제 동기화 여부"),
+):
+    """특정 날짜의 주간 등락률 데이터를 가져옵니다."""
+    try:
+        if not weekly_change_service:
+            raise HTTPException(status_code=500, detail="Weekly change service not available")
+
+        result = await weekly_change_service.get_weekly_change(date, force_sync=force_sync)
+        if not result:
+            return {"date": date, "items": [], "message": "No weekly change data available for this date"}
+
+        return result
+    except Exception as e:
+        logger.error(f"Error in get_weekly_change: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+
+@router.get("/weekly-change/dates", response_model=None)
+async def get_weekly_change_dates():
+    """주간 등락률 데이터가 존재하는 날짜 목록을 반환합니다."""
+    try:
+        if not weekly_change_service:
+            return []
+        return await weekly_change_service.list_available_dates()
+    except Exception as e:
+        logger.error(f"Error in get_weekly_change_dates: {e}")
+        return []
+
+
+@router.post("/weekly-change/sync", response_model=None)
+async def sync_weekly_change(date: str | None = Query(None, description="동기화할 특정 날짜 (YYYY-MM-DD)")):
+    """구글 드라이브로부터 주간 등락률 데이터를 동기화합니다."""
+    try:
+        if not weekly_change_service:
+            raise HTTPException(status_code=500, detail="Weekly change service not available")
+
+        result = await weekly_change_service.sync_data(date)
+        if not result:
+            return {"status": "fail", "message": "No new data found or sync failed"}
+            
+        return {"status": "success", "date": result.date, "item_count": len(result.items)}
+    except Exception as e:
+        logger.error(f"Error in sync_weekly_change: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/daily-ranking", response_model=None)
