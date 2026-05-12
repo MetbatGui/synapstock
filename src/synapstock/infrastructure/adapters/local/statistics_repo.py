@@ -9,6 +9,7 @@ from synapstock.domain.statistics.models import (
     MarketType,
     PaidInCapitalIncrease,
     SupplySubject,
+    WeeklyChangeReport,
 )
 
 
@@ -264,3 +265,43 @@ class LocalBondWithWarrantsRepository:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
             return [BondWithWarrants.model_validate(item) for item in data]
+
+
+class LocalWeeklyChangeRepository:
+    """주간 등락률 데이터를 로컬 JSON 파일로 관리하는 저장소."""
+
+    def __init__(self, data_root: str = "data/statistics/weekly_change"):
+        self.root = Path(data_root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def save_report(self, report: WeeklyChangeReport):
+        """주간 등락률 리포트를 저장한다."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        filename = f"weekly_change_{report.date}.json"
+        path = self.root / filename
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(report.model_dump_json(indent=2))
+
+    def load_report(self, date: str) -> WeeklyChangeReport | None:
+        """특정 날짜의 주간 등락률 리포트를 불러온다."""
+        filename = f"weekly_change_{date}.json"
+        path = self.root / filename
+        if not path.exists():
+            return None
+
+        with open(path, encoding="utf-8") as f:
+            from synapstock.domain.statistics.models import WeeklyChangeReport
+            return WeeklyChangeReport.model_validate_json(f.read())
+
+    def list_available_dates(self) -> list[str]:
+        """데이터가 존재하는 날짜 목록을 반환한다."""
+        files = self.root.glob("weekly_change_*.json")
+        dates = []
+        for f in files:
+            try:
+                # 'weekly_change_' (14자) 이후부터 '.json' 전까지 추출
+                date_str = f.name[14:-5]
+                dates.append(date_str)
+            except Exception:
+                continue
+        return sorted(dates, reverse=True)
