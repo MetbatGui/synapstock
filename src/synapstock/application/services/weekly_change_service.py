@@ -27,60 +27,93 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         # 로컬에 없거나 강제 동기화인 경우 Drive에서 확인
         return await self.sync_data(date)
 
+    async def _load_manifest(self) -> dict | None:
+        """구글 드라이브 루트에서 event_manifest.json을 로드합니다."""
+        if not self.drive_adapter:
+            return None
+        try:
+            # 루트 폴더에서 직접 manifest 파일 가져오기
+            content = await self.drive_adapter.get_file("event_manifest.json", folder="weekly_change")
+            if content:
+                import json
+                return json.loads(content.decode('utf-8'))
+        except Exception as e:
+            logger.warning(f"[{self.get_service_name()}] 매니페스트 로드 실패: {e}")
+        return None
+
     async def sync_data(self, date_str: str | None = None) -> WeeklyChangeReport | None:
-        """Drive의 'weekly_change' 폴더에서 데이터를 동기화합니다."""
+        """매니페스트 정보를 활용하여 데이터를 핀포인트로 동기화합니다."""
         if not self.drive_adapter:
             return None
 
-        # 1. 탐색 경로 결정 (날짜가 있으면 해당 연도/월, 없으면 루트 및 전체 탐색)
+        manifest = await self._load_manifest()
+        
+        # 1. 매니페스트가 있으면 핀포인트 검색
+        if manifest:
+            target_event = None
+            if date_str:
+                for event in manifest.values():
+                    if event.get("last_trading_day") == date_str:
+                        target_event = event
+                        break
+            else:
+                # 날짜 미지정 시 가장 최신 COMPLETED 이벤트 선택
+                completed = [e for e in manifest.values() if e.get("status") == "COMPLETED"]
+                if completed:
+                    target_event = sorted(completed, key=lambda x: x.get("last_trading_day", ""), reverse=True)[0]
+
+            if target_event:
+                year = target_event.get("year")
+                month = target_event.get("month")
+                # 드라이브는 xlsx 형식을 사용하므로 확장자 치환
+                filename = target_event.get("filename", "").replace(".parquet", ".xlsx")
+                # 매니페스트의 연/월 정보로 하위 폴더 경로 구성
+                sub_path = f"{year}/{month:02d}"
+                full_path = f"{sub_path}/{filename}"
+                
+                logger.info(f"[{self.get_service_name()}] 매니페스트 기반 핀포인트 동기화: {full_path}")
+                content = await self.drive_adapter.get_file(full_path, folder="weekly_change")
+                
+                if content:
+                    report = self.parser.parse(content, filename=filename, date=target_event.get("last_trading_day"))
+                    self.repository.save_report(report)
+                    return report
+
+        # 2. 매니페스트가 없거나 실패한 경우 기존 재귀 탐색 수행 (Fallback)
+        logger.info(f"[{self.get_service_name()}] 매니페스트 기반 탐색 실패, 기존 재귀 탐색 수행")
+        return await self._sync_data_fallback(date_str)
+
+    async def _sync_data_fallback(self, date_str: str | None = None) -> WeeklyChangeReport | None:
+        """기존의 폴더 재귀 탐색 방식 (매니페스트 없을 때 사용)"""
         search_paths = [""]
         if date_str and len(date_str) >= 7:
             search_paths.insert(0, f"{date_str[:4]}/{date_str[5:7]}")
 
         files = []
         for path in search_paths:
-            logger.info(f"[{self.get_service_name()}] Drive 검색 시도: {path or 'root'}")
             found = await self.drive_adapter.list_files_in_folder(path, folder="weekly_change")
             if found:
-                # 유효 파일만 필터링
                 valid = [f for f in found if f["name"].lower().endswith((".xlsx", ".xls")) and not f["name"].startswith("~$")]
-                # 날짜 필터링 (있을 경우)
                 if date_str and date_str[:4]:
                     valid = [f for f in valid if date_str[:4] in f["name"]]
-                
                 if valid:
                     files.extend(valid)
-                    # 특정 경로에서 파일을 찾았으면 중단 (최적화)
-                    if path != "":
-                        break
+                    if path != "": break
 
-        if not files:
-            logger.warning(f"[{self.get_service_name()}] 유효한 엑셀 파일을 찾을 수 없습니다.")
-            return None
-
-        # 최신 파일 선택
+        if not files: return None
         latest_file = sorted(files, key=lambda x: x["name"], reverse=True)[0]
-
-        # 2. 다운로드 및 파싱
-        # 파일이 어느 경로에 있었는지 확인하여 가져오기
         content = await self.drive_adapter.get_file(latest_file["name"], folder="weekly_change")
-        if not content:
-            return None
-
+        if not content: return None
         report = self.parser.parse(content, filename=latest_file["name"], date=date_str)
-        
-        # 3. 로컬 저장 (하위 폴더 구조 적용)
         self.repository.save_report(report)
-        
-        logger.info(f"[{self.get_service_name()}] {latest_file['name']} 동기화 완료")
         return report
 
     async def list_available_dates(self) -> list[dict[str, Any]]:
-        """로컬 및 클라우드(Drive)의 모든 가용 날짜 목록을 반환합니다."""
-        # 1. 로컬 데이터 조회
+        """매니페스트를 로드하여 모든 가용 날짜 목록을 순식간에 가져옵니다."""
+        results_map = {}
+        
+        # 1. 로컬 데이터 먼저 로드
         local_dates = self.repository.list_available_dates()
-        results_map = {} # date -> metadata
-
         for d in local_dates:
             report = self.repository.load_report(d)
             if report:
@@ -94,30 +127,35 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                     "source": "local"
                 }
 
-        # 2. 클라우드 데이터 스캔 (2020~2026 연도별 폴더 탐색)
-        if self.drive_adapter:
+        # 2. 매니페스트 로드 및 병합 (클라우드 스캔 대체)
+        manifest = await self._load_manifest()
+        if manifest:
+            for event in manifest.values():
+                if event.get("status") != "COMPLETED":
+                    continue
+                
+                date_str = event.get("last_trading_day")
+                if date_str and date_str not in results_map:
+                    # 파일명에서 정보 유추 또는 매니페스트 데이터 사용
+                    filename = event.get("filename", "")
+                    results_map[date_str] = {
+                        "date": date_str,
+                        "year": event.get("year"),
+                        "month": event.get("month"),
+                        "week_of_month": event.get("week_of_month"),
+                        "week_num": event.get("week"),
+                        "date_range": self.parser.extract_metadata_from_filename(filename).get("date_range"),
+                        "source": "cloud"
+                    }
+        else:
+            # 매니페스트가 없는 경우에만 제한적으로 현재 연도만 스캔 (최소한의 안전장치)
+            logger.info(f"[{self.get_service_name()}] 매니페스트 없음, 제한적 클라우드 스캔 수행")
             import datetime
-            import asyncio
-            current_year = datetime.datetime.now().year
-            years_to_check = range(2020, current_year + 2)
-            
-            async def scan_folder(path: str):
-                """특정 경로에서 파일을 찾아 results_map에 추가 (재귀 호출 가능)"""
-                cloud_files = await self.drive_adapter.list_files_in_folder(path, folder="weekly_change")
-                if not cloud_files:
-                    return
-
+            y = datetime.datetime.now().year
+            cloud_files = await self.drive_adapter.list_files_in_folder(str(y), folder="weekly_change")
+            if cloud_files:
                 for f in cloud_files:
                     name = f["name"]
-                    mime = f.get("mimeType", "")
-                    
-                    # 폴더인 경우 (보통 월 폴더) 한 단계 더 탐색
-                    if mime == "application/vnd.google-apps.folder":
-                        new_path = f"{path}/{name}" if path else name
-                        await scan_folder(new_path)
-                        continue
-
-                    # 파일인 경우 메타데이터 추출
                     if name.lower().endswith((".xlsx", ".xls")) and "weekly_gainers" in name:
                         meta = self.parser.extract_metadata_from_filename(name)
                         if meta and meta.get("date") != "Unknown":
@@ -132,10 +170,5 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                                     "date_range": meta["date_range"],
                                     "source": "cloud"
                                 }
-
-            # 각 연도별로 탐색 시작
-            # (병렬 처리를 하면 빠르지만 API 할당량을 고려하여 순차 또는 제한된 병렬로 수행)
-            for y in sorted(years_to_check, reverse=True):
-                await scan_folder(str(y))
 
         return sorted(results_map.values(), key=lambda x: x["date"], reverse=True)
