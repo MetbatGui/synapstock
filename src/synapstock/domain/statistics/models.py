@@ -471,3 +471,43 @@ class NewListing(BaseModel):
     listing_day_close: int = 0
     listing_day_change_pct: float = 0.0
     note: str | None = None
+
+
+class WeeklyChangeItem(BaseModel):
+    """주간 등락률의 개별 종목 항목 모델.
+
+    Attributes:
+        name (str): 종목명.
+        ticker (str | None): 종목 코드.
+        current_price (int): 현재가.
+        prev_week_close (int): 전주 금요일 종가.
+        change_rate (float): 주간 등락률 (%).
+    """
+
+    name: str
+    ticker: str | None = None
+    current_price: int = 0
+    prev_week_close: int = 0
+    change_rate: float = 0.0
+
+
+class WeeklyChangeReport(BaseModel):
+    """주간 등락률 전체 리포트 모델.
+
+    Attributes:
+        date (str): 기준 일자 (보통 범위의 종료일, YYYY-MM-DD).
+        year (int | None): 연도 (예: 2026).
+        month (int | None): 월 (예: 5).
+        week_of_month (int | None): 월간 주차 (예: 1).
+        week_num (int | None): 연간 주차 (예: 19).
+        date_range (str | None): 기간 (예: 0504~0508).
+        items (list[WeeklyChangeItem]): 등락률 항목 리스트.
+    """
+
+    date: str
+    year: int | None = None
+    month: int | None = None
+    week_of_month: int | None = None
+    week_num: int | None = None
+    date_range: str | None = None
+    items: list[WeeklyChangeItem]
