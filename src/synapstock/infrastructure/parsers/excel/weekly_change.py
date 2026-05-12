@@ -57,32 +57,55 @@ class WeeklyChangeParser(BaseExcelParser):
             
         return metadata
 
+    def _find_value(self, row, keywords, default=None):
+        """여러 키워드 중 하나라도 포함된 컬럼의 값을 찾아 반환합니다."""
+        for col in row.index:
+            col_str = str(col).replace(" ", "").replace("\n", "")
+            for kw in keywords:
+                if kw in col_str:
+                    return row[col]
+        return default
+
     def parse(self, content: bytes, **kwargs) -> WeeklyChangeReport:
-        """엑셀 내용을 파싱하여 WeeklyChangeReport를 반환합니다.
-        
-        Args:
-            content: 엑셀 파일 바이너리.
-            filename: 파일 이름 (메타데이터 추출용).
-            date: 기준 일자 (명시적으로 주어질 경우 우선함).
-        """
+        """엑셀 내용을 파싱하여 WeeklyChangeReport를 반환합니다."""
         filename = kwargs.get("filename", "")
         metadata = self.extract_metadata_from_filename(filename)
         
-        # 명시적인 date가 인자로 오면 그것을 우선함
-        date = kwargs.get("date") or metadata["date"]
+        # 파일명 날짜 우선 (없으면 인자값 사용)
+        date = metadata["date"] if metadata["date"] != "Unknown" else kwargs.get("date", "Unknown")
         
         df = pd.read_excel(io.BytesIO(content))
         
+        # 컬럼 키워드 정의
+        name_kws = ["종목명", "종목", "Name"]
+        curr_kws = ["현재가", "종가", "Price", "Close"]
+        prev_kws = ["전주종가", "이전종가", "이전가", "Prev"]
+        rate_kws = ["등락률", "주간등락률", "Change"]
+
         items = []
         for _, row in df.iterrows():
             try:
-                name = self._clean_stock_name(str(row.get("종목명", row.iloc[0])))
-                if not name or name == "nan":
+                # 1. 종목명 추출
+                raw_name = self._find_value(row, name_kws)
+                if raw_name is None: # 키워드로 못 찾으면 첫 번째 컬럼 사용
+                    raw_name = row.iloc[0]
+                
+                name = self._clean_stock_name(str(raw_name))
+                if not name or name == "nan" or "종목명" in name:
                     continue
                     
-                current_price = self.to_int(row.get("현재가", 0))
-                prev_week_close = self.to_int(row.get("전주종가", 0))
-                change_rate = self.to_float(row.get("등락률", 0.0))
+                # 2. 값 추출 및 정제
+                raw_curr = self._find_value(row, curr_kws, 0)
+                raw_prev = self._find_value(row, prev_kws, 0)
+                raw_rate = self._find_value(row, rate_kws, 0.0)
+
+                current_price = self.to_int(raw_curr)
+                prev_week_close = self.to_int(raw_prev)
+                
+                # 등락률 특수 처리 (+420.00% 등)
+                if isinstance(raw_rate, str):
+                    raw_rate = raw_rate.replace("+", "").replace("%", "").replace(",", "").strip()
+                change_rate = self.to_float(raw_rate)
                 
                 items.append(WeeklyChangeItem(
                     name=name,
