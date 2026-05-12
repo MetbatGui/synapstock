@@ -31,6 +31,7 @@ def test_config_load_from_env():
         "MIRO_ACCESS_TOKEN": "miro_token_123",
         "TELEGRAM_API_TOKEN": "bot_token_456",
         "GOOGLE_DRIVE_REPORT_FOLDER_ID": "report_id_789",
+        "GOOGLE_DRIVE_WEEKLY_CHANGE_ID": "weekly_id_101",
         "DATA_DIR": "custom_data"
     }
 
@@ -40,6 +41,7 @@ def test_config_load_from_env():
         assert config.miro_token == "miro_token_123"
         assert config.telegram_token == "bot_token_456"
         assert config.report_folder_id == "report_id_789"
+        assert config.weekly_change_folder_id == "weekly_id_101"
         assert config.data_dir == Path("custom_data")
         # DATA_DIR 변경 시 하위 경로도 변경되어야 함
         assert config.board_dir == Path("custom_data/board")
@@ -55,3 +57,4 @@ def test_config_optional_fields():
         config = AppConfig.load(load_env=False)
         assert config.report_folder_id is None
         assert config.sd_folder_id is None
+        assert config.weekly_change_folder_id is None
