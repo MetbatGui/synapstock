@@ -37,7 +37,9 @@ class ExcelFinancialDataAdapter(FinancialDataPort):
         지표(metric)와 기간(period)에 따라 해당 시트에서 데이터를 조회합니다.
         연간 데이터가 없는 경우 분기별 데이터를 합산하여 유사 연간 데이터를 생성합니다.
         """
-        sheet_name = f"{metric}_{period}"
+        # 시트 이름 보정 (분기별 -> 분기)
+        period_suffix = "분기" if period == "분기별" else period
+        sheet_name = f"{metric}_{period_suffix}"
         df = self._load_sheet(sheet_name)
 
         # 1. 연간 데이터를 요청했으나 시트가 없거나 기업 정보가 없는 경우 분기 합산 시도

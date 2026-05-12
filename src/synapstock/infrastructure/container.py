@@ -82,7 +82,7 @@ class Container:
         self._repo = LocalBoardRepository(self.config.board_dir)
         self._miro_adapter = MiroMindmapAdapter(self.config.miro_token)
         self._disclosure_adapter = DartDisclosureAdapter()
-        self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "financial_data.xlsx")
+        self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "재무제표.xlsx")
         self._ticker_search_adapter = NaverTickerSearchAdapter(cache_path=str(self.config.stock_cache_path))
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
         self._krx_adapter = NativeKrxAdapter()
