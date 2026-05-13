@@ -1,0 +1,138 @@
+/* 재무 분석용 통합 툴바 스타일 */
+.analysis-toolbar {
+    background: rgba(30, 41, 59, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 30px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.4s ease-out;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* 컨트롤 아이템 그룹 */
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.control-group label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* 드롭다운 스타일 개선 */
+.analysis-select {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 130px;
+}
+
+.analysis-select:hover {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+}
+
+.analysis-select:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+}
+
+/* 체크박스 커스텀 디자인 */
+.analysis-check-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    transition: background 0.2s;
+}
+
+.analysis-check-group:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.analysis-check-group input[type="checkbox"] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: transparent;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.analysis-check-group input[type="checkbox"]:checked {
+    background: #38bdf8;
+    border-color: #38bdf8;
+}
+
+.analysis-check-group input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 12px;
+}
+
+.analysis-check-group span {
+    font-size: 0.9rem;
+    color: #e2e8f0;
+}
+
+/* 리프레시 버튼 프리미엄 스타일 */
+.analysis-btn-primary {
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-left: auto; /* 오른쪽 정렬 */
+}
+
+.analysis-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    filter: brightness(1.1);
+}
+
+.analysis-btn-primary:active {
+    transform: translateY(0);
+}
+
+.analysis-btn-primary i {
+    font-size: 0.85rem;
+}

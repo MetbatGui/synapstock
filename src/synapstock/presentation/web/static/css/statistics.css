@@ -375,3 +375,59 @@
     text-align: center !important;
     background: rgba(255, 255, 255, 0.02);
 }
+/* Financial Analysis specific */
+.row-highlight {
+    background: rgba(0, 210, 255, 0.03);
+}
+
+.row-highlight td {
+    border-bottom: 1px solid rgba(0, 210, 255, 0.1) !important;
+}
+
+.stats-btn-refresh:hover i {
+    transition: transform 0.4s ease;
+    transform: rotate(180deg);
+}
+/* Weekly Change specific */
+.weekly-meta-info {
+    padding: 0 10px;
+    margin-bottom: 5px;
+}
+
+.weekly-badge-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.weekly-badge {
+    padding: 6px 14px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e5e7eb;
+}
+
+.weekly-badge.year { border-color: rgba(59, 130, 246, 0.3); color: #60a5fa; }
+.weekly-badge.week { border-color: rgba(168, 85, 247, 0.3); color: #a855f7; }
+.weekly-badge.month { border-color: rgba(234, 179, 8, 0.3); color: #eab308; }
+.weekly-badge.range { border-color: rgba(16, 185, 129, 0.3); color: #10b981; }
+
+.change-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    min-width: 70px;
+    text-align: center;
+}
+
+.change-badge.change-up { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.change-badge.change-down { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.change-badge.change-none { background: rgba(156, 163, 175, 0.1); color: #9ca3af; }

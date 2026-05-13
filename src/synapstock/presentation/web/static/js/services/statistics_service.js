@@ -118,5 +118,46 @@ export const statisticsService = {
         const response = await fetch(url);
         if (!response.ok) return [new Date().getFullYear().toString()];
         return await response.json();
+    },
+
+    /**
+     * 특정 날짜의 주간 등락률 데이터를 가져옵니다.
+     * @async
+     * @param {string} date - YYYY-MM-DD 형식의 날짜
+     * @param {boolean} [forceSync=false] - 강제 동기화 여부
+     * @returns {Promise<Object>} 주간 등락률 리포트 객체
+     */
+    async getWeeklyChange(date, forceSync = false) {
+        const url = `/api/statistics/weekly-change?date=${date}&force_sync=${forceSync}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error('Failed to fetch weekly change report');
+        }
+        return await response.json();
+    },
+
+    /**
+     * 주간 등락률 데이터가 존재하는 가용 날짜 목록을 조회합니다.
+     * @async
+     * @returns {Promise<string[]>} 날짜 문자열 배열
+     */
+    async getWeeklyChangeDates() {
+        const url = '/api/statistics/weekly-change/dates';
+        const response = await fetch(url);
+        if (!response.ok) return [];
+        return await response.json();
+    },
+
+    /**
+     * 주간 등락률 데이터를 동기화하도록 요청합니다.
+     * @async
+     * @param {string} [date] - 특정 날짜 (YYYY-MM-DD)
+     * @returns {Promise<Object>} 동기화 결과
+     */
+    async syncWeeklyChange(date = null) {
+        const url = `/api/statistics/weekly-change/sync${date ? `?date=${date}` : ''}`;
+        const response = await fetch(url, { method: 'POST' });
+        if (!response.ok) throw new Error('Weekly change sync failed');
+        return await response.json();
     }
 };

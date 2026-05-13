@@ -19,6 +19,7 @@ from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
+from synapstock.application.services.financial_service import FinancialService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
     DartDisclosureAdapter,
 )
@@ -33,6 +34,7 @@ from synapstock.infrastructure.adapters.local.board_repo import LocalBoardReposi
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
+from synapstock.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalBondWithWarrantsRepository,
     LocalBonusIssueRepository,
@@ -40,7 +42,9 @@ from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalCeilingRepository,
     LocalConvertibleBondRepository,
     LocalStatisticsRepository,
+    LocalWeeklyChangeRepository,
 )
+from synapstock.application.services.weekly_change_service import WeeklyChangeService
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
@@ -71,13 +75,14 @@ class Container:
         self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
         self.config.bw_dir.mkdir(parents=True, exist_ok=True)
         self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
+        self.config.weekly_change_dir.mkdir(parents=True, exist_ok=True)
         self.config.news_dir.mkdir(parents=True, exist_ok=True)
 
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
         self._miro_adapter = MiroMindmapAdapter(self.config.miro_token)
         self._disclosure_adapter = DartDisclosureAdapter()
-        self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "financial_data.xlsx")
+        self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "재무제표.xlsx")
         self._ticker_search_adapter = NaverTickerSearchAdapter(cache_path=str(self.config.stock_cache_path))
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
         self._krx_adapter = NativeKrxAdapter()
@@ -91,10 +96,12 @@ class Container:
         self._bonus_issue_repo = LocalBonusIssueRepository(str(self.config.bonus_issue_dir))
         self._convertible_bond_repo = LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
         self._bw_repo = LocalBondWithWarrantsRepository(str(self.config.bw_dir))
+        self._weekly_change_repo = LocalWeeklyChangeRepository(str(self.config.weekly_change_dir))
 
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
         self._news_repo = LocalNewsRepository(self.config.news_dir)
+        self._financial_repo = ExcelFinancialRepository(str(self.config.data_dir / "financial_statements" / "재무제표.xlsx"))
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
@@ -137,6 +144,13 @@ class Container:
             bw_repository=self._bw_repo,
         )
 
+        self._financial_service = FinancialService(repository=self._financial_repo)
+        self._weekly_change_service = WeeklyChangeService(
+            drive_adapter=self._drive_adapter,
+            folder_id=self.config.weekly_change_folder_id,
+            repository=self._weekly_change_repo
+        )
+
         self._report_service = None
         self._init_report_service()
 
@@ -160,6 +174,7 @@ class Container:
                 "bw": self.config.bw_folder_id,
                 "new_listing": self.config.new_listing_folder_id,
                 "news": self.config.news_folder_id,
+                "weekly_change": self.config.weekly_change_folder_id,
             }
             # None이 아닌 폴더 ID만 포함하여 dict[str, str] 보장
             valid_folders = {k: v for k, v in folders.items() if v is not None}
@@ -227,6 +242,14 @@ class Container:
     @property
     def news_service(self) -> NewsService:
         return self._news_service
+
+    @property
+    def financial_service(self) -> FinancialService:
+        return self._financial_service
+
+    @property
+    def weekly_change_service(self) -> WeeklyChangeService:
+        return self._weekly_change_service
 
 
 # 전역 컨테이너 인스턴스 생성

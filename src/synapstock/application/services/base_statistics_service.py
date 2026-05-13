@@ -77,7 +77,7 @@ class BaseStatisticsService(ABC, Generic[T]):
                 return []
 
             # 4. 파싱 및 저장
-            result = parser_func(content, **kwargs)
+            result = parser_func(content, filename=latest_file["name"], **kwargs)
             save_func(result)
 
             # 결과가 리스트가 아닌 단일 객체일 경우 처리

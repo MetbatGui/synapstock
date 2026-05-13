@@ -109,8 +109,8 @@ class GoogleDriveAdapter(StoragePort):
             return cast(str, file.get("id", ""))
 
     @retry(
-        wait=wait_exponential(multiplier=1, max=10),
-        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=20),
+        stop=stop_after_attempt(5),
         retry=retry_if_not_exception_type(ValueError),
     )
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
@@ -162,31 +162,44 @@ class GoogleDriveAdapter(StoragePort):
 
         return current_parent_id
 
+    @retry(
+        wait=wait_exponential(multiplier=1, max=20),
+        stop=stop_after_attempt(5),
+        retry=retry_if_not_exception_type(ValueError),
+    )
+    def _execute_api_call(self, func, *args, **kwargs):
+        """Google Drive API 호출을 재시도 로직과 함께 실행합니다."""
+        return func(*args, **kwargs)
+
     async def get_file(
         self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs
     ) -> bytes | None:
-        """Google Drive에서 바이너리 파일을 다운로드합니다."""
+        """Google Drive에서 바이너리 파일을 다운로드합니다 (강력한 재시도 포함)."""
         logger.debug(f"[GoogleDrive] get_file 요청: {path} (folder={folder})")
 
         def _get():
             try:
+                # 1. 파일 ID 조회 (내부적으로 재시도 포함)
                 file_id = self._get_file_id(path, folder=folder, root_id=root_id)
                 if not file_id:
                     logger.warning(f"[GoogleDrive] 파일을 찾을 수 없음: {path}")
                     return None
 
-                request = self.drive_service.files().get_media(fileId=file_id)
-                fh = io.BytesIO()
-                downloader = MediaIoBaseDownload(fh, request)
-                done = False
-                while not done:
-                    _, done = downloader.next_chunk()
-                fh.seek(0)
-                data = fh.read()
+                # 2. 다운로드 실행 (청크 단위 다운로드 전체를 재시도 대상으로 묶음)
+                def _do_download():
+                    request = self.drive_service.files().get_media(fileId=file_id)
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request)
+                    done = False
+                    while not done:
+                        _, done = downloader.next_chunk()
+                    return fh.getvalue()
+
+                data = self._execute_api_call(_do_download)
                 logger.info(f"[GoogleDrive] 파일 로드 성공: {path} ({len(data)} bytes)")
                 return data
             except Exception as e:
-                logger.error(f"[GoogleDrive] 파일 로드 실패 ({path}): {e}", exc_info=True)
+                logger.error(f"[GoogleDrive] 파일 로드 최종 실패 ({path}): {e}")
                 return None
 
         return await asyncio.to_thread(_get)
@@ -217,13 +230,15 @@ class GoogleDriveAdapter(StoragePort):
         return await asyncio.to_thread(_put)
 
     @retry(
-        wait=wait_exponential(multiplier=1, max=10),
-        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=20),
+        stop=stop_after_attempt(5),
         retry=retry_if_not_exception_type(ValueError),
     )
     def _upload_file(
         self, data: io.BytesIO, path: str, mime_type: str, folder: str | None = None, root_id: str | None = None
     ):
+        """데이터를 업로드합니다. 재시도 시 스트림 위치를 초기화합니다."""
+        data.seek(0)
         filename = os.path.basename(path)
         parent_id = self._ensure_path_directories(path, folder=folder, root_id=root_id)
 
