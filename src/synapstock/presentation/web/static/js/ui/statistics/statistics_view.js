@@ -24,9 +24,9 @@ const CONFIG = {
     /** @type {Object.<string, string>} */
     HIGH_PRICE_CLASSES: {
         '역·신': 'hp-red',
-        '역·근': 'hp-orange',
-        '52·신': 'hp-yellow',
-        '52·근': 'hp-lightgreen'
+        '역·근': 'hp-yellow',
+        '52·신': 'hp-green',
+        '52·근': 'hp-blue'
     },
     /** @type {RankChangeConfig} */
     RANK_CHANGE: {

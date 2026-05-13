@@ -209,9 +209,9 @@ export const ceilingView = {
 
         const HIGH_PRICE_CLASSES = {
             '역·신': 'hp-red',
-            '역·근': 'hp-orange',
-            '52·신': 'hp-yellow',
-            '52·근': 'hp-lightgreen'
+            '역·근': 'hp-yellow',
+            '52·신': 'hp-green',
+            '52·근': 'hp-blue'
         };
 
         // 10거래일 날짜 헤더 계산

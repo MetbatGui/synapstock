@@ -274,9 +274,9 @@
 }
 
 .hp-red { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
-.hp-orange { background: #7c2d12; color: #fed7aa; border: 1px solid #9a3412; }
 .hp-yellow { background: #713f12; color: #fef08a; border: 1px solid #854d0e; }
-.hp-lightgreen { background: #14532d; color: #bbf7d0; border: 1px solid #166534; }
+.hp-green { background: #14532d; color: #bbf7d0; border: 1px solid #166534; }
+.hp-blue { background: #1e3a8a; color: #bfdbfe; border: 1px solid #1e40af; }
 
 .change-up { color: #f87171; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 2px; }
 .change-down { color: #60a5fa; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 2px; }
