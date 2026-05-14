@@ -9,6 +9,7 @@ export const financialAnalysisView = {
     currentQuarter: null,
     turnaroundMode: 'NORMAL', // 'NORMAL' or 'TURNAROUND'
     allData: { normal: [], turnaround: [] }, // 전체 데이터 보관용
+    sortConfig: { key: 'change_rate', direction: 'desc' }, // 정렬 설정
 
     async init(container) {
         this.container = container || document.getElementById('stats-content');
@@ -40,8 +41,8 @@ export const financialAnalysisView = {
                 <div class="control-group">
                     <label>분석 유형</label>
                     <div class="stats-toggle-group" id="fin-turnaround-toggle">
-                        <button class="stats-toggle active" data-value="NORMAL">일반 성장</button>
-                        <button class="stats-toggle" data-value="TURNAROUND">흑자 전환</button>
+                        <button class="stats-toggle ${this.turnaroundMode === 'NORMAL' ? 'active' : ''}" data-value="NORMAL">일반 성장</button>
+                        <button class="stats-toggle ${this.turnaroundMode === 'TURNAROUND' ? 'active' : ''}" data-value="TURNAROUND">흑자 전환</button>
                     </div>
                 </div>
                 <button id="fin-refresh-btn" class="analysis-btn-primary">
@@ -53,15 +54,21 @@ export const financialAnalysisView = {
         `;
 
         this.bindEvents();
+        
+        // 현재 상태 복원
+        const metricSelect = this.container.querySelector('#fin-metric-select');
+        if (metricSelect) metricSelect.value = this.currentMetric;
+
         await this.loadQuarters();
         await this.loadData();
     },
 
     bindEvents() {
-        const metricSelect = document.getElementById('fin-metric-select');
-        const quarterSelect = document.getElementById('fin-quarter-select');
-        const turnaroundToggle = document.getElementById('fin-turnaround-toggle');
-        const refreshBtn = document.getElementById('fin-refresh-btn');
+        const metricSelect = this.container.querySelector('#fin-metric-select');
+        const quarterSelect = this.container.querySelector('#fin-quarter-select');
+        const turnaroundToggle = this.container.querySelector('#fin-turnaround-toggle');
+        const refreshBtn = this.container.querySelector('#fin-refresh-btn');
+        const tableContainer = this.container.querySelector('#fin-table-container');
 
         metricSelect?.addEventListener('change', async (e) => {
             this.currentMetric = e.target.value;
@@ -86,6 +93,21 @@ export const financialAnalysisView = {
         });
 
         refreshBtn?.addEventListener('click', () => this.loadData());
+
+        // 테이블 헤더 클릭 시 정렬 (이벤트 위임 - 테이블 컨테이너에 바인딩하여 뷰 전환 시 자동 소멸되도록 함)
+        tableContainer?.addEventListener('click', (e) => {
+            const th = e.target.closest('th[data-sort]');
+            if (!th) return;
+
+            const key = th.dataset.sort;
+            if (this.sortConfig.key === key) {
+                this.sortConfig.direction = this.sortConfig.direction === 'desc' ? 'asc' : 'desc';
+            } else {
+                this.sortConfig.key = key;
+                this.sortConfig.direction = 'desc';
+            }
+            this.renderTable();
+        });
     },
 
     async loadQuarters() {
@@ -131,14 +153,34 @@ export const financialAnalysisView = {
         const container = document.getElementById('fin-table-container');
         if (!container) return;
         
-        const filteredItems = this.turnaroundMode === 'TURNAROUND' 
+        let filteredItems = [...(this.turnaroundMode === 'TURNAROUND' 
             ? this.allData.turnaround 
-            : this.allData.normal;
+            : this.allData.normal)];
+
+        // 정렬 적용
+        if (this.sortConfig.key) {
+            filteredItems.sort((a, b) => {
+                const valA = a[this.sortConfig.key];
+                const valB = b[this.sortConfig.key];
+                if (this.sortConfig.direction === 'asc') {
+                    return valA - valB;
+                } else {
+                    return valB - valA;
+                }
+            });
+        }
 
         if (filteredItems.length === 0) {
             container.innerHTML = '<div class="stats-empty">조건에 맞는 데이터가 없습니다.</div>';
             return;
         }
+
+        const getSortIcon = (key) => {
+            if (this.sortConfig.key !== key) return '<i class="fas fa-sort" style="margin-left: 5px; opacity: 0.3;"></i>';
+            return this.sortConfig.direction === 'desc' 
+                ? '<i class="fas fa-sort-down" style="margin-left: 5px; color: var(--accent-blue);"></i>' 
+                : '<i class="fas fa-sort-up" style="margin-left: 5px; color: var(--accent-blue);"></i>';
+        };
 
         let html = `
             <table class="stats-table">
@@ -148,8 +190,12 @@ export const financialAnalysisView = {
                         <th style="min-width: 150px;">종목명</th>
                         <th style="text-align: right; min-width: 100px; color: #facc15;">이전 분기</th>
                         <th style="text-align: right; min-width: 100px;">직전 분기</th>
-                        <th style="text-align: right; min-width: 100px;">해당 분기</th>
-                        <th style="text-align: center; width: 120px;">등락률 (QoQ)</th>
+                        <th data-sort="current_value" style="text-align: right; min-width: 100px; cursor: pointer; user-select: none;">
+                            해당 분기 ${getSortIcon('current_value')}
+                        </th>
+                        <th data-sort="change_rate" style="text-align: center; width: 120px; cursor: pointer; user-select: none;">
+                            등락률 (QoQ) ${getSortIcon('change_rate')}
+                        </th>
                     </tr>
                 </thead>
                 <tbody>

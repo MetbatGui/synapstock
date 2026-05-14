@@ -10,6 +10,7 @@ export const consecutiveGrowthView = {
     currentCount: 3, 
     turnaroundMode: 'NORMAL', // 'NORMAL' or 'TURNAROUND'
     allData: { normal: [], turnaround: [] },
+    sortConfig: { key: 'current_value', direction: 'desc' }, // 정렬 설정 (기본 실적규모순)
 
     async init(container) {
         this.container = container || document.getElementById('stats-content');
@@ -49,8 +50,8 @@ export const consecutiveGrowthView = {
                 <div class="control-group">
                     <label>분석 유형</label>
                     <div class="stats-toggle-group" id="grow-turnaround-toggle">
-                        <button class="stats-toggle active" data-value="NORMAL">일반 성장</button>
-                        <button class="stats-toggle" data-value="TURNAROUND">흑자 전환</button>
+                        <button class="stats-toggle ${this.turnaroundMode === 'NORMAL' ? 'active' : ''}" data-value="NORMAL">일반 성장</button>
+                        <button class="stats-toggle ${this.turnaroundMode === 'TURNAROUND' ? 'active' : ''}" data-value="TURNAROUND">흑자 전환</button>
                     </div>
                 </div>
                 <button id="grow-refresh-btn" class="analysis-btn-primary">
@@ -62,16 +63,25 @@ export const consecutiveGrowthView = {
         `;
 
         this.bindEvents();
+        
+        // 현재 상태 복원
+        const metricSelect = this.container.querySelector('#grow-metric-select');
+        if (metricSelect) metricSelect.value = this.currentMetric;
+        
+        const countSelect = this.container.querySelector('#grow-count-select');
+        if (countSelect) countSelect.value = this.currentCount;
+
         await this.loadQuarters();
         await this.loadData();
     },
 
     bindEvents() {
-        const metricSelect = document.getElementById('grow-metric-select');
-        const quarterSelect = document.getElementById('grow-quarter-select');
-        const countSelect = document.getElementById('grow-count-select');
-        const turnaroundToggle = document.getElementById('grow-turnaround-toggle');
-        const refreshBtn = document.getElementById('grow-refresh-btn');
+        const metricSelect = this.container.querySelector('#grow-metric-select');
+        const quarterSelect = this.container.querySelector('#grow-quarter-select');
+        const countSelect = this.container.querySelector('#grow-count-select');
+        const turnaroundToggle = this.container.querySelector('#grow-turnaround-toggle');
+        const refreshBtn = this.container.querySelector('#grow-refresh-btn');
+        const tableContainer = this.container.querySelector('#grow-table-container');
 
         metricSelect?.addEventListener('change', async (e) => {
             this.currentMetric = e.target.value;
@@ -101,6 +111,21 @@ export const consecutiveGrowthView = {
         });
 
         refreshBtn?.addEventListener('click', () => this.loadData());
+
+        // 테이블 헤더 클릭 시 정렬
+        tableContainer?.addEventListener('click', (e) => {
+            const th = e.target.closest('th[data-sort]');
+            if (!th) return;
+
+            const key = th.dataset.sort;
+            if (this.sortConfig.key === key) {
+                this.sortConfig.direction = this.sortConfig.direction === 'desc' ? 'asc' : 'desc';
+            } else {
+                this.sortConfig.key = key;
+                this.sortConfig.direction = 'desc';
+            }
+            this.renderTable();
+        });
     },
 
     async loadQuarters() {
@@ -146,9 +171,22 @@ export const consecutiveGrowthView = {
         const container = document.getElementById('grow-table-container');
         if (!container) return;
         
-        const filteredItems = this.turnaroundMode === 'TURNAROUND' 
+        let filteredItems = [...(this.turnaroundMode === 'TURNAROUND' 
             ? this.allData.turnaround 
-            : this.allData.normal;
+            : this.allData.normal)];
+
+        // 정렬 적용
+        if (this.sortConfig.key) {
+            filteredItems.sort((a, b) => {
+                const valA = a[this.sortConfig.key];
+                const valB = b[this.sortConfig.key];
+                if (this.sortConfig.direction === 'asc') {
+                    return valA - valB;
+                } else {
+                    return valB - valA;
+                }
+            });
+        }
 
         if (filteredItems.length === 0) {
             container.innerHTML = `<div class="stats-empty">조건에 맞는 데이터를 찾지 못했습니다.</div>`;
@@ -159,14 +197,29 @@ export const consecutiveGrowthView = {
         const firstItem = filteredItems[0];
         const quarters = Object.keys(firstItem.history).sort();
 
+        const getSortIcon = (key) => {
+            if (this.sortConfig.key !== key) return '<i class="fas fa-sort" style="margin-left: 5px; opacity: 0.3;"></i>';
+            return this.sortConfig.direction === 'desc' 
+                ? '<i class="fas fa-sort-down" style="margin-left: 5px; color: var(--accent-blue);"></i>' 
+                : '<i class="fas fa-sort-up" style="margin-left: 5px; color: var(--accent-blue);"></i>';
+        };
+
         let html = `
             <table class="stats-table">
                 <thead>
                     <tr>
                         <th style="width: 50px; text-align: center;">순위</th>
                         <th style="min-width: 150px;">종목명</th>
-                        ${quarters.map((q, i) => `<th style="text-align: right; min-width: 90px; ${i === 0 ? 'color: #facc15;' : ''}">${q}</th>`).join('')}
-                        <th style="text-align: center; width: 110px;">전체 성장률</th>
+                        ${quarters.map((q, i) => {
+                            const isLatest = i === quarters.length - 1;
+                            const isPreStart = i === 0;
+                            const style = `text-align: right; min-width: 90px; ${isPreStart ? 'color: #facc15;' : ''} ${isLatest ? 'cursor: pointer; user-select: none;' : ''}`;
+                            const sortAttr = isLatest ? 'data-sort="current_value"' : '';
+                            return `<th ${sortAttr} style="${style}">${q}${isLatest ? ' ' + getSortIcon('current_value') : ''}</th>`;
+                        }).join('')}
+                        <th data-sort="change_rate" style="text-align: center; width: 110px; cursor: pointer; user-select: none;">
+                            전체 성장률 ${getSortIcon('change_rate')}
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
