@@ -193,7 +193,7 @@ export const financialAnalysisView = {
                         <th data-sort="current_value" style="text-align: right; min-width: 100px; cursor: pointer; user-select: none;">
                             해당 분기 ${getSortIcon('current_value')}
                         </th>
-                        <th data-sort="change_rate" style="text-align: center; width: 120px; cursor: pointer; user-select: none;">
+                        <th data-sort="change_rate" style="text-align: center; width: 140px; cursor: pointer; user-select: none;">
                             등락률 (QoQ) ${getSortIcon('change_rate')}
                         </th>
                     </tr>

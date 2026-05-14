@@ -217,7 +217,7 @@ export const consecutiveGrowthView = {
                             const sortAttr = isLatest ? 'data-sort="current_value"' : '';
                             return `<th ${sortAttr} style="${style}">${q}${isLatest ? ' ' + getSortIcon('current_value') : ''}</th>`;
                         }).join('')}
-                        <th data-sort="change_rate" style="text-align: center; width: 110px; cursor: pointer; user-select: none;">
+                        <th data-sort="change_rate" style="text-align: center; width: 140px; cursor: pointer; user-select: none;">
                             전체 성장률 ${getSortIcon('change_rate')}
                         </th>
                     </tr>
