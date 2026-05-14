@@ -8,8 +8,8 @@ export const consecutiveGrowthView = {
     currentMetric: 'OPERATING_PROFIT',
     currentQuarter: null,
     currentCount: 3, 
-    excludeTurnaround: false,
-    allData: [],
+    turnaroundMode: 'NORMAL', // 'NORMAL' or 'TURNAROUND'
+    allData: { normal: [], turnaround: [] },
 
     async init(container) {
         this.container = container || document.getElementById('stats-content');
@@ -46,9 +46,12 @@ export const consecutiveGrowthView = {
                         <option value="NET_INCOME">당기순이익</option>
                     </select>
                 </div>
-                <div class="analysis-check-group">
-                    <input type="checkbox" id="grow-exclude-turnaround">
-                    <span>흑자전환 제외</span>
+                <div class="control-group">
+                    <label>분석 유형</label>
+                    <div class="stats-toggle-group" id="grow-turnaround-toggle">
+                        <button class="stats-toggle active" data-value="NORMAL">일반 성장</button>
+                        <button class="stats-toggle" data-value="TURNAROUND">흑자 전환</button>
+                    </div>
                 </div>
                 <button id="grow-refresh-btn" class="analysis-btn-primary">
                     <i class="fas fa-search"></i> 분석 시작
@@ -67,7 +70,7 @@ export const consecutiveGrowthView = {
         const metricSelect = document.getElementById('grow-metric-select');
         const quarterSelect = document.getElementById('grow-quarter-select');
         const countSelect = document.getElementById('grow-count-select');
-        const turnaroundCheck = document.getElementById('grow-exclude-turnaround');
+        const turnaroundToggle = document.getElementById('grow-turnaround-toggle');
         const refreshBtn = document.getElementById('grow-refresh-btn');
 
         metricSelect?.addEventListener('change', async (e) => {
@@ -86,9 +89,15 @@ export const consecutiveGrowthView = {
             this.loadData();
         });
 
-        turnaroundCheck?.addEventListener('change', (e) => {
-            this.excludeTurnaround = e.target.checked;
-            this.renderTable(this.allData);
+        turnaroundToggle?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.stats-toggle');
+            if (!btn) return;
+
+            turnaroundToggle.querySelectorAll('.stats-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            this.turnaroundMode = btn.dataset.value;
+            this.renderTable();
         });
 
         refreshBtn?.addEventListener('click', () => this.loadData());
@@ -121,23 +130,25 @@ export const consecutiveGrowthView = {
         tableContainer.innerHTML = '<div class="stats-loader"><i class="fas fa-spinner fa-spin"></i> 연속 성장주 탐색 중...</div>';
 
         try {
-            const data = await financialService.getConsecutiveGrowers(this.currentMetric, this.currentQuarter, this.currentCount);
+            const data = await financialService.getConsecutiveGrowers(
+                this.currentMetric, 
+                this.currentQuarter, 
+                this.currentCount
+            );
             this.allData = data;
-            this.renderTable(data);
+            this.renderTable();
         } catch (error) {
             tableContainer.innerHTML = `<div class="stats-error">오류 발생: ${error.message}</div>`;
         }
     },
 
-    renderTable(items) {
+    renderTable() {
         const container = document.getElementById('grow-table-container');
         if (!container) return;
         
-        // 필터링 적용
-        let filteredItems = items || [];
-        if (this.excludeTurnaround) {
-            filteredItems = filteredItems.filter(item => !(item.prev_value <= 0 && item.current_value > 0));
-        }
+        const filteredItems = this.turnaroundMode === 'TURNAROUND' 
+            ? this.allData.turnaround 
+            : this.allData.normal;
 
         if (filteredItems.length === 0) {
             container.innerHTML = `<div class="stats-empty">조건에 맞는 데이터를 찾지 못했습니다.</div>`;
@@ -154,7 +165,7 @@ export const consecutiveGrowthView = {
                     <tr>
                         <th style="width: 50px; text-align: center;">순위</th>
                         <th style="min-width: 150px;">종목명</th>
-                        ${quarters.map(q => `<th style="text-align: right; min-width: 90px;">${q}</th>`).join('')}
+                        ${quarters.map((q, i) => `<th style="text-align: right; min-width: 90px; ${i === 0 ? 'color: #facc15;' : ''}">${q}</th>`).join('')}
                         <th style="text-align: center; width: 110px;">전체 성장률</th>
                     </tr>
                 </thead>
@@ -181,11 +192,19 @@ export const consecutiveGrowthView = {
                             ${isTurnaround ? '<span class="badge-mini" style="background: #facc15; color: #000;">흑자전환</span>' : ''}
                         </div>
                     </td>
-                    ${quarters.map(q => {
+                    ${quarters.map((q, i) => {
                         const val = item.history[q] || 0;
                         const isLatest = q === quarters[quarters.length - 1];
-                        const valColor = isLatest ? '#fff' : 'rgba(255,255,255,0.5)';
-                        return `<td style="text-align: right; font-family: 'Inter'; color: ${valColor};">${Math.round(val).toLocaleString()}</td>`;
+                        const isPreStart = i === 0;
+                        let valColor = isLatest ? '#fff' : 'rgba(255,255,255,0.5)';
+                        let bgStyle = '';
+                        
+                        if (isPreStart) {
+                            valColor = '#facc15';
+                            bgStyle = 'background: rgba(250, 204, 21, 0.05);';
+                        }
+                        
+                        return `<td style="text-align: right; font-family: 'Inter'; color: ${valColor}; ${bgStyle}">${Math.round(val).toLocaleString()}</td>`;
                     }).join('')}
                     <td style="text-align: center; color: ${rateColor}; font-weight: bold; background: rgba(255,255,255,0.02);">
                         ${rateSymbol} ${Math.abs(rate).toLocaleString()}%

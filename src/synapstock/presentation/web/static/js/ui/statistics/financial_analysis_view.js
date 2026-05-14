@@ -7,8 +7,8 @@ export const financialAnalysisView = {
     container: null,
     currentMetric: 'OPERATING_PROFIT',
     currentQuarter: null,
-    excludeTurnaround: false,
-    allData: [], // 전체 데이터 보관용
+    turnaroundMode: 'NORMAL', // 'NORMAL' or 'TURNAROUND'
+    allData: { normal: [], turnaround: [] }, // 전체 데이터 보관용
 
     async init(container) {
         this.container = container || document.getElementById('stats-content');
@@ -37,9 +37,12 @@ export const financialAnalysisView = {
                         <option value="NET_INCOME">당기순이익</option>
                     </select>
                 </div>
-                <div class="analysis-check-group">
-                    <input type="checkbox" id="fin-exclude-turnaround">
-                    <span>흑자전환 제외</span>
+                <div class="control-group">
+                    <label>분석 유형</label>
+                    <div class="stats-toggle-group" id="fin-turnaround-toggle">
+                        <button class="stats-toggle active" data-value="NORMAL">일반 성장</button>
+                        <button class="stats-toggle" data-value="TURNAROUND">흑자 전환</button>
+                    </div>
                 </div>
                 <button id="fin-refresh-btn" class="analysis-btn-primary">
                     <i class="fas fa-sync-alt"></i> 분석 업데이트
@@ -57,7 +60,7 @@ export const financialAnalysisView = {
     bindEvents() {
         const metricSelect = document.getElementById('fin-metric-select');
         const quarterSelect = document.getElementById('fin-quarter-select');
-        const turnaroundCheck = document.getElementById('fin-exclude-turnaround');
+        const turnaroundToggle = document.getElementById('fin-turnaround-toggle');
         const refreshBtn = document.getElementById('fin-refresh-btn');
 
         metricSelect?.addEventListener('change', async (e) => {
@@ -71,9 +74,15 @@ export const financialAnalysisView = {
             this.loadData();
         });
 
-        turnaroundCheck?.addEventListener('change', (e) => {
-            this.excludeTurnaround = e.target.checked;
-            this.renderTable(this.allData); // 데이터 재요청 없이 필터링 렌더링
+        turnaroundToggle?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.stats-toggle');
+            if (!btn) return;
+
+            turnaroundToggle.querySelectorAll('.stats-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            this.turnaroundMode = btn.dataset.value;
+            this.renderTable(); // 로컬 데이터로 토글
         });
 
         refreshBtn?.addEventListener('click', () => this.loadData());
@@ -106,23 +115,25 @@ export const financialAnalysisView = {
         tableContainer.innerHTML = '<div class="stats-loader"><i class="fas fa-spinner fa-spin"></i> 데이터 분석 중...</div>';
 
         try {
-            const data = await financialService.getTopGrowers(this.currentMetric, this.currentQuarter);
-            this.allData = data; // 전체 데이터 저장
-            this.renderTable(data);
+            const data = await financialService.getTopGrowers(
+                this.currentMetric, 
+                this.currentQuarter, 
+                500
+            );
+            this.allData = data; // {normal: [], turnaround: []}
+            this.renderTable();
         } catch (error) {
             tableContainer.innerHTML = `<div class="stats-error">오류 발생: ${error.message}</div>`;
         }
     },
 
-    renderTable(items) {
+    renderTable() {
         const container = document.getElementById('fin-table-container');
         if (!container) return;
         
-        // 필터링 적용
-        let filteredItems = items || [];
-        if (this.excludeTurnaround) {
-            filteredItems = filteredItems.filter(item => !(item.prev_value <= 0 && item.current_value > 0));
-        }
+        const filteredItems = this.turnaroundMode === 'TURNAROUND' 
+            ? this.allData.turnaround 
+            : this.allData.normal;
 
         if (filteredItems.length === 0) {
             container.innerHTML = '<div class="stats-empty">조건에 맞는 데이터가 없습니다.</div>';
@@ -135,6 +146,7 @@ export const financialAnalysisView = {
                     <tr>
                         <th style="width: 50px; text-align: center;">순위</th>
                         <th style="min-width: 150px;">종목명</th>
+                        <th style="text-align: right; min-width: 100px; color: #facc15;">이전 분기</th>
                         <th style="text-align: right; min-width: 100px;">직전 분기</th>
                         <th style="text-align: right; min-width: 100px;">해당 분기</th>
                         <th style="text-align: center; width: 120px;">등락률 (QoQ)</th>
@@ -164,6 +176,9 @@ export const financialAnalysisView = {
                             </span>
                             ${isTurnaround ? '<span class="badge-mini" style="background: #facc15; color: #000;">흑자전환</span>' : ''}
                         </div>
+                    </td>
+                    <td style="text-align: right; color: #facc15; background: rgba(250, 204, 21, 0.05);">
+                        ${item.pre_prev_value !== null ? Math.round(item.pre_prev_value).toLocaleString() : '-'}
                     </td>
                     <td style="text-align: right; color: rgba(255,255,255,0.6);">
                         ${Math.round(item.prev_value).toLocaleString()}
