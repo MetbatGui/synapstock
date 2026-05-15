@@ -7,7 +7,7 @@ from synapstock.infrastructure.parsers.excel import DisclosureParser
 logger = logging.getLogger(__name__)
 
 class DisclosureAnalysisService(BaseStatisticsService):
-    """유무상증자, CB, BW 등 공시 데이터 분석 전문 서비스."""
+    """[DEPRECATED] 유무상증자, CB, BW 등 공시 데이터 분석 전문 서비스. (무상증자 외 기능 비활성화)"""
 
     def __init__(self, drive_adapter, folder_id, local_repository):
         super().__init__(drive_adapter, folder_id)
@@ -19,6 +19,9 @@ class DisclosureAnalysisService(BaseStatisticsService):
 
     async def get_data(self, dataType: str, year: str, force_sync: bool = False) -> list:
         """데이터 타입별 조회를 처리합니다."""
+        if dataType in ["capital_increase", "cb", "bw"]:
+            return []
+
         if force_sync:
             return await self.sync_data(dataType, year)
 
@@ -35,6 +38,10 @@ class DisclosureAnalysisService(BaseStatisticsService):
 
     async def sync_data(self, dataType: str, year: str) -> list:
         """각 공시 정보별 동기화 로직을 실행합니다."""
+        if dataType in ["capital_increase", "cb", "bw"]:
+            logger.warning(f"[{self.get_service_name()}] {dataType} 기능은 현재 비활성화되어 리소스를 할당하지 않습니다.")
+            return []
+
         mapping = {
             "capital_increase": ("유상증자", "capital_increase", self.parser.parse_paid_in_capital_increase, getattr(self.repository, "save_capital_increase_data", lambda x: None)),
             "bonus_issue": ("무상증자", "bonus_issue", self.parser.parse_bonus_issue, getattr(self.repository, "save_bonus_issue_data", lambda x: None)),

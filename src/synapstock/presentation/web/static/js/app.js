@@ -46,10 +46,10 @@ window.triggerReportUpload = triggerReportUpload;
 window.triggerNewsAdd = triggerNewsAdd;
 
 // 통계 뷰 객체 전역 노출 (인라인 이벤트 핸들러 대응)
-window.capitalIncreaseView = capitalIncreaseView;
+// window.capitalIncreaseView = capitalIncreaseView;
 window.bonusIssueView = bonusIssueView;
-window.convertibleBondView = convertibleBondView;
-window.bondWithWarrantsView = bondWithWarrantsView;
+// window.convertibleBondView = convertibleBondView;
+// window.bondWithWarrantsView = bondWithWarrantsView;
 
 /**
  * 종목 상세 페이지로 즉시 이동하는 전역 함수
@@ -163,14 +163,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 statisticsMonthView.init(statsContainer);
             } else if (path.includes('ceiling')) {
                 ceilingView.init(statsContainer);
-            } else if (path.includes('capital-increase')) {
-                capitalIncreaseView.render(statsContainer);
+            // } else if (path.includes('capital-increase')) {
+            //     capitalIncreaseView.render(statsContainer);
             } else if (path.includes('bonus-issue')) {
                 bonusIssueView.render(statsContainer);
-            } else if (path.includes('convertible-bond')) {
-                convertibleBondView.render(statsContainer);
-            } else if (path.includes('bond-with-warrants')) {
-                bondWithWarrantsView.render(statsContainer);
+            // } else if (path.includes('convertible-bond')) {
+            //     convertibleBondView.render(statsContainer);
+            // } else if (path.includes('bond-with-warrants')) {
+            //     bondWithWarrantsView.render(statsContainer);
             } else if (path.includes('new-listing')) {
                 newListingView.render(statsContainer);
             } else if (path.includes('financial')) {
@@ -208,14 +208,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     statisticsMonthView.init(statsContainer);
                 } else if (route === 'ceiling') {
                     ceilingView.init(statsContainer);
-                } else if (route === 'capital-increase') {
-                    capitalIncreaseView.render(statsContainer);
+                // } else if (route === 'capital-increase') {
+                //     capitalIncreaseView.render(statsContainer);
                 } else if (route === 'bonus-issue') {
                     bonusIssueView.render(statsContainer);
-                } else if (route === 'convertible-bond') {
-                    convertibleBondView.render(statsContainer);
-                } else if (route === 'bond-with-warrants') {
-                    bondWithWarrantsView.render(statsContainer);
+                // } else if (route === 'convertible-bond') {
+                //     convertibleBondView.render(statsContainer);
+                // } else if (route === 'bond-with-warrants') {
+                //     bondWithWarrantsView.render(statsContainer);
                 } else if (route === 'new-listing') {
                     newListingView.render(statsContainer);
                 } else if (route === 'growth') {
@@ -269,14 +269,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     statisticsMonthView.init(statsContainer);
                 } else if (currentPath.includes('ceiling')) {
                     ceilingView.init(statsContainer);
-                } else if (currentPath.includes('capital-increase')) {
-                    capitalIncreaseView.render(statsContainer);
+                // } else if (currentPath.includes('capital-increase')) {
+                //     capitalIncreaseView.render(statsContainer);
                 } else if (currentPath.includes('bonus-issue')) {
                     bonusIssueView.render(statsContainer);
-                } else if (currentPath.includes('convertible-bond')) {
-                    convertibleBondView.render(statsContainer);
-                } else if (currentPath.includes('bond-with-warrants')) {
-                    bondWithWarrantsView.render(statsContainer);
+                // } else if (currentPath.includes('convertible-bond')) {
+                //     convertibleBondView.render(statsContainer);
+                // } else if (currentPath.includes('bond-with-warrants')) {
+                //     bondWithWarrantsView.render(statsContainer);
                 } else if (currentPath.includes('new-listing')) {
                     newListingView.render(statsContainer);
                 } else if (currentPath.includes('financial')) {
