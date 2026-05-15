@@ -120,6 +120,7 @@ class StatisticsService:
 
     # --- 공시 분석 (Disclosure) ---
     async def get_capital_increase_data(self, force_sync: bool = False, year: str = "2026") -> list:
+        """[DEPRECATED] 유상증자 데이터를 가져옵니다."""
         items = await self.disclosure_svc.get_data("capital_increase", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
@@ -128,10 +129,12 @@ class StatisticsService:
         return self._enrich_tickers(items)
 
     async def get_convertible_bond_data(self, force_sync: bool = False, year: str = "2026") -> list:
+        """[DEPRECATED] 전환사채 데이터를 가져옵니다."""
         items = await self.disclosure_svc.get_data("cb", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
     async def get_bw_data(self, force_sync: bool = False, year: str = "2026") -> list:
+        """[DEPRECATED] BW 데이터를 가져옵니다."""
         items = await self.disclosure_svc.get_data("bw", year, force_sync=force_sync)
         return self._enrich_tickers(items)
 
