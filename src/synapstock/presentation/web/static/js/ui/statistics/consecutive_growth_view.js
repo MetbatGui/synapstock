@@ -8,8 +8,9 @@ export const consecutiveGrowthView = {
     currentMetric: 'OPERATING_PROFIT',
     currentQuarter: null,
     currentCount: 3, 
-    excludeTurnaround: false,
-    allData: [],
+    turnaroundMode: 'NORMAL', // 'NORMAL' or 'TURNAROUND'
+    allData: { normal: [], turnaround: [] },
+    sortConfig: { key: 'current_value', direction: 'desc' }, // 정렬 설정 (기본 실적규모순)
 
     async init(container) {
         this.container = container || document.getElementById('stats-content');
@@ -46,9 +47,12 @@ export const consecutiveGrowthView = {
                         <option value="NET_INCOME">당기순이익</option>
                     </select>
                 </div>
-                <div class="analysis-check-group">
-                    <input type="checkbox" id="grow-exclude-turnaround">
-                    <span>흑자전환 제외</span>
+                <div class="control-group">
+                    <label>분석 유형</label>
+                    <div class="stats-toggle-group" id="grow-turnaround-toggle">
+                        <button class="stats-toggle ${this.turnaroundMode === 'NORMAL' ? 'active' : ''}" data-value="NORMAL">일반 성장</button>
+                        <button class="stats-toggle ${this.turnaroundMode === 'TURNAROUND' ? 'active' : ''}" data-value="TURNAROUND">흑자 전환</button>
+                    </div>
                 </div>
                 <button id="grow-refresh-btn" class="analysis-btn-primary">
                     <i class="fas fa-search"></i> 분석 시작
@@ -59,16 +63,25 @@ export const consecutiveGrowthView = {
         `;
 
         this.bindEvents();
+        
+        // 현재 상태 복원
+        const metricSelect = this.container.querySelector('#grow-metric-select');
+        if (metricSelect) metricSelect.value = this.currentMetric;
+        
+        const countSelect = this.container.querySelector('#grow-count-select');
+        if (countSelect) countSelect.value = this.currentCount;
+
         await this.loadQuarters();
         await this.loadData();
     },
 
     bindEvents() {
-        const metricSelect = document.getElementById('grow-metric-select');
-        const quarterSelect = document.getElementById('grow-quarter-select');
-        const countSelect = document.getElementById('grow-count-select');
-        const turnaroundCheck = document.getElementById('grow-exclude-turnaround');
-        const refreshBtn = document.getElementById('grow-refresh-btn');
+        const metricSelect = this.container.querySelector('#grow-metric-select');
+        const quarterSelect = this.container.querySelector('#grow-quarter-select');
+        const countSelect = this.container.querySelector('#grow-count-select');
+        const turnaroundToggle = this.container.querySelector('#grow-turnaround-toggle');
+        const refreshBtn = this.container.querySelector('#grow-refresh-btn');
+        const tableContainer = this.container.querySelector('#grow-table-container');
 
         metricSelect?.addEventListener('change', async (e) => {
             this.currentMetric = e.target.value;
@@ -86,12 +99,33 @@ export const consecutiveGrowthView = {
             this.loadData();
         });
 
-        turnaroundCheck?.addEventListener('change', (e) => {
-            this.excludeTurnaround = e.target.checked;
-            this.renderTable(this.allData);
+        turnaroundToggle?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.stats-toggle');
+            if (!btn) return;
+
+            turnaroundToggle.querySelectorAll('.stats-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            this.turnaroundMode = btn.dataset.value;
+            this.renderTable();
         });
 
         refreshBtn?.addEventListener('click', () => this.loadData());
+
+        // 테이블 헤더 클릭 시 정렬
+        tableContainer?.addEventListener('click', (e) => {
+            const th = e.target.closest('th[data-sort]');
+            if (!th) return;
+
+            const key = th.dataset.sort;
+            if (this.sortConfig.key === key) {
+                this.sortConfig.direction = this.sortConfig.direction === 'desc' ? 'asc' : 'desc';
+            } else {
+                this.sortConfig.key = key;
+                this.sortConfig.direction = 'desc';
+            }
+            this.renderTable();
+        });
     },
 
     async loadQuarters() {
@@ -121,22 +155,37 @@ export const consecutiveGrowthView = {
         tableContainer.innerHTML = '<div class="stats-loader"><i class="fas fa-spinner fa-spin"></i> 연속 성장주 탐색 중...</div>';
 
         try {
-            const data = await financialService.getConsecutiveGrowers(this.currentMetric, this.currentQuarter, this.currentCount);
+            const data = await financialService.getConsecutiveGrowers(
+                this.currentMetric, 
+                this.currentQuarter, 
+                this.currentCount
+            );
             this.allData = data;
-            this.renderTable(data);
+            this.renderTable();
         } catch (error) {
             tableContainer.innerHTML = `<div class="stats-error">오류 발생: ${error.message}</div>`;
         }
     },
 
-    renderTable(items) {
+    renderTable() {
         const container = document.getElementById('grow-table-container');
         if (!container) return;
         
-        // 필터링 적용
-        let filteredItems = items || [];
-        if (this.excludeTurnaround) {
-            filteredItems = filteredItems.filter(item => !(item.prev_value <= 0 && item.current_value > 0));
+        let filteredItems = [...(this.turnaroundMode === 'TURNAROUND' 
+            ? this.allData.turnaround 
+            : this.allData.normal)];
+
+        // 정렬 적용
+        if (this.sortConfig.key) {
+            filteredItems.sort((a, b) => {
+                const valA = a[this.sortConfig.key];
+                const valB = b[this.sortConfig.key];
+                if (this.sortConfig.direction === 'asc') {
+                    return valA - valB;
+                } else {
+                    return valB - valA;
+                }
+            });
         }
 
         if (filteredItems.length === 0) {
@@ -148,14 +197,29 @@ export const consecutiveGrowthView = {
         const firstItem = filteredItems[0];
         const quarters = Object.keys(firstItem.history).sort();
 
+        const getSortIcon = (key) => {
+            if (this.sortConfig.key !== key) return '<i class="fas fa-sort" style="margin-left: 5px; opacity: 0.3;"></i>';
+            return this.sortConfig.direction === 'desc' 
+                ? '<i class="fas fa-sort-down" style="margin-left: 5px; color: var(--accent-blue);"></i>' 
+                : '<i class="fas fa-sort-up" style="margin-left: 5px; color: var(--accent-blue);"></i>';
+        };
+
         let html = `
             <table class="stats-table">
                 <thead>
                     <tr>
                         <th style="width: 50px; text-align: center;">순위</th>
                         <th style="min-width: 150px;">종목명</th>
-                        ${quarters.map(q => `<th style="text-align: right; min-width: 90px;">${q}</th>`).join('')}
-                        <th style="text-align: center; width: 110px;">전체 성장률</th>
+                        ${quarters.map((q, i) => {
+                            const isLatest = i === quarters.length - 1;
+                            const isPreStart = i === 0;
+                            const style = `text-align: right; min-width: 90px; ${isPreStart ? 'color: #facc15;' : ''} ${isLatest ? 'cursor: pointer; user-select: none;' : ''}`;
+                            const sortAttr = isLatest ? 'data-sort="current_value"' : '';
+                            return `<th ${sortAttr} style="${style}">${q}${isLatest ? ' ' + getSortIcon('current_value') : ''}</th>`;
+                        }).join('')}
+                        <th data-sort="change_rate" style="text-align: center; width: 140px; cursor: pointer; user-select: none;">
+                            전체 성장률 ${getSortIcon('change_rate')}
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -181,11 +245,19 @@ export const consecutiveGrowthView = {
                             ${isTurnaround ? '<span class="badge-mini" style="background: #facc15; color: #000;">흑자전환</span>' : ''}
                         </div>
                     </td>
-                    ${quarters.map(q => {
+                    ${quarters.map((q, i) => {
                         const val = item.history[q] || 0;
                         const isLatest = q === quarters[quarters.length - 1];
-                        const valColor = isLatest ? '#fff' : 'rgba(255,255,255,0.5)';
-                        return `<td style="text-align: right; font-family: 'Inter'; color: ${valColor};">${Math.round(val).toLocaleString()}</td>`;
+                        const isPreStart = i === 0;
+                        let valColor = isLatest ? '#fff' : 'rgba(255,255,255,0.5)';
+                        let bgStyle = '';
+                        
+                        if (isPreStart) {
+                            valColor = '#facc15';
+                            bgStyle = 'background: rgba(250, 204, 21, 0.05);';
+                        }
+                        
+                        return `<td style="text-align: right; font-family: 'Inter'; color: ${valColor}; ${bgStyle}">${Math.round(val).toLocaleString()}</td>`;
                     }).join('')}
                     <td style="text-align: center; color: ${rateColor}; font-weight: bold; background: rgba(255,255,255,0.02);">
                         ${rateSymbol} ${Math.abs(rate).toLocaleString()}%
