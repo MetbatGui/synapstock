@@ -70,10 +70,10 @@ class Container:
         self.config.statistics_dir.mkdir(parents=True, exist_ok=True)
         self.config.netbuy_dir.mkdir(parents=True, exist_ok=True)
         self.config.ceiling_dir.mkdir(parents=True, exist_ok=True)
-        self.config.capital_increase_dir.mkdir(parents=True, exist_ok=True)
+        # self.config.capital_increase_dir.mkdir(parents=True, exist_ok=True)
         self.config.bonus_issue_dir.mkdir(parents=True, exist_ok=True)
-        self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
-        self.config.bw_dir.mkdir(parents=True, exist_ok=True)
+        # self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
+        # self.config.bw_dir.mkdir(parents=True, exist_ok=True)
         self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
         self.config.weekly_change_dir.mkdir(parents=True, exist_ok=True)
         self.config.news_dir.mkdir(parents=True, exist_ok=True)
@@ -92,10 +92,10 @@ class Container:
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         self._statistics_repo = LocalStatisticsRepository(str(self.config.netbuy_dir))
         self._ceiling_repo = LocalCeilingRepository(str(self.config.ceiling_dir))
-        self._capital_increase_repo = LocalCapitalIncreaseRepository(str(self.config.capital_increase_dir))
+        self._capital_increase_repo = None # LocalCapitalIncreaseRepository(str(self.config.capital_increase_dir))
         self._bonus_issue_repo = LocalBonusIssueRepository(str(self.config.bonus_issue_dir))
-        self._convertible_bond_repo = LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
-        self._bw_repo = LocalBondWithWarrantsRepository(str(self.config.bw_dir))
+        self._convertible_bond_repo = None # LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
+        self._bw_repo = None # LocalBondWithWarrantsRepository(str(self.config.bw_dir))
         self._weekly_change_repo = LocalWeeklyChangeRepository(str(self.config.weekly_change_dir))
 
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
@@ -168,10 +168,10 @@ class Container:
                 "report": self.config.report_folder_id,
                 "sd": self.config.sd_folder_id,
                 "ceiling": self.config.ceiling_folder_id,
-                "capital_increase": self.config.capital_increase_folder_id,
+                # "capital_increase": self.config.capital_increase_folder_id,
                 "bonus_issue": self.config.bonus_issue_folder_id,
-                "convertible_bond": self.config.convertible_bond_folder_id,
-                "bw": self.config.bw_folder_id,
+                # "convertible_bond": self.config.convertible_bond_folder_id,
+                # "bw": self.config.bw_folder_id,
                 "new_listing": self.config.new_listing_folder_id,
                 "news": self.config.news_folder_id,
                 "weekly_change": self.config.weekly_change_folder_id,
