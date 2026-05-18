@@ -12,8 +12,6 @@ from typing import cast
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from synapstock.domain.models import Board
-
 logger = logging.getLogger(__name__)
 
 from synapstock.presentation.web.core.dependencies import (
@@ -261,3 +259,21 @@ async def delete_stock_report(board: str, ticker: str, report_path: str) -> dict
         return JSONResponse(status_code=404, content={"message": "Stock or report not found"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
+
+
+@router.post("/api/board/create", response_model=None)
+async def create_board(name: str) -> dict | JSONResponse:
+    """새로운 가상 보드를 생성합니다."""
+    success = command_service.create_board(name)
+    if success:
+        return {"status": "success"}
+    return JSONResponse(status_code=500, content={"message": "Failed to create board"})
+
+
+@router.post("/api/board/delete", response_model=None)
+async def delete_board(name: str) -> dict | JSONResponse:
+    """보드 전체를 삭제합니다."""
+    success = command_service.delete_board(name)
+    if success:
+        return {"status": "success"}
+    return JSONResponse(status_code=404, content={"message": "Board not found or delete failed"})

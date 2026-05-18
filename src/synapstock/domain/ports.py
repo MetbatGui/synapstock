@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 from synapstock.domain.models import Board, ScrapedNews
-from synapstock.domain.news.models import NewsBatch, NewsItem
+from synapstock.domain.news.models import NewsBatch
 
 
 class BoardRepositoryPort(ABC):
@@ -41,6 +41,14 @@ class BoardRepositoryPort(ABC):
 
         Returns:
             Board 이름 리스트 (확장자 제외, 정렬됨).
+        """
+
+    @abstractmethod
+    def delete(self, name: str) -> None:
+        """이름에 해당하는 Board를 삭제한다.
+
+        Args:
+            name: 삭제할 Board 이름.
         """
 
 

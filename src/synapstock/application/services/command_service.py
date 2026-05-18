@@ -48,3 +48,23 @@ class BoardCommandService:
         if success:
             self._repository.save(board)
         return success
+
+    def create_board(self, name: str) -> bool:
+        """새로운 빈 보드를 생성합니다."""
+        try:
+            from synapstock.domain.models import Board, Node
+            # 루트 노드 이름은 보드 이름과 동일하게 설정 (기본값)
+            root = Node(name=name, depth=0)
+            board = Board(id=name, name=name, root=root)
+            self._repository.save(board)
+            return True
+        except Exception:
+            return False
+
+    def delete_board(self, name: str) -> bool:
+        """보드 전체를 삭제합니다."""
+        try:
+            self._repository.delete(name)
+            return True
+        except Exception:
+            return False
