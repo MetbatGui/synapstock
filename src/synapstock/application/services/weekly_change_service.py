@@ -65,7 +65,7 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                         target_event = event
                         break
             else:
-                completed = [e for e in manifest.values() if e.get("status") == "COMPLETED"]
+                completed = [e for e in manifest.values() if e.get("status") in ("COMPLETED", "FINAL")]
                 if completed:
                     target_event = sorted(completed, key=lambda x: x.get("last_trading_day", ""), reverse=True)[0]
 
@@ -88,7 +88,7 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                 content = await self.drive_adapter.get_file(full_path, folder="weekly_change")
                 
                 if content:
-                    corrected_date = f"{year}-{full_range[5:7]}-{full_range[7:]}"
+                    corrected_date = target_event.get("last_trading_day")
                     report = self.parser.parse(content, filename=corrected_filename, date=corrected_date)
                     self.repository.save_report(report)
                     return report
@@ -145,7 +145,7 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         manifest = await self._load_manifest()
         if manifest:
             for event in manifest.values():
-                if event.get("status") != "COMPLETED":
+                if event.get("status") not in ("COMPLETED", "FINAL"):
                     continue
                 
                 date_str = event.get("last_trading_day")

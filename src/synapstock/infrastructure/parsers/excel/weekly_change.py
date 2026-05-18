@@ -83,7 +83,8 @@ class WeeklyChangeParser(BaseExcelParser):
         filename = kwargs.get("filename", "")
         metadata = self.extract_metadata_from_filename(filename)
         
-        date = metadata["date"] if metadata["date"] != "Unknown" else kwargs.get("date", "Unknown")
+        explicit_date = kwargs.get("date")
+        date = explicit_date if explicit_date and explicit_date != "Unknown" else metadata["date"]
         
         df = pd.read_excel(io.BytesIO(content))
         
