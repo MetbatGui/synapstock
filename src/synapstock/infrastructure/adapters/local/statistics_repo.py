@@ -280,15 +280,15 @@ class LocalWeeklyChangeRepository:
             if len(date_str) >= 10:
                 year = int(date_str[:4])
                 month = int(date_str[5:7])
-        
+
         # 파일명 결정: date_range가 있으면 사용, 없으면 date_str 사용
         filename_part = date_range if date_range else date_str
-        
+
         if year and month:
             folder = self.root / f"{year}년" / f"{month:02d}월"
             folder.mkdir(parents=True, exist_ok=True)
             return folder / f"weekly_change_{filename_part}.json"
-        
+
         return self.root / f"weekly_change_{filename_part}.json"
 
     def save_report(self, report: WeeklyChangeReport):
@@ -302,10 +302,10 @@ class LocalWeeklyChangeRepository:
         """특정 날짜의 리포트를 불러온다. 파일명에 해당 날짜가 포함되어 있는지 검색한다."""
         # 1. 모든 하위 폴더에서 weekly_change_*.json 파일을 찾음
         files = list(self.root.rglob("weekly_change_*.json"))
-        
+
         # 2. 날짜(예: 0515)가 파일명에 포함되어 있거나, 내부 데이터를 로드해서 확인
         target_date_short = date.replace("-", "")[4:] # '2026-05-15' -> '0515'
-        
+
         for path in files:
             # 파일명에 0515가 포함되어 있는지 단순 체크 (예: 0511~0515)
             if target_date_short in path.name or date in path.name:

@@ -7,19 +7,20 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from synapstock.application.services.news_service import NewsService
     from synapstock.domain.ports import FinancialDataPort
 
 from synapstock.application.services.command_service import BoardCommandService
+from synapstock.application.services.financial_service import FinancialService
 from synapstock.application.services.media_service import StockMediaService
 from synapstock.application.services.query_service import BoardQueryService
 from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
-from synapstock.application.services.financial_service import FinancialService
+from synapstock.application.services.weekly_change_service import WeeklyChangeService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
     DartDisclosureAdapter,
 )
@@ -34,17 +35,12 @@ from synapstock.infrastructure.adapters.local.board_repo import LocalBoardReposi
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
-from synapstock.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 from synapstock.infrastructure.adapters.local.statistics_repo import (
-    LocalBondWithWarrantsRepository,
     LocalBonusIssueRepository,
-    LocalCapitalIncreaseRepository,
     LocalCeilingRepository,
-    LocalConvertibleBondRepository,
     LocalStatisticsRepository,
     LocalWeeklyChangeRepository,
 )
-from synapstock.application.services.weekly_change_service import WeeklyChangeService
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
@@ -53,6 +49,7 @@ from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
 from synapstock.infrastructure.config import AppConfig
+from synapstock.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 
 logger = logging.getLogger(__name__)
 
