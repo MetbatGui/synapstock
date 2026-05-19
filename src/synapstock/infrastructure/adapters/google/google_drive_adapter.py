@@ -316,6 +316,23 @@ class GoogleDriveAdapter(StoragePort):
                 return None
         return await asyncio.to_thread(_get)
 
+    async def delete_file(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
+        """Google Drive에서 파일을 찾아서 영구적으로 삭제합니다."""
+        def _delete():
+            try:
+                file_id = self._get_file_id(path, folder=folder, root_id=root_id)
+                if not file_id:
+                    logger.warning(f"[GoogleDrive] 삭제할 파일을 찾을 수 없음: {path}")
+                    return False
+                self.drive_service.files().delete(fileId=file_id).execute()
+                logger.info(f"[GoogleDrive] 파일 영구 삭제 성공: {path}")
+                return True
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 삭제 실패 ({path}): {e}")
+                return False
+        return await asyncio.to_thread(_delete)
+
+
     async def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
 
@@ -357,7 +374,12 @@ class GoogleDriveAdapter(StoragePort):
         logger.info(f"[GoogleDrive] PDF 동기화 완료: {count}개 파일 업로드됨.")
 
     async def download_file(
-        self, filename: str, local_path: str | Path, folder: str | None = None, root_id: str | None = None
+        self,
+        filename: str,
+        local_path: str | Path,
+        folder: str | None = None,
+        root_id: str | None = None,
+        **kwargs,
     ) -> bool:
         """Google Drive에서 단일 파일을 원자적으로(Atomic) 다운로드합니다."""
         import os
