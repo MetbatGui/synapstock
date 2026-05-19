@@ -2,6 +2,7 @@
 
 from typing import cast
 
+from synapstock.application.services.board_file_sync_service import BoardFileSyncService
 from synapstock.domain.models import Stock
 from synapstock.domain.ports import BoardRepositoryPort
 
@@ -9,9 +10,12 @@ from synapstock.domain.ports import BoardRepositoryPort
 class BoardCommandService:
     """보드의 구조적 변경(추가/삭제) 작업을 수행하는 서비스 클래스입니다. (CQRS - Command)"""
 
-    def __init__(self, repository: BoardRepositoryPort) -> None:
-        """필요한 퍼시스턴스 어댑터로 서비스를 초기화합니다."""
+    def __init__(
+        self, repository: BoardRepositoryPort, sync_service: BoardFileSyncService | None = None
+    ) -> None:
+        """필요한 퍼시스턴스 어댑터 및 동기화 서비스로 초기화합니다."""
         self._repository = repository
+        self._sync_service = sync_service
 
     def add_node(self, board_name: str, parent_name: str, new_node_name: str) -> bool:
         """특정 부모 노드 아래에 하위 노드를 추가합니다."""
@@ -20,6 +24,8 @@ class BoardCommandService:
         success = cast(bool, board.add_node(parent_name, new_node_name))
         if success:
             self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(board_name, deleted=False)
         return success
 
     def add_stock(self, board_name: str, parent_name: str, stock_name: str, ticker: str) -> bool:
@@ -29,6 +35,8 @@ class BoardCommandService:
         success = cast(bool, board.add_stock_to_node(parent_name, Stock(name=stock_name, ticker=ticker)))
         if success:
             self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(board_name, deleted=False)
         return success
 
     def delete_node(self, board_name: str, node_name: str) -> bool:
@@ -38,6 +46,8 @@ class BoardCommandService:
         success = cast(bool, board.delete_node(node_name))
         if success:
             self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(board_name, deleted=False)
         return success
 
     def delete_stock(self, board_name: str, ticker: str) -> bool:
@@ -47,6 +57,8 @@ class BoardCommandService:
         success = cast(bool, board.root.find_and_remove_stock(ticker))
         if success:
             self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(board_name, deleted=False)
         return success
 
     def create_board(self, name: str) -> bool:
@@ -57,6 +69,8 @@ class BoardCommandService:
             root = Node(name=name, depth=0)
             board = Board(id=name, name=name, root=root)
             self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(name, deleted=False)
             return True
         except Exception:
             return False
@@ -65,6 +79,9 @@ class BoardCommandService:
         """보드 전체를 삭제합니다."""
         try:
             self._repository.delete(name)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(name, deleted=True)
             return True
         except Exception:
             return False
+
