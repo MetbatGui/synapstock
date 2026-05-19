@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 from synapstock.presentation.web.core.dependencies import (
+    board_file_sync_service,
     command_service,
     media_service,
     query_service,
@@ -277,3 +278,22 @@ async def delete_board(name: str) -> dict | JSONResponse:
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Board not found or delete failed"})
+
+
+@router.post("/api/board/virtual/sync", response_model=None)
+async def sync_virtual_boards() -> dict | JSONResponse:
+    """구글 드라이브 클라우드 저장소와 로컬 가상/테마 보드 파일들을 실시간으로 양방향 동기화합니다."""
+    try:
+        success = await board_file_sync_service.sync_with_drive()
+        if success:
+            return {
+                "status": "success",
+                "message": "구글 드라이브 클라우드 저장소와 가상/테마 보드 양방향 동기화가 무사히 완료되었습니다."
+            }
+        return JSONResponse(
+            status_code=500,
+            content={"message": "구글 드라이브 파일 동기화 처리에 실패했습니다. 로그를 확인하세요."}
+        )
+    except Exception as e:
+        logger.error(f"Error executing board drive sync: {str(e)}")
+        return JSONResponse(status_code=500, content={"message": f"서버 동기화 오류: {str(e)}"})
