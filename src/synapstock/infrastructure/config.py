@@ -51,6 +51,7 @@ class AppConfig(BaseModel):
     new_listing_folder_id: str | None = None
     news_folder_id: str | None = None
     weekly_change_folder_id: str | None = None
+    theme_folder_id: str | None = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -91,4 +92,5 @@ class AppConfig(BaseModel):
             new_listing_folder_id=os.getenv("GOOGLE_DRIVE_NEW_LISTING_FOLDER_ID"),
             news_folder_id=os.getenv("GOOGLE_DRIVE_NEWS_FOLDER_ID"),
             weekly_change_folder_id=os.getenv("GOOGLE_DRIVE_WEEKLY_CHANGE_ID"),
+            theme_folder_id=os.getenv("GOOGLE_DRIVE_THEME_FOLDER_ID"),
         )
