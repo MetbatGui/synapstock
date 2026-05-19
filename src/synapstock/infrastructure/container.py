@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from synapstock.application.services.news_service import NewsService
     from synapstock.domain.ports import FinancialDataPort
 
+from synapstock.application.services.board_file_sync_service import BoardFileSyncService
 from synapstock.application.services.command_service import BoardCommandService
 from synapstock.application.services.financial_service import FinancialService
 from synapstock.application.services.media_service import StockMediaService
@@ -98,20 +99,31 @@ class Container:
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
         self._news_repo = LocalNewsRepository(self.config.news_dir)
-        self._financial_repo = ExcelFinancialRepository(str(self.config.data_dir / "financial_statements" / "재무제표.xlsx"))
+        self._financial_repo = ExcelFinancialRepository(
+            str(self.config.data_dir / "financial_statements" / "재무제표.xlsx")
+        )
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
 
         # 5. 도메인 서비스 싱글톤
+        self._board_file_sync_service = BoardFileSyncService(
+            repository=self._repo,
+            drive_adapter=self._drive_adapter,
+            theme_folder_id=self.config.theme_folder_id,
+            manifest_path=self.config.board_dir / "board_sync_manifest.json"
+        )
         self._query_service = BoardQueryService(
             repository=self._repo,
             ticker_search=self._ticker_search_adapter,
             disclosure=self._disclosure_adapter,
             financial=cast("FinancialDataPort", self._financial_adapter),
         )
-        self._command_service = BoardCommandService(repository=self._repo)
+        self._command_service = BoardCommandService(
+            repository=self._repo,
+            sync_service=self._board_file_sync_service
+        )
 
         from synapstock.application.services.news_service import NewsService
 
@@ -247,6 +259,10 @@ class Container:
     @property
     def weekly_change_service(self) -> WeeklyChangeService:
         return self._weekly_change_service
+
+    @property
+    def board_file_sync_service(self) -> BoardFileSyncService:
+        return self._board_file_sync_service
 
 
 # 전역 컨테이너 인스턴스 생성
