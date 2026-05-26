@@ -300,10 +300,26 @@ class GoogleDriveAdapter(StoragePort):
         return await self.list_files_in_folder("", folder=folder)
 
     async def get_file_by_id(self, file_id: str) -> bytes | None:
-        """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다."""
+        """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다.
+        Google Sheets 등 Google Docs 편집기 문서 포맷인 경우 적절한 포맷으로 Export하여 다운로드합니다.
+        """
         def _get():
             try:
-                request = self.drive_service.files().get_media(fileId=file_id)
+                # 1. MimeType 확인
+                file_meta = self.drive_service.files().get(fileId=file_id, fields="mimeType").execute()
+                mime_type = file_meta.get("mimeType", "")
+                logger.info(f"[GoogleDrive] 파일 ID({file_id})의 MimeType 조회 결과: {mime_type}")
+
+                # 2. 구글 스프레드시트인 경우 엑셀로 Export
+                if mime_type == "application/vnd.google-apps.spreadsheet":
+                    logger.info(f"[GoogleDrive] 파일 ID({file_id})가 Google Sheets 포맷이므로 엑셀(.xlsx)로 Export 다운로드합니다.")
+                    request = self.drive_service.files().export_media(
+                        fileId=file_id,
+                        mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                else:
+                    request = self.drive_service.files().get_media(fileId=file_id)
+
                 fh = io.BytesIO()
                 downloader = MediaIoBaseDownload(fh, request)
                 done = False
@@ -313,6 +329,17 @@ class GoogleDriveAdapter(StoragePort):
                 return fh.read()
             except Exception as e:
                 logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
+                return None
+        return await asyncio.to_thread(_get)
+
+    async def get_file_metadata(self, file_id: str) -> dict | None:
+        """파일 ID로 Google Drive 파일의 메타데이터(예: name, modifiedTime, size, mimeType 등)를 조회합니다."""
+        def _get():
+            try:
+                file_meta = self.drive_service.files().get(fileId=file_id, fields="id, name, modifiedTime, size, mimeType").execute()
+                return file_meta
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 ID({file_id}) 메타데이터 조회 실패: {e}")
                 return None
         return await asyncio.to_thread(_get)
 
