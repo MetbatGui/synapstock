@@ -144,6 +144,8 @@ class FinancialService:
                     continue
                 if abs(vals[-1]) < min_value:
                     continue
+                if vals[1] == 0.0:  # 분모가 0인 종목은 제외 (division by zero 방지)
+                    continue
 
                 change_rate = self._calculate_change_rate(vals[-1], vals[1])
                 history = {q: s.values.get(q, 0.0) for q in quarters}
