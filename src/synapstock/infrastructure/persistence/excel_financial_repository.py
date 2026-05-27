@@ -12,8 +12,8 @@ class ExcelFinancialRepository(FinancialRepository):
         # 지표별 시트 인덱스 매핑 (분기 기준)
         self._metric_sheet_map = {
             FinancialMetric.REVENUE: 0,
-            FinancialMetric.OPERATING_PROFIT: 1,
-            FinancialMetric.NET_INCOME: 2
+            FinancialMetric.OPERATING_PROFIT: 2,
+            FinancialMetric.NET_INCOME: 4
         }
 
     def get_all_quarters(self, metric: FinancialMetric) -> list[str]:
@@ -67,3 +67,10 @@ class ExcelFinancialRepository(FinancialRepository):
             # 로깅은 추후 추가
             print(f"Error loading financials from excel: {e}")
             return []
+
+    def get_last_modified_time(self) -> float:
+        import os
+        try:
+            return os.path.getmtime(self.file_path)
+        except Exception:
+            return 0.0

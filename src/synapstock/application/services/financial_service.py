@@ -8,6 +8,17 @@ class FinancialService:
     def __init__(self, repository: FinancialRepository):
         self.repository = repository
         self._cache = {}  # {key: result_dict}
+        self._last_mtime = 0.0
+
+    def _update_cache_if_modified(self):
+        """저장소의 데이터 소스 파일이 수정되었는지 확인하고 수정한 경우 캐시를 클리어합니다."""
+        try:
+            current_mtime = self.repository.get_last_modified_time()
+            if current_mtime != self._last_mtime:
+                self._cache.clear()
+                self._last_mtime = current_mtime
+        except Exception:
+            pass
 
     def get_available_quarters(self, metric: FinancialMetric) -> list[str]:
         """선택 가능한 모든 분기 리스트를 반환합니다."""
@@ -19,6 +30,7 @@ class FinancialService:
         """직전 분기 대비 등락률이 높은 상위 종목을 추출합니다. (QoQ)
         일반 성장과 흑자 전환 결과를 동시에 반환하며 캐싱을 지원합니다.
         """
+        self._update_cache_if_modified()
         if not target_quarter:
             target_quarter = self.repository.get_latest_quarter(metric)
         if not target_quarter:
@@ -95,6 +107,7 @@ class FinancialService:
         """지정한 분기부터 과거 N분기 동안 연속으로 실적이 상승한 종목을 추출합니다.
         일반 성장과 흑자 전환 결과를 동시에 반환하며 캐싱을 지원합니다.
         """
+        self._update_cache_if_modified()
         if not target_quarter:
             target_quarter = self.repository.get_latest_quarter(metric)
         if not target_quarter:

@@ -17,3 +17,7 @@ class FinancialRepository(Protocol):
     def get_all_quarters(self, metric: FinancialMetric) -> list[str]:
         """선택 가능한 모든 분기 리스트를 반환합니다."""
         ...
+
+    def get_last_modified_time(self) -> float:
+        """데이터 소스의 마지막 수정 시각을 반환합니다."""
+        ...
