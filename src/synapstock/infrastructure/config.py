@@ -53,6 +53,7 @@ class AppConfig(BaseModel):
     weekly_change_folder_id: str | None = None
     theme_folder_id: str | None = None
     financial_statements_id: str | None = None
+    stock_split_folder_id: str | None = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -95,4 +96,5 @@ class AppConfig(BaseModel):
             weekly_change_folder_id=os.getenv("GOOGLE_DRIVE_WEEKLY_CHANGE_ID"),
             theme_folder_id=os.getenv("GOOGLE_DRIVE_THEME_FOLDER_ID"),
             financial_statements_id=os.getenv("GOOGLE_DRIVE_FINANCIAL_STATEMENTS_ID"),
+            stock_split_folder_id=os.getenv("GOOGLE_DRIVE_STOCK_SPLIT_ID"),
         )

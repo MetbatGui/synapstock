@@ -4,6 +4,8 @@ from synapstock.domain.statistics.models import (
     MonthlyMarketStats,
     RankingItem,
     SupplySubject,
+    StockSplit,
+    StockSplitManifest,
 )
 
 __all__ = [
@@ -12,4 +14,7 @@ __all__ = [
     "MonthlyMarketStats",
     "RankingItem",
     "SupplySubject",
+    "StockSplit",
+    "StockSplitManifest",
 ]
+
