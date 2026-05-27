@@ -68,8 +68,11 @@ class LocalBoardRepository(BoardRepositoryPort):
         )
 
     def list_boards(self) -> list[str]:
-        """루트 디렉터리의 .json 파일 이름 목록을 반환한다."""
-        return sorted(p.stem for p in self.root_dir.glob("*.json"))
+        """루트 디렉터리의 theme_* 또는 virtual_* 형식의 .json 파일 이름 목록을 반환한다."""
+        return sorted(
+            p.stem for p in self.root_dir.glob("*.json")
+            if p.name.startswith("theme_") or p.name.startswith("virtual_")
+        )
 
     def delete(self, name: str) -> None:
         """이름에 해당하는 Board 파일을 삭제한다."""
