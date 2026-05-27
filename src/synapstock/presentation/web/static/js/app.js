@@ -27,6 +27,7 @@ import { bondWithWarrantsView } from './ui/statistics/bond_with_warrants_view.js
 import { newListingView } from './ui/statistics/new_listing_view.js';
 import { financialAnalysisView } from './ui/statistics/financial_analysis_view.js';
 import { weeklyChangeView } from './ui/statistics/weekly_change_view.js';
+import { stockSplitView } from './ui/statistics/stock_split_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -48,6 +49,7 @@ window.triggerNewsAdd = triggerNewsAdd;
 // 통계 뷰 객체 전역 노출 (인라인 이벤트 핸들러 대응)
 // window.capitalIncreaseView = capitalIncreaseView;
 window.bonusIssueView = bonusIssueView;
+window.stockSplitView = stockSplitView;
 // window.convertibleBondView = convertibleBondView;
 // window.bondWithWarrantsView = bondWithWarrantsView;
 
@@ -173,6 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
             //     bondWithWarrantsView.render(statsContainer);
             } else if (path.includes('new-listing')) {
                 newListingView.render(statsContainer);
+            } else if (path.includes('stock-split')) {
+                stockSplitView.render(statsContainer);
             } else if (path.includes('financial')) {
                 financialAnalysisView.init(statsContainer);
             } else if (path.includes('weekly-change')) {
@@ -218,6 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 //     bondWithWarrantsView.render(statsContainer);
                 } else if (route === 'new-listing') {
                     newListingView.render(statsContainer);
+                } else if (route === 'stock-split') {
+                    stockSplitView.render(statsContainer);
                 } else if (route === 'growth') {
                     consecutiveGrowthView.init(statsContainer);
                 } else if (route === 'financial') {
@@ -279,6 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 //     bondWithWarrantsView.render(statsContainer);
                 } else if (currentPath.includes('new-listing')) {
                     newListingView.render(statsContainer);
+                } else if (currentPath.includes('stock-split')) {
+                    stockSplitView.render(statsContainer);
                 } else if (currentPath.includes('financial')) {
                     financialAnalysisView.init(statsContainer);
                 } else if (currentPath.includes('weekly-change')) {
