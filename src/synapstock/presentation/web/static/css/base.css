@@ -42,7 +42,8 @@ body {
 .nav-logo {
     font-size: 1.5rem;
     font-weight: 700;
-    margin-right: 60px;
+    margin-right: 40px;
+    margin-left: auto;
 }
 
 .nav-logo span {
@@ -82,7 +83,9 @@ body {
     margin-left: auto;
     font-size: 0.85rem;
     color: #4ade80;
+    flex-shrink: 0;
 }
+
 
 /* Content Layout */
 .content-area {
@@ -101,3 +104,41 @@ body {
 .tab-content.active {
     display: block;
 }
+
+/* 상단바 검색 통합 프리미엄 스타일 */
+.navbar-search {
+    margin-left: 40px;
+    margin-right: 0;
+    flex: 1;
+    max-width: 320px;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.navbar-search .search-input-wrapper {
+    height: 38px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.navbar-search .search-input-wrapper:focus-within {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.15);
+}
+
+.navbar-search .search-input-wrapper i {
+    font-size: 0.95rem;
+}
+
+.navbar-search #global-stock-search {
+    font-size: 0.85rem;
+    padding: 6px 0;
+}
+
+.navbar-search .search-results-dropdown {
+    width: 350px;
+    left: auto;
+    right: 0;
+}
+

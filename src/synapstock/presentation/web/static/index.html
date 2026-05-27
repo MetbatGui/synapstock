@@ -31,10 +31,19 @@
             <a href="#" class="nav-item" data-tab="dashboard-tab">종목정보</a>
             <a href="#" class="nav-item" data-tab="statistics-tab">통계 분석</a>
         </div>
+        <!-- 공통 상단바 검색창 통합 (모든 도메인에서 접근 가능) -->
+        <div class="global-search-container navbar-search">
+            <div class="search-input-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" id="global-stock-search" placeholder="종목 검색 (이름/티커)..." autocomplete="off">
+            </div>
+            <div id="global-search-results" class="search-results-dropdown" style="display: none;"></div>
+        </div>
         <div class="nav-status">
             <span id="sync-status-indicator">● System Ready</span>
         </div>
     </nav>
+
 
     <!-- 재무 데이터 개폐식 사이드바 -->
     <aside id="financial-sidebar" class="financial-sidebar">
@@ -115,14 +124,7 @@
                             </div>
                         </div>
 
-                        <!-- 전체 종목 검색창 추가 -->
-                        <div class="global-search-container">
-                            <div class="search-input-wrapper">
-                                <i class="fas fa-search"></i>
-                                <input type="text" id="global-stock-search" placeholder="전체 보드 종목 검색 (이름/티커)..." autocomplete="off">
-                            </div>
-                            <div id="global-search-results" class="search-results-dropdown" style="display: none;"></div>
-                        </div>
+
 
                         <button id="sync-btn" class="btn btn-primary">
                             <i class="fas fa-sync-alt"></i> Sync with Miro
