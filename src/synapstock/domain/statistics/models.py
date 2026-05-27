@@ -544,6 +544,18 @@ class StockSplit(BaseModel):
     listing_date: str | None = Field(default=None, validation_alias=AliasChoices("신주상장예정일", "listing_date"))
     general_meeting_date: str | None = Field(default=None, validation_alias=AliasChoices("주총결의일", "general_meeting_date"))
 
+    @computed_field
+    def rcp_no(self) -> str:
+        return self.receipt_no
+
+    @computed_field
+    def parent_rcp_no(self) -> str | None:
+        return self.original_receipt_no
+
+    @computed_field
+    def is_correction(self) -> bool:
+        return self.original_receipt_no is not None and len(self.original_receipt_no.strip()) > 0
+
     @field_validator("market", "disclosure_type", mode="before")
     @classmethod
     def normalize_strings(cls, v):

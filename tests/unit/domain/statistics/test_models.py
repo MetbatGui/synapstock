@@ -66,6 +66,12 @@ def test_stock_split_model_normalization():
     assert model.listing_date == "2025-02-27"
     assert model.general_meeting_date == "2024-12-12"
 
+    # computed_field 검증 (프론트엔드 이전 공시 추적 호환용)
+    assert model.rcp_no == "20241212801081"
+    assert model.parent_rcp_no == "20241212000000"
+    assert model.is_correction is True
+
+
     # 2. NaN 및 빈 값(None) 처리 검증 (엣지 케이스)
     edge_data = {
         "회사명": "엣지컴퍼니",
