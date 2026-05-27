@@ -282,6 +282,11 @@ export const stockSplitView = {
                             <i class="fas fa-calendar-alt"></i> 주요 일정
                         </h4>
                         <div class="stats-timeline">
+                            ${item.first_disclosure_date ? `
+                            <div class="stats-timeline-item">
+                                <div style="color: #9ca3af;">최초공시 등록일</div>
+                                <div class="stats-timeline-date">${item.first_disclosure_date}</div>
+                            </div>` : ''}
                             <div class="stats-timeline-item">
                                 <div style="color: #9ca3af;">이사회결의일</div>
                                 <div class="stats-timeline-date">${item.board_resolution_date || '-'}</div>
@@ -292,7 +297,7 @@ export const stockSplitView = {
                                 <div class="stats-timeline-date">${item.general_meeting_date}</div>
                             </div>` : ''}
                             <div class="stats-timeline-item active">
-                                <div style="color: #9ca3af;">배정기준일</div>
+                                <div style="color: #9ca3af;">등록일자 (기준일)</div>
                                 <div class="stats-timeline-date">${item.base_date || '-'}</div>
                             </div>
                             <div class="stats-timeline-item">

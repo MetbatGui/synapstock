@@ -533,16 +533,17 @@ class StockSplit(BaseModel):
 
     company_name: str = Field(validation_alias=AliasChoices("회사명", "company_name"))
     market: str | None = Field(default=None, validation_alias=AliasChoices("시장", "market"))
-    disclosure_type: str | None = Field(default=None, validation_alias=AliasChoices("공시구분", "disclosure_type"))
-    base_date: str = Field(validation_alias=AliasChoices("배정기준일", "base_date"))
+    disclosure_type: str | None = Field(default=None, validation_alias=AliasChoices("공시구분", "철회여부", "disclosure_type"))
+    base_date: str = Field(validation_alias=AliasChoices("배정기준일", "등록일자", "base_date"))
     board_resolution_date: str | None = Field(default=None, validation_alias=AliasChoices("이사회결의일", "board_resolution_date"))
-    receipt_no: str = Field(validation_alias=AliasChoices("접수번호", "receipt_no"))
-    original_receipt_no: str | None = Field(default=None, validation_alias=AliasChoices("원접수번호", "original_receipt_no"))
-    prev_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이전)", "prev_shares"))
-    post_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이후)", "post_shares"))
-    split_ratio: float | None = Field(default=None, validation_alias=AliasChoices("분할비율", "split_ratio"))
+    receipt_no: str = Field(validation_alias=AliasChoices("접수번호", "공시번호", "receipt_no"))
+    original_receipt_no: str | None = Field(default=None, validation_alias=AliasChoices("원접수번호", "이전공시번호", "original_receipt_no"))
+    prev_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이전)", "분할전 보통주식수(주)", "prev_shares"))
+    post_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이후)", "분할후 보통주식수(주)", "post_shares"))
+    split_ratio: float | None = Field(default=None, validation_alias=AliasChoices("분할비율", "분할배율", "split_ratio"))
     listing_date: str | None = Field(default=None, validation_alias=AliasChoices("신주상장예정일", "listing_date"))
     general_meeting_date: str | None = Field(default=None, validation_alias=AliasChoices("주총결의일", "general_meeting_date"))
+    first_disclosure_date: str | None = Field(default=None, validation_alias=AliasChoices("최초공시 등록일자", "first_disclosure_date"))
 
     @computed_field
     def rcp_no(self) -> str:
@@ -566,7 +567,7 @@ class StockSplit(BaseModel):
             return None
         return s
 
-    @field_validator("base_date", "board_resolution_date", "listing_date", "general_meeting_date", mode="before")
+    @field_validator("base_date", "board_resolution_date", "listing_date", "general_meeting_date", "first_disclosure_date", mode="before")
     @classmethod
     def normalize_date(cls, v):
         if not v or (isinstance(v, float) and (v != v or v is None)): # NaN check
