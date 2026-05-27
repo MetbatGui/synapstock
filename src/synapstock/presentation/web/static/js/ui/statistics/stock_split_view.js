@@ -242,6 +242,23 @@ export const stockSplitView = {
             ? `1 : ${item.split_ratio.toFixed(1)} (${item.split_ratio}배 분할)`
             : '-';
 
+        const history = this.getHistoryChain(item.rcp_no || item.receipt_no);
+        const historyOptions = history.length > 1 ? `
+            <div style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:0.85rem; color:#9ca3af;"><i class="fas fa-history"></i> 공시 이력:</span>
+                    <select class="stats-select" style="padding: 4px 8px; font-size: 0.8rem;" onchange="stockSplitView.jumpToHistory(this.value)">
+                        <option value="">이전/정정 공시로 이동...</option>
+                        ${history.map(h => `
+                            <option value="${h.rcp_no || h.receipt_no}" ${ (h.rcp_no || h.receipt_no) === (item.rcp_no || item.receipt_no) ? 'selected disabled' : '' }>
+                                ${h.base_date || '-'} - ${h.correction_count === 0 ? '최초공시' : h.correction_count + '차정정'} ${ (h.rcp_no || h.receipt_no) === (item.rcp_no || item.receipt_no) ? '(현재)' : '' }
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            </div>
+        ` : '';
+
         return `
             <div class="stats-detail-container animate-fade-in">
                 <div class="stats-detail-grid">
@@ -312,7 +329,7 @@ export const stockSplitView = {
                 <div class="stats-info-footer">
                     <div style="margin-right: auto; font-size: 0.85rem; color: #9ca3af;">
                         <i class="fas fa-fingerprint"></i> 접수번호: ${item.rcp_no || item.receipt_no}
-                        ${item.parent_rcp_no ? `<br/><i class="fas fa-link"></i> 원접수번호: ${item.parent_rcp_no}` : ''}
+                        ${item.parent_rcp_no ? `<br/><i class="fas fa-link"></i> 이전접수: <a href="#" onclick="stockSplitView.jumpToHistory('${item.parent_rcp_no}'); return false;" style="color:var(--accent-blue); text-decoration:underline;">${item.parent_rcp_no}</a>` : ''}
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${item.rcp_no || item.receipt_no}" target="_blank" class="stats-btn-action stats-btn-dart">
@@ -320,6 +337,7 @@ export const stockSplitView = {
                         </a>
                     </div>
                 </div>
+                ${historyOptions}
             </div>
         `;
     },
@@ -347,5 +365,85 @@ export const stockSplitView = {
             }
             return { ...item, correction_count: count };
         });
+    },
+
+    /**
+     * 특정 접수번호를 기준으로 최초공시~현재까지 이어지는 공시 체인을 반환합니다.
+     * @param {string} rcpNo - 기준 접수번호
+     * @returns {Array} 시간순 정렬된 공시 이력 배열
+     */
+    getHistoryChain: function (rcpNo) {
+        const chain = [];
+        const itemMap = {};
+        this.cachedItems.forEach(it => {
+            const key = it.rcp_no || it.receipt_no;
+            if (key) itemMap[key] = it;
+        });
+
+        const current = itemMap[rcpNo];
+        if (!current) return [];
+
+        // 최상위(최초공시) 탐색
+        let root = current;
+        while (root.parent_rcp_no && itemMap[root.parent_rcp_no]) {
+            root = itemMap[root.parent_rcp_no];
+        }
+
+        // 최상위에서 하향 탐색하여 체인 구성
+        const findChildren = (node) => {
+            chain.push(node);
+            const children = this.cachedItems.filter(it => it.parent_rcp_no === (node.rcp_no || node.receipt_no));
+            children.forEach(child => findChildren(child));
+        };
+        findChildren(root);
+
+        // 중복 제거 후 날짜순 정렬
+        return [...new Set(chain)].sort((a, b) => {
+            const dateA = a.base_date || '';
+            const dateB = b.base_date || '';
+            return dateA.localeCompare(dateB);
+        });
+    },
+
+    /**
+     * 특정 접수번호의 행으로 이동하여 상세 패널을 자동으로 엽니다.
+     * @param {string} rcpNo - 이동할 접수번호
+     */
+    jumpToHistory: function (rcpNo) {
+        if (!rcpNo) return;
+        const target = this.cachedItems.find(it => (it.rcp_no || it.receipt_no) === rcpNo);
+        if (!target) return;
+
+        // 1. 현재 필터에서 해당 행이 보이는지 확인
+        let targetRow = document.querySelector(`.ss-row[data-rcp-no="${rcpNo}"]`);
+
+        // 2. 안 보이면 연도 필터 변경 후 재렌더링
+        if (!targetRow) {
+            const year = (target.base_date || '').substring(0, 4);
+            const yearSelect = document.getElementById('ss-year-select');
+            if (yearSelect && yearSelect.value !== year) {
+                yearSelect.value = year;
+                this.renderTable(this.cachedItems, year);
+            }
+        }
+
+        // 3. 렌더링 완료 후 스크롤 및 상세 열기
+        setTimeout(() => {
+            targetRow = document.querySelector(`.ss-row[data-rcp-no="${rcpNo}"]`);
+            if (targetRow) {
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetRow.style.outline = '2px solid var(--accent-blue)';
+                targetRow.style.boxShadow = '0 0 15px rgba(96, 165, 250, 0.5)';
+                setTimeout(() => {
+                    targetRow.style.outline = 'none';
+                    targetRow.style.boxShadow = 'none';
+                }, 2000);
+
+                const detailRow = targetRow.nextElementSibling;
+                if (detailRow && detailRow.style.display === 'none') {
+                    targetRow.click();
+                }
+            }
+        }, 200);
     },
 };
