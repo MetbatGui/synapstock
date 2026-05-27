@@ -10,7 +10,13 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from synapstock.domain.statistics.models import MarketType, SupplySubject
-from synapstock.presentation.web.core.dependencies import statistics_service, weekly_change_service
+from synapstock.presentation.web.core.dependencies import (
+    statistics_service,
+    weekly_change_service,
+    stock_split_repo,
+    stock_split_sync_service,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -301,3 +307,46 @@ async def get_new_listing(force_sync: bool = Query(False, description="강제 �
     except Exception as e:
         logger.error(f"Error in get_new_listing: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})
+
+
+@router.get("/stock-splits", response_model=None)
+async def get_stock_splits(
+    year: str | None = Query(None, description="조회 연도 (YYYY)"),
+    force_sync: bool = Query(False, description="강제 동기화 여부"),
+):
+    """주식 분할(액면분할) 이력 데이터를 가져옵니다."""
+    try:
+        if not stock_split_repo:
+            raise HTTPException(status_code=500, detail="Stock split repository not available")
+
+        if force_sync and stock_split_sync_service:
+            logger.info("[API] 주식 분할 강제 동기화 요청 실행")
+            await stock_split_sync_service.sync()
+
+        if year:
+            items = stock_split_repo.load_by_year(year)
+        else:
+            items = stock_split_repo.load_all()
+
+        return {"count": len(items), "items": items}
+    except Exception as e:
+        logger.error(f"Error in get_stock_splits: {e}")
+        return JSONResponse(status_code=500, content={"message": str(e)})
+
+
+@router.post("/stock-splits/sync", response_model=None)
+async def sync_stock_splits():
+    """구글 드라이브로부터 주식 분할 데이터를 수동 동기화합니다."""
+    try:
+        if not stock_split_sync_service:
+            raise HTTPException(status_code=500, detail="Stock split sync service not available")
+
+        success = await stock_split_sync_service.sync()
+        if not success:
+            return {"status": "fail", "message": "Sync failed"}
+
+        return {"status": "success", "message": "동기화 성공"}
+    except Exception as e:
+        logger.error(f"Error in sync_stock_splits: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

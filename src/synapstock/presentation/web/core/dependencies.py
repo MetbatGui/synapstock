@@ -24,6 +24,9 @@ statistics_service = container.statistics_service
 financial_service = container.financial_service
 weekly_change_service = container.weekly_change_service
 board_file_sync_service = container.board_file_sync_service
+stock_split_sync_service = container._stock_split_sync_service
+stock_split_repo = container._stock_split_repo
+
 
 
 async def sync_indices_if_needed(force: bool = False):

@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import AliasChoices, BaseModel, Field, computed_field
+from pydantic import AliasChoices, BaseModel, Field, computed_field, field_validator
 
 
 class MarketType(StrEnum):
@@ -511,3 +511,133 @@ class WeeklyChangeReport(BaseModel):
     week_num: int | None = None
     date_range: str | None = None
     items: list[WeeklyChangeItem]
+
+
+class StockSplit(BaseModel):
+    """주식 분할(액면분할) 상세 정보를 나타내는 도메인 모델.
+
+    Attributes:
+        company_name (str): 회사명.
+        market (str | None): 시장 (KOSPI/KOSDAQ 등).
+        disclosure_type (str | None): 공시구분.
+        base_date (str): 배정기준일 (YYYY-MM-DD 포맷 정규화).
+        board_resolution_date (str | None): 이사회결의일 (YYYY-MM-DD 포맷 정규화).
+        receipt_no (str): 접수번호 (14자리 고유 문자열, 고유 식별자).
+        original_receipt_no (str | None): 원접수번호.
+        prev_shares (int | None): 발행주식수(이전).
+        post_shares (int | None): 발행주식수(이후).
+        split_ratio (float | None): 분할비율.
+        listing_date (str | None): 신주상장예정일 (YYYY-MM-DD 포맷 정규화).
+        general_meeting_date (str | None): 주총결의일 (YYYY-MM-DD 포맷 정규화).
+    """
+
+    company_name: str = Field(validation_alias=AliasChoices("회사명", "company_name"))
+    market: str | None = Field(default=None, validation_alias=AliasChoices("시장", "market"))
+    disclosure_type: str | None = Field(default=None, validation_alias=AliasChoices("공시구분", "disclosure_type"))
+    base_date: str = Field(validation_alias=AliasChoices("배정기준일", "base_date"))
+    board_resolution_date: str | None = Field(default=None, validation_alias=AliasChoices("이사회결의일", "board_resolution_date"))
+    receipt_no: str = Field(validation_alias=AliasChoices("접수번호", "receipt_no"))
+    original_receipt_no: str | None = Field(default=None, validation_alias=AliasChoices("원접수번호", "original_receipt_no"))
+    prev_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이전)", "prev_shares"))
+    post_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이후)", "post_shares"))
+    split_ratio: float | None = Field(default=None, validation_alias=AliasChoices("분할비율", "split_ratio"))
+    listing_date: str | None = Field(default=None, validation_alias=AliasChoices("신주상장예정일", "listing_date"))
+    general_meeting_date: str | None = Field(default=None, validation_alias=AliasChoices("주총결의일", "general_meeting_date"))
+
+    @computed_field
+    def rcp_no(self) -> str:
+        return self.receipt_no
+
+    @computed_field
+    def parent_rcp_no(self) -> str | None:
+        return self.original_receipt_no
+
+    @computed_field
+    def is_correction(self) -> bool:
+        return self.original_receipt_no is not None and len(self.original_receipt_no.strip()) > 0
+
+    @field_validator("market", "disclosure_type", mode="before")
+    @classmethod
+    def normalize_strings(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip()
+        if s.lower() in ("nan", ""):
+            return None
+        return s
+
+    @field_validator("base_date", "board_resolution_date", "listing_date", "general_meeting_date", mode="before")
+    @classmethod
+    def normalize_date(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)): # NaN check
+            return None
+        s = str(v).strip()
+        if s.lower() in ("nan", ""):
+            return None
+        # YYYY.MM.DD 또는 YYYY-MM-DD 등을 YYYY-MM-DD로 통일
+        s = s.replace(".", "-")
+        # 시간 부분이 포함되어 있는 경우 (예: '2024-12-12 00:00:00') 제거
+        if " " in s:
+            s = s.split(" ")[0]
+        return s
+
+    @field_validator("split_ratio", mode="before")
+    @classmethod
+    def normalize_split_ratio(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip().lower()
+        if s in ("nan", ""):
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+
+    @field_validator("prev_shares", "post_shares", mode="before")
+    @classmethod
+    def normalize_shares(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip().lower()
+        if s in ("nan", ""):
+            return None
+        try:
+            return int(float(s))
+        except ValueError:
+            return None
+
+    @field_validator("receipt_no", "original_receipt_no", mode="before")
+    @classmethod
+    def normalize_receipt_no(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip().lower()
+        if s in ("nan", ""):
+            return None
+        try:
+            # e+13 같은 float 표현식 방지
+            if "." in s:
+                return str(int(float(s)))
+            return s
+        except ValueError:
+            return s
+
+
+class StockSplitManifest(BaseModel):
+    """주식 분할 동기화 상태를 추적하기 위한 매니페스트 모델.
+
+    Attributes:
+        manifest_version (str): 매니페스트 버전.
+        last_updated (str): 마지막 동기화 일시.
+        total_records (int): 전체 레코드 개수.
+        supported_years (list[str]): 지원하는 연도 목록.
+        years_index (dict[str, list[str]]): 연도별 접수번호(receipt_no) 목록 인덱스.
+    """
+
+    manifest_version: str
+    last_updated: str
+    total_records: int
+    supported_years: list[str]
+    years_index: dict[str, list[str]]
+

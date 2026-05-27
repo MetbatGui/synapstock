@@ -31,7 +31,9 @@ class AppConfig(BaseModel):
     bw_dir: Path = Path("data/statistics/bw")
     new_listing_dir: Path = Path("data/statistics/new_listing")
     weekly_change_dir: Path = Path("data/statistics/weekly_change")
+    stock_split_dir: Path = Path("data/statistics/stock_split")
     news_dir: Path = Path("data/news")
+
 
     # 외부 API 토큰 (환경 변수)
     miro_token: str = ""
@@ -53,6 +55,7 @@ class AppConfig(BaseModel):
     weekly_change_folder_id: str | None = None
     theme_folder_id: str | None = None
     financial_statements_id: str | None = None
+    stock_split_folder_id: str | None = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -80,7 +83,9 @@ class AppConfig(BaseModel):
             bw_dir=data_root / "statistics" / "bw",
             new_listing_dir=data_root / "statistics" / "new_listing",
             weekly_change_dir=data_root / "statistics" / "weekly_change",
+            stock_split_dir=data_root / "statistics" / "stock_split",
             news_dir=data_root / "news",
+
             miro_token=os.getenv("MIRO_ACCESS_TOKEN", ""),
             telegram_token=os.getenv("TELEGRAM_API_TOKEN", ""),
             report_folder_id=os.getenv("GOOGLE_DRIVE_REPORT_FOLDER_ID"),
@@ -95,4 +100,5 @@ class AppConfig(BaseModel):
             weekly_change_folder_id=os.getenv("GOOGLE_DRIVE_WEEKLY_CHANGE_ID"),
             theme_folder_id=os.getenv("GOOGLE_DRIVE_THEME_FOLDER_ID"),
             financial_statements_id=os.getenv("GOOGLE_DRIVE_FINANCIAL_STATEMENTS_ID"),
+            stock_split_folder_id=os.getenv("GOOGLE_DRIVE_STOCK_SPLIT_ID"),
         )

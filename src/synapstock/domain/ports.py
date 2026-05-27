@@ -5,6 +5,8 @@ from collections.abc import Callable
 
 from synapstock.domain.models import Board, ScrapedNews
 from synapstock.domain.news.models import NewsBatch
+from synapstock.domain.statistics.models import StockSplit, StockSplitManifest
+
 
 
 class BoardRepositoryPort(ABC):
@@ -249,3 +251,36 @@ class NewsRepositoryPort(ABC):
     @abstractmethod
     def save_sync_metadata(self, metadata: dict) -> None:
         """동기화 메타데이터를 저장합니다."""
+
+
+class StockSplitRepositoryPort(ABC):
+    """주식 분할(액면분할) 영속성 관리를 위한 추상 포트."""
+
+    @abstractmethod
+    def load_all(self) -> list[StockSplit]:
+        """모든 주식 분할 이력을 불러옵니다."""
+
+    @abstractmethod
+    def load_by_year(self, year: str) -> list[StockSplit]:
+        """특정 연도의 주식 분할 이력을 불러옵니다."""
+
+    @abstractmethod
+    def load_manifest(self) -> StockSplitManifest | None:
+        """로컬 매니페스트 정보를 불러옵니다."""
+
+    @abstractmethod
+    def save_manifest(self, manifest: StockSplitManifest) -> None:
+        """로컬 매니페스트 정보를 저장합니다."""
+
+    @abstractmethod
+    def save_excel_file(self, filename: str, content: bytes) -> None:
+        """엑셀 파일 데이터를 로컬 저장소에 저장합니다."""
+
+    @abstractmethod
+    def save_manifest_file(self, content: bytes) -> None:
+        """매니페스트 JSON 데이터를 로컬 저장소에 저장합니다."""
+
+    @abstractmethod
+    def get_file_mtime(self, filename: str) -> float | None:
+        """로컬에 다운로드된 파일의 최종 수정 시간(mtime)을 구합니다."""
+

@@ -22,7 +22,9 @@ from synapstock.application.services.report_service import ReportService
 from synapstock.application.services.statistics_service import StatisticsService
 from synapstock.application.services.sync_service import BoardSyncService
 from synapstock.application.services.weekly_change_service import WeeklyChangeService
+from synapstock.application.services.stock_split_sync_service import StockSplitSyncService
 from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import (
+
     DartDisclosureAdapter,
 )
 from synapstock.infrastructure.adapters.financial.excel_adapter import (
@@ -42,7 +44,9 @@ from synapstock.infrastructure.adapters.local.statistics_repo import (
     LocalStatisticsRepository,
     LocalWeeklyChangeRepository,
 )
+from synapstock.infrastructure.adapters.local.stock_split_repo import LocalStockSplitRepository
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
+
 from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
 )
@@ -74,7 +78,9 @@ class Container:
         # self.config.bw_dir.mkdir(parents=True, exist_ok=True)
         self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
         self.config.weekly_change_dir.mkdir(parents=True, exist_ok=True)
+        self.config.stock_split_dir.mkdir(parents=True, exist_ok=True)
         self.config.news_dir.mkdir(parents=True, exist_ok=True)
+
 
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
@@ -95,6 +101,8 @@ class Container:
         self._convertible_bond_repo = None # LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
         self._bw_repo = None # LocalBondWithWarrantsRepository(str(self.config.bw_dir))
         self._weekly_change_repo = LocalWeeklyChangeRepository(str(self.config.weekly_change_dir))
+        self._stock_split_repo = LocalStockSplitRepository(str(self.config.stock_split_dir))
+
 
         from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
@@ -108,6 +116,8 @@ class Container:
         self._init_google_drive()
         self.sync_financial_statements_from_drive()
         self.sync_boards_from_drive_in_background()
+        self.sync_stock_splits_from_drive_in_background()
+
 
         # 5. 도메인 서비스 싱글톤
         self._board_file_sync_service = BoardFileSyncService(
@@ -161,6 +171,12 @@ class Container:
             folder_id=self.config.weekly_change_folder_id,
             repository=self._weekly_change_repo
         )
+        self._stock_split_sync_service = StockSplitSyncService(
+            repository=self._stock_split_repo,
+            drive_adapter=self._drive_adapter,
+            stock_split_folder_id=self.config.stock_split_folder_id
+        )
+
 
         self._report_service = None
         self._init_report_service()
@@ -186,7 +202,9 @@ class Container:
                 "new_listing": self.config.new_listing_folder_id,
                 "news": self.config.news_folder_id,
                 "weekly_change": self.config.weekly_change_folder_id,
+                "stock_split": self.config.stock_split_folder_id,
             }
+
             # None이 아닌 폴더 ID만 포함하여 dict[str, str] 보장
             valid_folders = {k: v for k, v in folders.items() if v is not None}
 
@@ -257,6 +275,31 @@ class Container:
         t = threading.Thread(target=run_sync_in_background, name="BoardSyncThread", daemon=True)
         t.start()
         logger.info("[Container] 백그라운드 가상/테마 보드 동기화 스레드를 성공적으로 시작했습니다.")
+
+    def sync_stock_splits_from_drive_in_background(self):
+        """Google Drive로부터 주식 분할(액면분할) 데이터를 백그라운드 스레드에서 다운로드하여 동기화합니다."""
+        if not self._drive_adapter or not self.config.stock_split_folder_id:
+            logger.info("[Container] 주식 분할 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
+            return
+
+        import threading
+
+        def run_sync_in_background():
+            import asyncio
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                new_loop.run_until_complete(self._stock_split_sync_service.sync())
+            except Exception as e:
+                logger.error(f"[Container] 백그라운드 주식 분할 동기화 실패: {e}")
+            finally:
+                new_loop.close()
+
+        # 완전한 논블로킹(Non-blocking) 백그라운드 데몬 스레드로 실행
+        t = threading.Thread(target=run_sync_in_background, name="StockSplitSyncThread", daemon=True)
+        t.start()
+        logger.info("[Container] 백그라운드 주식 분할 동기화 스레드를 성공적으로 시작했습니다.")
+
 
     async def _sync_financial_statements_async(self):
         import os
