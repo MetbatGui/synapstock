@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
 from synapstock.domain.ports import FinancialDataPort
 
 

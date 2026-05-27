@@ -1,8 +1,7 @@
 import hashlib
 import json
 import logging
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from synapstock.domain.news.models import NewsBatch, NewsItem
 from synapstock.domain.ports import NewsRepositoryPort, NewsScraperPort, StoragePort
@@ -62,13 +61,13 @@ class NewsService:
         try:
             # 1. 드라이브에서 메타데이터 파일 가져오기
             metadata_content = await self.drive_adapter.get_file("news_metadata.json", folder="news")
-            
+
             # 메타데이터가 없으면 드라이브 파일 목록을 직접 조회하여 생성 시도 (폴백)
             if not metadata_content:
                 logger.info("[NewsService] 드라이브에 메타데이터가 없습니다. 파일 목록을 직접 조회합니다.")
                 drive_files = await self.drive_adapter.list_files_in_folder("", folder="news")
                 drive_metadata = {
-                    f["name"]: f["modifiedTime"] 
+                    f["name"]: f["modifiedTime"]
                     for f in drive_files if f["name"].startswith("news_") and f["name"].endswith(".json")
                 }
             else:
@@ -78,9 +77,9 @@ class NewsService:
             for filename, drive_mtime_str in drive_metadata.items():
                 if filename == "news_metadata.json":
                     continue
-                
+
                 date_str = filename.replace("news_", "").replace(".json", "")
-                
+
                 # 시각 변환 및 로컬 비교 (개선 B)
                 drive_mtime = self._parse_drive_mtime(drive_mtime_str)
                 local_mtime = self.repository.get_file_mtime(date_str)
@@ -89,7 +88,7 @@ class NewsService:
                 if drive_mtime > local_mtime + 1.0:
                     logger.info(f"[NewsService] 다운로드 대상 발견: {filename}")
                     content = await self.drive_adapter.get_file(filename, folder="news")
-                    
+
                     if content:
                         # Repository를 통한 저장 및 시각 설정 (개선 A)
                         self.repository.save_raw_file(filename, content, mtime=drive_mtime)
@@ -100,10 +99,10 @@ class NewsService:
 
             if download_count > 0 or not self._is_indexed:
                 self._rebuild_index()
-            
+
             # 로컬 메타데이터 최신화 및 필요시 드라이브 업로드 (동기화 보장)
             await self._update_local_metadata(drive_metadata)
-            
+
             logger.info(f"[NewsService] 동기화 프로세스 종료 ({download_count}개 업데이트)")
         except Exception as e:
             logger.error(f"[NewsService] 동기화 중 치명적 오류: {e}", exc_info=True)
@@ -117,15 +116,15 @@ class NewsService:
         local_metadata = {}
         for file_path in self.repository.get_all_batch_files():
             filename = file_path.name
-            mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+            mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
             local_metadata[filename] = mtime.isoformat().replace("+00:00", "Z")
 
         # 드라이브 정보와 합침 (누락 방지)
         local_metadata.update(drive_metadata)
-        
+
         # Repository를 통해 메타데이터 영속화 (개선 C)
         self.repository.save_sync_metadata(local_metadata)
-            
+
         if self.drive_adapter:
             content = json.dumps(local_metadata, indent=2).encode("utf-8")
             await self.drive_adapter.put_file("news_metadata.json", content, folder="news")

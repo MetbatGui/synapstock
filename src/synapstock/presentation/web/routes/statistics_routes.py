@@ -59,7 +59,7 @@ async def sync_weekly_change(date: str | None = Query(None, description="동기�
         result = await weekly_change_service.sync_data(date)
         if not result:
             return {"status": "fail", "message": "No new data found or sync failed"}
-            
+
         return {"status": "success", "date": result.date, "item_count": len(result.items)}
     except Exception as e:
         logger.error(f"Error in sync_weekly_change: {e}")
@@ -217,7 +217,7 @@ async def get_ceiling_dates(year: str | None = Query(None, description="조회�
 #     try:
 #         if not statistics_service:
 #             raise HTTPException(status_code=500, detail="Statistics service not available")
-# 
+#
 #         items = await statistics_service.get_capital_increase_data(force_sync=force_sync)
 #         return {"count": len(items), "items": items}
 #     except Exception as e:
@@ -245,14 +245,14 @@ async def get_bonus_issue(force_sync: bool = Query(False, description="강제 �
 #     try:
 #         if not statistics_service:
 #             raise HTTPException(status_code=500, detail="Statistics service not available")
-# 
+#
 #         items = await statistics_service.get_convertible_bond_data(force_sync=force_sync)
 #         return {"count": len(items), "items": items}
 #     except Exception as e:
 #         logger.error(f"Error in get_convertible_bond: {e}")
 #         return JSONResponse(status_code=500, content={"message": str(e)})
-# 
-# 
+#
+#
 # @router.post("/convertible-bond/sync", response_model=None)
 # async def sync_convertible_bond():
 #     """전환사채(CB) 데이터를 구글 드라이브와 동기화합니다."""
@@ -271,14 +271,14 @@ async def get_bonus_issue(force_sync: bool = Query(False, description="강제 �
 #     try:
 #         if not statistics_service:
 #             raise HTTPException(status_code=500, detail="Statistics service not available")
-# 
+#
 #         items = await statistics_service.get_bw_data(force_sync=force_sync)
 #         return {"count": len(items), "items": items}
 #     except Exception as e:
 #         logger.error(f"Error in get_bond_with_warrants: {e}")
 #         return JSONResponse(status_code=500, content={"message": str(e)})
-# 
-# 
+#
+#
 # @router.post("/bond-with-warrants/sync", response_model=None)
 # async def sync_bond_with_warrants():
 #     """신주인수권부사채(BW) 데이터를 구글 드라이브와 동기화합니다."""

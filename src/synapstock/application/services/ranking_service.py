@@ -107,7 +107,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             from datetime import datetime
             now = datetime.now()
             current_year = now.year
-            
+
             target_year = f"{current_year}년"
             target_subfolder = "일별수급정리표"
             target_filename = f"{current_year}일별수급순위정리표.xlsx"
@@ -136,7 +136,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             # 1.4 파일 수정 날짜 체크 (자동 동기화 판단)
             modified_time = target_file.get("modifiedTime", "")
             needs_sync = self.cache_manager.needs_update("ranking", target_file["name"], modified_time)
-            
+
             if not needs_sync:
                 # 수정 날짜가 동일하면 더 이상 진행할 필요 없음 (성능 최적화)
                 if date_str:
@@ -158,7 +158,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             # 3. 동기화할 날짜 결정
             # 로컬에 이미 존재하는 날짜는 건너뜀 (과거 시트는 변경될 이유가 거의 없으므로 신규 추가만 수행)
             existing_dates = set(self.repository.list_available_dates(MarketType.KOSPI, SupplySubject.FOREIGN))
-            
+
             all_rankings = []
             newly_synced_count = 0
 
@@ -185,10 +185,10 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
             if newly_synced_count > 0 or needs_sync:
                 if newly_synced_count > 0:
                     logger.info(f"[{self.get_service_name()}] 총 {newly_synced_count}일치 데이터가 새로 추가되었습니다.")
-                
+
                 # 캐시 매니저 업데이트 (수정 날짜 기록)
                 self.cache_manager.update_cache_info("ranking", target_file["name"], modified_time, {"file_id": target_file["id"]})
-                
+
                 if not all_rankings and date_str:
                     return self.repository.get_rankings(date_str)
                 return all_rankings

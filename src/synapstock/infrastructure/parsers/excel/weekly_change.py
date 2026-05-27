@@ -1,7 +1,11 @@
 import io
 import logging
+from typing import Any
+
 import pandas as pd
+
 from synapstock.domain.statistics.models import WeeklyChangeItem, WeeklyChangeReport
+
 from .base import BaseExcelParser
 
 logger = logging.getLogger(__name__)
@@ -11,12 +15,12 @@ class WeeklyChangeParser(BaseExcelParser):
 
     def extract_metadata_from_filename(self, filename: str) -> dict:
         """파일명에서 메타데이터를 추출합니다.
-        
+
         예: 'weekly_gainers_2026_W19_05M1W_0504~0508.xlsx'
         """
         import re
-        
-        metadata = {
+
+        metadata: dict[str, Any] = {
             "year": None,
             "month": None,
             "week_of_month": None,
@@ -24,37 +28,37 @@ class WeeklyChangeParser(BaseExcelParser):
             "date_range": None,
             "date": "Unknown"
         }
-        
+
         try:
             # 1. 연도 추출 (4자리 숫자)
             year_match = re.search(r"(\d{4})", filename)
             if year_match:
                 metadata["year"] = int(year_match.group(1))
-            
+
             # 2. 주차 추출 (W + 숫자)
             week_match = re.search(r"W(\d+)", filename)
             if week_match:
                 metadata["week_num"] = int(week_match.group(1))
-            
+
             # 3. 월 및 월간 주차 (MM + M + 숫자 + W) - 예: 05M1W
             mw_match = re.search(r"(\d{2})M(\d+)W", filename)
             if mw_match:
                 metadata["month"] = int(mw_match.group(1))
                 metadata["week_of_month"] = int(mw_match.group(2))
-            
+
             # 4. 기간 추출 (0504~0508)
             range_match = re.search(r"(\d{4}~\d{4})", filename)
             if range_match:
                 metadata["date_range"] = range_match.group(1)
-                
+
                 # 5. 기준일 설정 (종료일 기준, 예: 2026-05-08)
                 if metadata["year"]:
                     end_date_str = range_match.group(1).split("~")[1] # 0508
                     metadata["date"] = f"{metadata['year']}-{end_date_str[:2]}-{end_date_str[2:]}"
-                    
+
         except Exception as e:
             logger.warning(f"[WeeklyChangeParser] 파일명 메타데이터 추출 실패 ({filename}): {e}")
-            
+
         return metadata
 
     def _find_value(self, row, keywords, default=None):
@@ -66,7 +70,7 @@ class WeeklyChangeParser(BaseExcelParser):
             col_norm = unicodedata.normalize("NFC", str(col)).strip().replace(" ", "").replace("\n", "")
             if col_norm in keywords:
                 return row[col]
-        
+
         # 2. 부분 일치 시도
         for col in row.index:
             col_norm = unicodedata.normalize("NFC", str(col)).strip().replace(" ", "").replace("\n", "")
@@ -82,11 +86,12 @@ class WeeklyChangeParser(BaseExcelParser):
         """엑셀 내용을 파싱하여 WeeklyChangeReport를 반환합니다."""
         filename = kwargs.get("filename", "")
         metadata = self.extract_metadata_from_filename(filename)
-        
-        date = metadata["date"] if metadata["date"] != "Unknown" else kwargs.get("date", "Unknown")
-        
+
+        explicit_date = kwargs.get("date")
+        date = explicit_date if explicit_date and explicit_date != "Unknown" else metadata["date"]
+
         df = pd.read_excel(io.BytesIO(content))
-        
+
         # 컬럼 키워드 (사용자 제공 형식 반영)
         name_kws = ["종목명", "Name"]
         curr_kws = ["종가", "현재가"]
@@ -99,13 +104,15 @@ class WeeklyChangeParser(BaseExcelParser):
             try:
                 # 1. 종목명 및 티커 추출
                 raw_name = self._find_value(row, name_kws)
-                if raw_name is None: raw_name = row.iloc[0]
+                if raw_name is None:
+                    raw_name = row.iloc[0]
                 name = self._clean_stock_name(str(raw_name))
-                if not name or name == "nan" or "종목" in name: continue
-                
+                if not name or name == "nan" or "종목" in name:
+                    continue
+
                 raw_ticker = self._find_value(row, ticker_kws)
                 ticker = str(raw_ticker).strip().zfill(6) if raw_ticker is not None else None
-                    
+
                 # 2. 값 추출
                 raw_curr = self._find_value(row, curr_kws)
                 raw_base = self._find_value(row, base_kws)
@@ -115,15 +122,15 @@ class WeeklyChangeParser(BaseExcelParser):
                 if isinstance(raw_rate, str):
                     raw_rate = raw_rate.replace("+", "").replace("%", "").replace(",", "").strip()
                 change_rate = self.to_float(raw_rate)
-                
+
                 # 현재가(종가) 및 기준가(기준가/시가) 정제
                 current_price = self.to_int(raw_curr) if raw_curr is not None else 0
                 base_price = self.to_int(raw_base) if raw_base is not None else 0
-                
+
                 # 기준가가 0이면 등락률로 역산 (백업용)
                 if base_price == 0 and current_price > 0:
                     base_price = int(round(current_price / (1 + change_rate / 100)))
-                
+
                 items.append(WeeklyChangeItem(
                     name=name,
                     ticker=ticker,
@@ -134,7 +141,7 @@ class WeeklyChangeParser(BaseExcelParser):
             except Exception as e:
                 logger.warning(f"[WeeklyChangeParser] 행 파싱 실패: {e}")
                 continue
-                
+
         return WeeklyChangeReport(
             date=date,
             year=metadata["year"],

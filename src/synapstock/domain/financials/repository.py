@@ -1,9 +1,11 @@
 from typing import Protocol
+
 from .models import FinancialMetric, FinancialStatement
+
 
 class FinancialRepository(Protocol):
     """재무 데이터를 로드하는 저장소 인터페이스."""
-    
+
     def load_all(self, metric: FinancialMetric) -> list[FinancialStatement]:
         """지정된 지표의 모든 종목 데이터를 로드합니다."""
         ...
@@ -14,4 +16,8 @@ class FinancialRepository(Protocol):
 
     def get_all_quarters(self, metric: FinancialMetric) -> list[str]:
         """선택 가능한 모든 분기 리스트를 반환합니다."""
+        ...
+
+    def get_last_modified_time(self) -> float:
+        """데이터 소스의 마지막 수정 시각을 반환합니다."""
         ...

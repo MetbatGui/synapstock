@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+
 from synapstock.application.services.base_statistics_service import BaseStatisticsService
 from synapstock.domain.statistics.models import WeeklyChangeReport
 from synapstock.infrastructure.parsers.excel.weekly_change import WeeklyChangeParser
@@ -65,7 +66,7 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                         target_event = event
                         break
             else:
-                completed = [e for e in manifest.values() if e.get("status") == "COMPLETED"]
+                completed = [e for e in manifest.values() if e.get("status") in ("COMPLETED", "FINAL")]
                 if completed:
                     target_event = sorted(completed, key=lambda x: x.get("last_trading_day", ""), reverse=True)[0]
 
@@ -73,22 +74,22 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                 year = target_event.get("year")
                 month = target_event.get("month")
                 week_num = target_event.get("week")
-                
+
                 # 파일명 교정 (월~금 고정)
                 full_range = self._get_full_week_range(year, week_num)
                 raw_filename = target_event.get("filename", "").replace(".parquet", ".xlsx")
                 import re
                 corrected_filename = re.sub(r"\d{4}~\d{4}", full_range, raw_filename)
-                
+
                 # [중요] 드라이브 폴더 구조: {year}/{month:02d}월 (예: 2026/05월)
                 sub_path = f"{year}/{month:02d}월"
                 full_path = f"{sub_path}/{corrected_filename}"
-                
+
                 logger.info(f"[{self.get_service_name()}] 경로/파일명 교정 후 핀포인트 동기화: {full_path}")
                 content = await self.drive_adapter.get_file(full_path, folder="weekly_change")
-                
+
                 if content:
-                    corrected_date = f"{year}-{full_range[5:7]}-{full_range[7:]}"
+                    corrected_date = target_event.get("last_trading_day")
                     report = self.parser.parse(content, filename=corrected_filename, date=corrected_date)
                     self.repository.save_report(report)
                     return report
@@ -107,17 +108,24 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         for path in search_paths:
             found = await self.drive_adapter.list_files_in_folder(path, folder="weekly_change")
             if found:
-                valid = [f for f in found if f["name"].lower().endswith((".xlsx", ".xls")) and not f["name"].startswith("~$")]
+                valid = [
+                    f for f in found
+                    if f["name"].lower().endswith((".xlsx", ".xls"))
+                    and not f["name"].startswith("~$")
+                ]
                 if date_str and date_str[:4]:
                     valid = [f for f in valid if date_str[:4] in f["name"]]
                 if valid:
                     files.extend(valid)
-                    if path != "": break
+                    if path != "":
+                        break
 
-        if not files: return None
+        if not files:
+            return None
         latest_file = sorted(files, key=lambda x: x["name"], reverse=True)[0]
         content = await self.drive_adapter.get_file(latest_file["name"], folder="weekly_change")
-        if not content: return None
+        if not content:
+            return None
         report = self.parser.parse(content, filename=latest_file["name"], date=date_str)
         self.repository.save_report(report)
         return report
@@ -125,7 +133,7 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
     async def list_available_dates(self) -> list[dict[str, Any]]:
         """매니페스트를 로드하여 모든 가용 날짜 목록을 순식간에 가져옵니다."""
         results_map = {}
-        
+
         # 1. 로컬 데이터 먼저 로드
         local_dates = self.repository.list_available_dates()
         for d in local_dates:
@@ -145,9 +153,9 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         manifest = await self._load_manifest()
         if manifest:
             for event in manifest.values():
-                if event.get("status") != "COMPLETED":
+                if event.get("status") not in ("COMPLETED", "FINAL"):
                     continue
-                
+
                 date_str = event.get("last_trading_day")
                 if date_str and date_str not in results_map:
                     # 파일명에서 정보 유추 또는 매니페스트 데이터 사용

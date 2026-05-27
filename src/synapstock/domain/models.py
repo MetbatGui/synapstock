@@ -185,6 +185,13 @@ class Board(BaseModel):
     name: str  # 표시 이름
     root: Node
 
+    @property
+    def is_virtual(self) -> bool:
+        """virtual_ 접두사 존재 여부를 바탕으로 가상 보드 여부를 판별합니다."""
+        target = self.id or self.name
+        return target is not None and target.startswith("virtual_")
+
+
     @model_validator(mode="before")
     @classmethod
     def create_root_node(cls, data: Any) -> Any:

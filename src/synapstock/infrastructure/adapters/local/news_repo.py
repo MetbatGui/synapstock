@@ -66,7 +66,7 @@ class LocalNewsRepository(NewsRepositoryPort):
     def get_all_batch_files(self) -> list[Path]:
         """모든 뉴스 배치 파일 경로 목록을 반환합니다. (메타데이터 파일 제외)"""
         return [
-            f for f in self.base_dir.glob("news_*.json") 
+            f for f in self.base_dir.glob("news_*.json")
             if f.name != "news_metadata.json"
         ]
 
@@ -84,7 +84,7 @@ class LocalNewsRepository(NewsRepositoryPort):
         if not metadata_path.exists():
             return {}
         try:
-            with open(metadata_path, "r", encoding="utf-8") as f:
+            with open(metadata_path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}

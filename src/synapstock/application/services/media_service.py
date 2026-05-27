@@ -1,6 +1,6 @@
 """종목 관련 미디어(리포트, 뉴스) 관리를 담당하는 유즈케이스 레이어."""
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from synapstock.domain.ports import BoardRepositoryPort, StoragePort
 

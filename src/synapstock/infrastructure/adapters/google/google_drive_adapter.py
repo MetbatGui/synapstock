@@ -300,10 +300,26 @@ class GoogleDriveAdapter(StoragePort):
         return await self.list_files_in_folder("", folder=folder)
 
     async def get_file_by_id(self, file_id: str) -> bytes | None:
-        """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다."""
+        """파일 ID를 직접 사용하여 Google Drive에서 파일을 다운로드합니다.
+        Google Sheets 등 Google Docs 편집기 문서 포맷인 경우 적절한 포맷으로 Export하여 다운로드합니다.
+        """
         def _get():
             try:
-                request = self.drive_service.files().get_media(fileId=file_id)
+                # 1. MimeType 확인
+                file_meta = self.drive_service.files().get(fileId=file_id, fields="mimeType").execute()
+                mime_type = file_meta.get("mimeType", "")
+                logger.info(f"[GoogleDrive] 파일 ID({file_id})의 MimeType 조회 결과: {mime_type}")
+
+                # 2. 구글 스프레드시트인 경우 엑셀로 Export
+                if mime_type == "application/vnd.google-apps.spreadsheet":
+                    logger.info(f"[GoogleDrive] 파일 ID({file_id})가 Google Sheets 포맷이므로 엑셀(.xlsx)로 Export 다운로드합니다.")
+                    request = self.drive_service.files().export_media(
+                        fileId=file_id,
+                        mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                else:
+                    request = self.drive_service.files().get_media(fileId=file_id)
+
                 fh = io.BytesIO()
                 downloader = MediaIoBaseDownload(fh, request)
                 done = False
@@ -315,6 +331,34 @@ class GoogleDriveAdapter(StoragePort):
                 logger.error(f"[GoogleDrive] 파일 ID({file_id}) 다운로드 실패: {e}")
                 return None
         return await asyncio.to_thread(_get)
+
+    async def get_file_metadata(self, file_id: str) -> dict | None:
+        """파일 ID로 Google Drive 파일의 메타데이터(예: name, modifiedTime, size, mimeType 등)를 조회합니다."""
+        def _get():
+            try:
+                file_meta = self.drive_service.files().get(fileId=file_id, fields="id, name, modifiedTime, size, mimeType").execute()
+                return file_meta
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 ID({file_id}) 메타데이터 조회 실패: {e}")
+                return None
+        return await asyncio.to_thread(_get)
+
+    async def delete_file(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
+        """Google Drive에서 파일을 찾아서 영구적으로 삭제합니다."""
+        def _delete():
+            try:
+                file_id = self._get_file_id(path, folder=folder, root_id=root_id)
+                if not file_id:
+                    logger.warning(f"[GoogleDrive] 삭제할 파일을 찾을 수 없음: {path}")
+                    return False
+                self.drive_service.files().delete(fileId=file_id).execute()
+                logger.info(f"[GoogleDrive] 파일 영구 삭제 성공: {path}")
+                return True
+            except Exception as e:
+                logger.error(f"[GoogleDrive] 파일 삭제 실패 ({path}): {e}")
+                return False
+        return await asyncio.to_thread(_delete)
+
 
     async def sync_pdf_reports(self, local_dir: str, drive_folder_path: str):
         """로컬 PDF 리포트를 Google Drive와 동기화합니다.
@@ -357,7 +401,12 @@ class GoogleDriveAdapter(StoragePort):
         logger.info(f"[GoogleDrive] PDF 동기화 완료: {count}개 파일 업로드됨.")
 
     async def download_file(
-        self, filename: str, local_path: str | Path, folder: str | None = None, root_id: str | None = None
+        self,
+        filename: str,
+        local_path: str | Path,
+        folder: str | None = None,
+        root_id: str | None = None,
+        **kwargs,
     ) -> bool:
         """Google Drive에서 단일 파일을 원자적으로(Atomic) 다운로드합니다."""
         import os

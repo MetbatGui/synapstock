@@ -27,10 +27,10 @@ from synapstock.presentation.web.core.dependencies import sync_indices_if_needed
 from synapstock.presentation.web.core.websocket_manager import manager
 from synapstock.presentation.web.routes import (
     board_routes,
+    financial_routes,
     report_routes,
     statistics_routes,
     stock_routes,
-    financial_routes,
 )
 
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
@@ -132,7 +132,6 @@ async def startup_event():
     # 리포트 및 뉴스 인덱스 동기화 (충돌 방지를 위해 백그라운드에서 순차 실행)
     logger.info("[Startup] 인덱스 동기화 프로세스 시작 (Google Drive)")
     from synapstock.presentation.web.core.dependencies import (
-        sync_indices_if_needed,
         sync_news_archive,
     )
 
