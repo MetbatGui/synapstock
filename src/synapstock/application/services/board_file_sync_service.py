@@ -76,7 +76,7 @@ class BoardFileSyncService:
         logger.info(f"[BoardFileSync] 로컬 매니페스트 갱신: {board_id} (deleted={deleted})")
 
     async def sync_with_drive(self, progress_callback: Callable[[str, float], None] | None = None) -> bool:
-        """구글 드라이브와 로컬 저장소 간의 모든 보드 파일에 대해 양방향 동기화를 집행합니다."""
+        """구글 드라이브와 로컬 저장소 간의 모든 보드 파일에 대해 병렬 양방향 동기화를 집행합니다."""
         if not self._drive_adapter or not self._theme_folder_id:
             msg = "Google Drive 어댑터 또는 테마 폴더 ID(theme_folder_id)가 지정되지 않아 동기화를 생략합니다."
             logger.warning(msg)
@@ -119,7 +119,7 @@ class BoardFileSyncService:
             "boards": merged_boards,
         }
 
-        # 3. 병합된 최신 매니페스트를 기준으로 개별 보드 파일 동기화 집행
+        # 3. 병합된 최신 매니페스트를 기준으로 개별 보드 파일 병렬 동기화 집행
         total_items = len(merged_boards)
         if total_items == 0:
             if progress_callback:
@@ -127,80 +127,91 @@ class BoardFileSyncService:
             self.save_local_manifest(merged_manifest)
             return True
 
-        current_index = 0
+        import asyncio
+        completed_count = 0
         success_count = 0
+        lock = asyncio.Lock()
+        sem = asyncio.Semaphore(8)  # 동시 구글 API 요청을 8개로 제한하여 SSL 끊김 방지 및 최적화
 
-        for b_id, info in merged_boards.items():
-            current_index += 1
-            progress_ratio = 0.1 + (float(current_index) / total_items) * 0.8
+        async def _sync_single_board(b_id: str, info: dict[str, Any]):
+            nonlocal completed_count, success_count
             board_filename = f"{b_id}.json"
             deleted = info.get("deleted", False)
             display_name = info.get("name", b_id)
 
-            if deleted:
-                # [CASE A] 드라이브상에서 지워진 보드 👉 로컬 파일 물리적 삭제
+            async with sem:
                 try:
-                    self._repository.delete(b_id)
-                    logger.info(f"[BoardFileSync] 보드 물리적 삭제 완료: {board_filename}")
-                except FileNotFoundError:
-                    pass
+                    if deleted:
+                        # [CASE A] 드라이브상에서 지워진 보드 👉 로컬 파일 물리적 삭제
+                        try:
+                            self._repository.delete(b_id)
+                            logger.info(f"[BoardFileSync] 보드 물리적 삭제 완료: {board_filename}")
+                        except FileNotFoundError:
+                            pass
+                        except Exception as e:
+                            logger.error(f"[BoardFileSync] 보드 삭제 중 예외 ({b_id}): {e}")
+                        async with lock:
+                            success_count += 1
+                    else:
+                        l_info = local_manifest.get("boards", {}).get(b_id)
+                        r_info = remote_manifest.get("boards", {}).get(b_id)
+                        l_modified = l_info.get("last_modified", 0.0) if l_info else 0.0
+                        r_modified = r_info.get("last_modified", 0.0) if r_info else 0.0
+                        local_exists = b_id in self._repository.list_boards()
+
+                        if not local_exists and r_info:
+                            # [CASE B] 로컬에는 없는데 드라이브에 존재함 👉 다운로드 후 로컬 생성
+                            data = await self._drive_adapter.get_file(board_filename, root_id=self._theme_folder_id)
+                            if data:
+                                board_json = json.loads(data.decode("utf-8"))
+                                board = Board.model_validate(board_json)
+                                board.id = b_id
+                                self._repository.save(board)
+                                async with lock:
+                                    success_count += 1
+                                logger.info(f"[BoardFileSync] 신규 다운로드 성공: {board_filename}")
+
+                        elif local_exists and r_modified > l_modified:
+                            # [CASE C] 원격 버전이 더 최신임 👉 다운로드 후 로컬 덮어쓰기
+                            data = await self._drive_adapter.get_file(board_filename, root_id=self._theme_folder_id)
+                            if data:
+                                board_json = json.loads(data.decode("utf-8"))
+                                board = Board.model_validate(board_json)
+                                board.id = b_id
+                                self._repository.save(board)
+                                async with lock:
+                                    success_count += 1
+                                logger.info(f"[BoardFileSync] 덮어쓰기 업데이트 성공: {board_filename}")
+
+                        elif local_exists and (not r_info or l_modified > r_modified):
+                            # [CASE D] 로컬 버전이 더 최신이거나 로컬에만 있음 👉 구글 드라이브로 업로드
+                            board = self._repository.load(b_id)
+                            board_bytes = board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True).encode("utf-8")
+                            up_success = await self._drive_adapter.put_file(
+                                board_filename, board_bytes, root_id=self._theme_folder_id
+                            )
+                            if up_success:
+                                async with lock:
+                                    success_count += 1
+                                logger.info(f"[BoardFileSync] 파일 업로드 완료: {board_filename}")
+                        else:
+                            async with lock:
+                                success_count += 1
                 except Exception as e:
-                    logger.error(f"[BoardFileSync] 보드 삭제 중 예외 ({b_id}): {e}")
+                    logger.error(f"[BoardFileSync] 보드 동기화 실패 ({b_id}): {e}", exc_info=True)
+                finally:
+                    async with lock:
+                        completed_count += 1
+                        progress_ratio = 0.1 + (float(completed_count) / total_items) * 0.8
+                        if progress_callback:
+                            progress_callback(
+                                f"동기화 진행 중: {display_name} ({completed_count}/{total_items})",
+                                progress_ratio
+                            )
 
-                success_count += 1
-                if progress_callback:
-                    progress_callback(f"보드 삭제 반영: {display_name}", progress_ratio)
-                continue
-
-            l_info = local_manifest.get("boards", {}).get(b_id)
-            r_info = remote_manifest.get("boards", {}).get(b_id)
-            l_modified = l_info.get("last_modified", 0.0) if l_info else 0.0
-            r_modified = r_info.get("last_modified", 0.0) if r_info else 0.0
-            local_exists = b_id in self._repository.list_boards()
-
-            try:
-                if not local_exists and r_info:
-                    # [CASE B] 로컬에는 없는데 드라이브에 존재함 👉 다운로드 후 로컬 생성
-                    if progress_callback:
-                        progress_callback(f"드라이브에서 파일 다운로드 중: {display_name}", progress_ratio)
-                    data = await self._drive_adapter.get_file(board_filename, root_id=self._theme_folder_id)
-                    if data:
-                        board_json = json.loads(data.decode("utf-8"))
-                        board = Board.model_validate(board_json)
-                        board.id = b_id
-                        self._repository.save(board)
-                        success_count += 1
-                        logger.info(f"[BoardFileSync] 신규 다운로드 성공: {board_filename}")
-
-                elif local_exists and r_modified > l_modified:
-                    # [CASE C] 원격 버전이 더 최신임 👉 다운로드 후 로컬 덮어쓰기
-                    if progress_callback:
-                        progress_callback(f"원격 최신 버전 다운로드 중: {display_name}", progress_ratio)
-                    data = await self._drive_adapter.get_file(board_filename, root_id=self._theme_folder_id)
-                    if data:
-                        board_json = json.loads(data.decode("utf-8"))
-                        board = Board.model_validate(board_json)
-                        board.id = b_id
-                        self._repository.save(board)
-                        success_count += 1
-                        logger.info(f"[BoardFileSync] 덮어쓰기 업데이트 성공: {board_filename}")
-
-                elif local_exists and (not r_info or l_modified > r_modified):
-                    # [CASE D] 로컬 버전이 더 최신이거나 로컬에만 있음 👉 구글 드라이브로 업로드
-                    if progress_callback:
-                        progress_callback(f"로컬 최신 버전 드라이브 업로드 중: {display_name}", progress_ratio)
-                    board = self._repository.load(b_id)
-                    board_bytes = board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True).encode("utf-8")
-                    up_success = await self._drive_adapter.put_file(
-                        board_filename, board_bytes, root_id=self._theme_folder_id
-                    )
-                    if up_success:
-                        success_count += 1
-                        logger.info(f"[BoardFileSync] 파일 업로드 완료: {board_filename}")
-                else:
-                    success_count += 1
-            except Exception as e:
-                logger.error(f"[BoardFileSync] 보드 동기화 실패 ({b_id}): {e}", exc_info=True)
+        # asyncio.gather를 통한 병렬 동기화 집행!
+        tasks = [_sync_single_board(b_id, info) for b_id, info in merged_boards.items()]
+        await asyncio.gather(*tasks)
 
         # 4. 최종 완성된 병합 매니페스트 저장 및 구글 드라이브 업로드
         self.save_local_manifest(merged_manifest)

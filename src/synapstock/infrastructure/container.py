@@ -289,7 +289,7 @@ class Container:
                         f"(mimeType = 'application/vnd.google-apps.spreadsheet' or "
                         f"mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')"
                     )
-                    results = self._drive_adapter.drive_service.files().list(
+                    results = self._drive_adapter.service.files().list(
                         q=query,
                         fields="files(id, name, modifiedTime, mimeType)",
                         orderBy="modifiedTime desc"

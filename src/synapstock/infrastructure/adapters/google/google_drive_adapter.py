@@ -39,6 +39,8 @@ class GoogleDriveAdapter(StoragePort):
         self.token_file = token_file
         self.folders = folders or {}
         self.client_secret_file = client_secret_file
+        import threading
+        self._lock = threading.Lock()
 
         if not self.token_file:
             raise ValueError("token_file must be provided.")
@@ -46,7 +48,23 @@ class GoogleDriveAdapter(StoragePort):
         if not os.path.exists(self.token_file):
             raise FileNotFoundError(f"Token file not found: {self.token_file}")
 
-        self.drive_service = self._authenticate()
+    @property
+    def service(self):
+        """다중 스레드 안전성(Thread-safety)을 위해 호출하는 스레드별로 독립적인 Drive API 서비스 인스턴스를 제공합니다."""
+        import threading
+        if not hasattr(self, "_thread_local_services"):
+            self._thread_local_services = threading.local()
+            
+        if not getattr(self._thread_local_services, "service", None):
+            logger.info(f"[GoogleDrive] 스레드 {threading.current_thread().name} 전용 API 서비스 생성...")
+            creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                with open(self.token_file, "w") as token:
+                    token.write(creds.to_json())
+            self._thread_local_services.service = build("drive", "v3", credentials=creds, static_discovery=False)
+            
+        return self._thread_local_services.service
 
     def _get_root_id(self, folder: str | None = None) -> str:
         """키워드에 해당하는 폴더 ID를 반환합니다."""
@@ -94,7 +112,7 @@ class GoogleDriveAdapter(StoragePort):
             f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' "
             f"and '{parent_id}' in parents and trashed = false"
         )
-        results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
+        results = self.service.files().list(q=query, fields="files(id, name)").execute()
         files = results.get("files", [])
 
         if files:
@@ -105,7 +123,7 @@ class GoogleDriveAdapter(StoragePort):
                 "mimeType": "application/vnd.google-apps.folder",
                 "parents": [parent_id],
             }
-            file = self.drive_service.files().create(body=file_metadata, fields="id").execute()
+            file = self.service.files().create(body=file_metadata, fields="id").execute()
             return cast(str, file.get("id", ""))
 
     @retry(
@@ -129,7 +147,7 @@ class GoogleDriveAdapter(StoragePort):
 
             # 한글 유니코드 정규화(NFC/NFD) 문제 대응을 위해 하위 목록 전체 조회 후 비교
             results = (
-                self.drive_service.files()
+                self.service.files()
                 .list(q=f"'{current_parent_id}' in parents and trashed = false", fields="files(id, name, mimeType)")
                 .execute()
             )
@@ -168,8 +186,9 @@ class GoogleDriveAdapter(StoragePort):
         retry=retry_if_not_exception_type(ValueError),
     )
     def _execute_api_call(self, func, *args, **kwargs):
-        """Google Drive API 호출을 재시도 로직과 함께 실행합니다."""
-        return func(*args, **kwargs)
+        """Google Drive API 호출을 재시도 로직과 함께 실행합니다. 스레드 소켓 충돌 방지 락을 사용합니다."""
+        with self._lock:
+            return func(*args, **kwargs)
 
     async def get_file(
         self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs
@@ -187,7 +206,7 @@ class GoogleDriveAdapter(StoragePort):
 
                 # 2. 다운로드 실행 (청크 단위 다운로드 전체를 재시도 대상으로 묶음)
                 def _do_download():
-                    request = self.drive_service.files().get_media(fileId=file_id)
+                    request = self.service.files().get_media(fileId=file_id)
                     fh = io.BytesIO()
                     downloader = MediaIoBaseDownload(fh, request)
                     done = False
@@ -243,17 +262,17 @@ class GoogleDriveAdapter(StoragePort):
         parent_id = self._ensure_path_directories(path, folder=folder, root_id=root_id)
 
         query = f"name = '{filename}' and '{parent_id}' in parents and trashed = false"
-        results = self.drive_service.files().list(q=query, fields="files(id)").execute()
+        results = self.service.files().list(q=query, fields="files(id)").execute()
         files = results.get("files", [])
 
         media = MediaIoBaseUpload(data, mimetype=mime_type, resumable=True)
 
         if files:
             file_id = files[0]["id"]
-            self.drive_service.files().update(fileId=file_id, media_body=media).execute()
+            self.service.files().update(fileId=file_id, media_body=media).execute()
         else:
             file_metadata = {"name": filename, "parents": [parent_id]}
-            self.drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
+            self.service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
     async def path_exists(self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs) -> bool:
         return await asyncio.to_thread(self._get_file_id, path, folder=folder, root_id=root_id) is not None
@@ -281,7 +300,7 @@ class GoogleDriveAdapter(StoragePort):
 
                 query = f"'{folder_id}' in parents and trashed = false"
                 results = (
-                    self.drive_service.files()
+                    self.service.files()
                     .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
                     .execute()
                 )
@@ -306,19 +325,21 @@ class GoogleDriveAdapter(StoragePort):
         def _get():
             try:
                 # 1. MimeType 확인
-                file_meta = self.drive_service.files().get(fileId=file_id, fields="mimeType").execute()
+                with self._lock:
+                    file_meta = self.service.files().get(fileId=file_id, fields="mimeType").execute()
                 mime_type = file_meta.get("mimeType", "")
-                logger.info(f"[GoogleDrive] 파일 ID({file_id})의 MimeType 조회 결과: {mime_type}")
 
                 # 2. 구글 스프레드시트인 경우 엑셀로 Export
                 if mime_type == "application/vnd.google-apps.spreadsheet":
                     logger.info(f"[GoogleDrive] 파일 ID({file_id})가 Google Sheets 포맷이므로 엑셀(.xlsx)로 Export 다운로드합니다.")
-                    request = self.drive_service.files().export_media(
-                        fileId=file_id,
-                        mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    with self._lock:
+                        request = self.service.files().export_media(
+                            fileId=file_id,
+                            mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
                 else:
-                    request = self.drive_service.files().get_media(fileId=file_id)
+                    with self._lock:
+                        request = self.service.files().get_media(fileId=file_id)
 
                 fh = io.BytesIO()
                 downloader = MediaIoBaseDownload(fh, request)
@@ -336,7 +357,8 @@ class GoogleDriveAdapter(StoragePort):
         """파일 ID로 Google Drive 파일의 메타데이터(예: name, modifiedTime, size, mimeType 등)를 조회합니다."""
         def _get():
             try:
-                file_meta = self.drive_service.files().get(fileId=file_id, fields="id, name, modifiedTime, size, mimeType").execute()
+                with self._lock:
+                    file_meta = self.service.files().get(fileId=file_id, fields="id, name, modifiedTime, size, mimeType").execute()
                 return file_meta
             except Exception as e:
                 logger.error(f"[GoogleDrive] 파일 ID({file_id}) 메타데이터 조회 실패: {e}")
@@ -351,7 +373,7 @@ class GoogleDriveAdapter(StoragePort):
                 if not file_id:
                     logger.warning(f"[GoogleDrive] 삭제할 파일을 찾을 수 없음: {path}")
                     return False
-                self.drive_service.files().delete(fileId=file_id).execute()
+                self.service.files().delete(fileId=file_id).execute()
                 logger.info(f"[GoogleDrive] 파일 영구 삭제 성공: {path}")
                 return True
             except Exception as e:
@@ -417,7 +439,7 @@ class GoogleDriveAdapter(StoragePort):
             try:
                 target_root_id = root_id or self._get_root_id(folder)
                 results = (
-                    self.drive_service.files()
+                    self.service.files()
                     .list(
                         q=f"name = '{filename}' and '{target_root_id}' in parents and trashed = false",
                         fields="files(id, name)",
@@ -430,7 +452,7 @@ class GoogleDriveAdapter(StoragePort):
                     return False
 
                 file_id = files[0]["id"]
-                request = self.drive_service.files().get_media(fileId=file_id)
+                request = self.service.files().get_media(fileId=file_id)
 
                 local_path_obj = Path(local_path)
                 local_path_obj.parent.mkdir(parents=True, exist_ok=True)
