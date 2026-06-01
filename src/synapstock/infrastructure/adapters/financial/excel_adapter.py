@@ -61,10 +61,10 @@ class ExcelFinancialDataAdapter(FinancialDataPort):
         # 'company_name' 컬럼을 제외한 모든 컬럼(시기)을 순회
         for col in df.columns[1:]:
             val = row[col].values[0]
-            # 숫자인 경우 정수형으로 변환 (보기 좋게)
+            # 숫자인 경우 Python 기본 int로 변환 (numpy scalar는 JSON 직렬화 불가)
             if pd.notna(val):
-                if isinstance(val, (float, int)):
-                    val = int(val)
+                if isinstance(val, (float, int)) or hasattr(val, "item"):
+                    val = int(val) if not hasattr(val, "item") else int(val.item())
                 result.append({"quarter": str(col), "value": val})
             else:
                 # 데이터가 없는 경우 None으로 추가

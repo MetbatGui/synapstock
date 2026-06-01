@@ -58,7 +58,7 @@ body {
 .nav-item {
     text-decoration: none;
     color: var(--text-secondary);
-    font-size: 0.95rem;
+    font-size: 0.95rem; 
     font-weight: 500;
     transition: 0.3s ease;
     position: relative;
