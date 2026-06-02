@@ -4,6 +4,8 @@
  */
 
 export const heatmapView = {
+    _timerId: null,
+
     /**
      * 테마 히트맵 뷰 초기화 및 렌더링
      * @param {HTMLElement} container - 렌더링할 대상 부모 컨테이너
@@ -16,6 +18,15 @@ export const heatmapView = {
                     <div style="display:flex; flex-direction:column; gap:5px;">
                         <h2 style="color: #00d2ff !important; margin: 0; font-size: 1.5rem;">📈 테마 증시 히트맵 (실시간 KRX)</h2>
                         <p style="color: #9ca3af; font-size: 0.85rem; margin: 0;">각 영역의 크기는 시가총액(조 원), 색상은 당일 등락률(%)을 나타냅니다. (종목 노드를 클릭하면 상세 대시보드로 이동합니다)</p>
+                    </div>
+                    <!-- 우측 상단 갱신 버튼 및 캐시 만료 연동 타이머 -->
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span id="heatmap-timer" style="color: #9ca3af; font-size: 0.85rem; font-family: monospace; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); display:none;">
+                            다음 갱신까지 --:--
+                        </span>
+                        <button id="heatmap-refresh-btn" class="financial-opt-btn" style="background: rgba(0,210,255,0.1); color: #00d2ff; border: 1px solid rgba(0,210,255,0.2); font-size: 0.85rem; padding: 6px 14px; display:flex; align-items:center; gap:6px; border-radius: 8px; font-weight: 600;">
+                            <i class="fas fa-sync-alt" id="refresh-icon"></i> 실시간 갱신
+                        </button>
                     </div>
                 </div>
                 
@@ -56,21 +67,48 @@ export const heatmapView = {
 
         // 2. 최초 렌더링 실행 (종목 포함 뷰로 영구 고정)
         await this.fetchAndRender(true);
+
+        // 3. 수동 갱신 버튼 이벤트 바인딩
+        const refreshBtn = document.getElementById('heatmap-refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', async () => {
+                await this.fetchAndRender(true, true);
+            });
+        }
     },
 
     /**
      * API 통신 및 Plotly 그리기 수행
      * @param {boolean} showStocks - 종목 상세 노출 여부
+     * @param {boolean} forceRefresh - 캐시 강제 무효화 여부
      */
-    async fetchAndRender(showStocks) {
+    async fetchAndRender(showStocks, forceRefresh = false) {
         const shimmer = document.getElementById('heatmap-shimmer');
         const canvas = document.getElementById('plotly-heatmap-canvas');
+        const refreshIcon = document.getElementById('refresh-icon');
+        const refreshBtn = document.getElementById('heatmap-refresh-btn');
         
+        // 기존 실행 중인 타이머가 있다면 즉각 정리
+        if (this._timerId) {
+            clearInterval(this._timerId);
+            this._timerId = null;
+        }
+
         if (shimmer) shimmer.style.display = 'flex';
         
+        // UI 로딩 피드백 (회전 애니메이션 및 비활성화)
+        if (refreshIcon) {
+            refreshIcon.classList.add('fa-spin');
+        }
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.style.opacity = '0.6';
+        }
+        
         try {
-            // 1. API 데이터 Fetch (대/중분류 카테고리와 종목 구분을 모두 포함하여 원본 HTML 형태 고정)
-            const response = await fetch('/api/heatmap/data?show_categories=true&show_stocks=true');
+            // 1. API 데이터 Fetch (강제 갱신 쿼리 매핑)
+            const url = `/api/heatmap/data?show_categories=true&show_stocks=true${forceRefresh ? '&force_refresh=true' : ''}`;
+            const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
             const data = await response.json();
             
@@ -90,7 +128,6 @@ export const heatmapView = {
                 // 등락률에 따른 색상 매핑
                 marker: {
                     colors: data.colors,
-                    // 사용자 정의 컬러 맵: [0: 파랑(하락), 0.5: 어두운 회색(보합), 1: 빨강(상승)]
                     colorscale: [
                         [0.0, 'blue'],
                         [0.5, '#444444'],
@@ -106,19 +143,16 @@ export const heatmapView = {
                         ypad: 30,
                         tickfont: { color: '#9ca3af', family: 'Inter' }
                     },
-                    line: { width: 1.5, color: '#0a0e14' } // 다크 모드에 맞는 경계선
+                    line: { width: 1.5, color: '#0a0e14' }
                 },
                 
-                // 마우스 호버 시 툴팁 서식
                 customdata: data.colors,
                 hovertemplate: '<b>%{label}</b><br>시가총액: %{value:.2f}조 원<br>등락률: %{customdata:.2f}%<extra></extra>',
                 
-                // 노드 텍스트 렌더링 서식
                 textinfo: 'label+value+percent entry',
                 texttemplate: '<b>%{label}</b><br>%{value:.2f}조<br>%{customdata:+.2f}%',
                 textposition: 'middle center',
                 
-                // 폰트 스타일링
                 textfont: {
                     family: 'Inter, sans-serif',
                     size: 13,
@@ -134,21 +168,21 @@ export const heatmapView = {
             
             const layout = {
                 margin: { l: 5, r: 5, t: 30, b: 5 },
-                paper_bgcolor: 'rgba(0,0,0,0)', // 투명 배경으로 다크 그라데이션 흡수
+                paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 font: { family: 'Inter, sans-serif', color: '#f3f4f6' }
             };
             
             const config = {
                 responsive: true,
-                displayModeBar: false // 상단 툴바를 제거해 깔끔한 대시보드 유지
+                displayModeBar: false
             };
             
             // 3. Plotly 렌더링 실행
             if (window.Plotly) {
                 await window.Plotly.newPlot(canvas, [trace], layout, config);
                 
-                // 4. 클릭 이벤트 바인딩 (Miro 마인드맵 솔루션과 완전 융합)
+                // 4. 클릭 이벤트 바인딩
                 canvas.on('plotly_click', (eventData) => {
                     if (eventData && eventData.points && eventData.points[0]) {
                         const pt = eventData.points[0];
@@ -158,7 +192,6 @@ export const heatmapView = {
                             const ticker = window._heatmapRawTickers[pointIndex];
                             const name = pt.label;
                             
-                            // 유효한 티커 코드일 때만 주식 대시보드로 즉시 전환 (UX 혁신)
                             if (ticker && ticker !== 'TBD' && ticker !== 'none' && ticker !== '') {
                                 if (window._jumpToStock) {
                                     window._jumpToStock(ticker, name);
@@ -169,6 +202,15 @@ export const heatmapView = {
                 });
             } else {
                 throw new Error("Plotly.js 라이브러리가 로드되지 않았습니다.");
+            }
+            
+            // 5. 타이머 기동 (expired_at 연동)
+            if (data.expired_at) {
+                const timerSpan = document.getElementById('heatmap-timer');
+                if (timerSpan) {
+                    timerSpan.style.display = 'inline-block';
+                    this.startCountdown(data.expired_at, timerSpan);
+                }
             }
             
         } catch (err) {
@@ -182,6 +224,48 @@ export const heatmapView = {
             `;
         } finally {
             if (shimmer) shimmer.style.display = 'none';
+            if (refreshIcon) {
+                refreshIcon.classList.remove('fa-spin');
+            }
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.style.opacity = '1';
+            }
         }
+    },
+
+    /**
+     * 캐시 만료 예정 시간을 토대로 카운트다운 타이머를 실행합니다.
+     * @param {string} expiredAtStr - 캐시 만료 시각 (ISO 8601 형식)
+     * @param {HTMLElement} timerSpan - 렌더링 영역
+     */
+    startCountdown(expiredAtStr, timerSpan) {
+        const expiredAt = new Date(expiredAtStr);
+        
+        const updateTimer = () => {
+            const now = new Date();
+            const diffMs = expiredAt - now;
+            
+            if (diffMs <= 0) {
+                clearInterval(this._timerId);
+                this._timerId = null;
+                timerSpan.textContent = '다음 갱신까지 00:00';
+                // 00:00 도달 시 자동으로 캐시 데이터 신규 갱신
+                this.fetchAndRender(true);
+                return;
+            }
+            
+            const totalSec = Math.floor(diffMs / 1000);
+            const minutes = Math.floor(totalSec / 60);
+            const seconds = totalSec % 60;
+            
+            const mm = String(minutes).padStart(2, '0');
+            const ss = String(seconds).padStart(2, '0');
+            
+            timerSpan.textContent = `다음 갱신까지 ${mm}:${ss}`;
+        };
+        
+        updateTimer();
+        this._timerId = setInterval(updateTimer, 1000);
     }
 };

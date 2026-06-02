@@ -67,3 +67,13 @@ def test_heatmap_cache_hit_and_expiry_refresh():
     
     # 만료 시간도 다시 현재 기준 10분 후로 갱신되었음을 검증
     assert expected_expiry_min < HeatmapService._expired_at < (datetime.now() + timedelta(minutes=11))
+
+    # 6. 네 번째 호출 (force_refresh = True 검증)
+    # 현재 캐시가 안전하게 살아있는 상황에서 force_refresh=True를 전달해 강제 갱신 작동 검증
+    themes_fourth = service_another.get_themes(force_refresh=True)
+    
+    # 캐시가 강제 무효화 및 재생성되었으므로 세 번째 호출 결과와 다른 인스턴스여야 함
+    assert themes_fourth is not themes_third
+    # 호출 횟수가 3회로 증가했음을 검증 (캐시 우회 작동 확인)
+    assert mock_file_repo.load_heatmap.call_count == 3
+    assert mock_krx_repo.fetch_listing.call_count == 3

@@ -57,12 +57,22 @@ class HeatmapService:
         # 2. Domain Model -> DataFrame 변환 (하위 호환)
         return self._convert_themes_to_dataframe(themes)
 
-    def get_themes(self) -> List[Theme]:
+    @classmethod
+    def get_expired_at(cls) -> Optional[datetime]:
+        """캐시 만료 예정 일시를 반환합니다."""
+        return cls._expired_at
+
+    def get_themes(self, force_refresh: bool = False) -> List[Theme]:
         """도메인 모델로 테마 목록을 반환합니다. (10분 캐시 적용)"""
         now = datetime.now()
         
+        # 0. 강제 새로고침이 요청된 경우 즉시 캐시 무효화
+        if force_refresh:
+            HeatmapService._cache_data = None
+            HeatmapService._expired_at = None
+        
         # 1. 캐시 만료 여부 확인 및 제거
-        if HeatmapService._expired_at and now >= HeatmapService._expired_at:
+        elif HeatmapService._expired_at and now >= HeatmapService._expired_at:
             HeatmapService._cache_data = None
             HeatmapService._expired_at = None
             
