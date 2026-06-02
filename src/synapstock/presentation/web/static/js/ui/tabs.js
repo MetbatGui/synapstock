@@ -76,6 +76,8 @@ export function switchTab(tabId, updateHistory = true) {
             history.pushState({ tab: 'dashboard' }, '', '/stock/none');
         } else if (tabId === 'statistics-tab') {
             history.pushState({ tab: 'statistics' }, '', '/statistics');
+        } else if (tabId === 'heatmap-tab') {
+            history.pushState({ tab: 'heatmap' }, '', '/heatmap');
         }
     }
 
@@ -107,6 +109,8 @@ export function initHistoryState(loadStockDashboard) {
         const path = window.location.pathname;
         if (path === '/') {
             switchTab('mindmap-tab', false);
+        } else if (path === '/heatmap') {
+            switchTab('heatmap-tab', false);
         } else if (path.startsWith('/stock/')) {
             const ticker = path.split('/').pop();
             const name = event.state ? event.state.name : null;

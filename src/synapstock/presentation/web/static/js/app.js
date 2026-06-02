@@ -28,6 +28,7 @@ import { newListingView } from './ui/statistics/new_listing_view.js';
 import { financialAnalysisView } from './ui/statistics/financial_analysis_view.js';
 import { weeklyChangeView } from './ui/statistics/weekly_change_view.js';
 import { stockSplitView } from './ui/statistics/stock_split_view.js';
+import { heatmapView } from './ui/statistics/heatmap_view.js';
 
 // ── 전역 상태 ─────────────────────────────────────────────────────────────
 window._currentBoardData = null;
@@ -177,13 +178,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 newListingView.render(statsContainer);
             } else if (path.includes('stock-split')) {
                 stockSplitView.render(statsContainer);
+            } else if (path.includes('heatmap')) {
+                heatmapView.init(statsContainer);
             } else if (path.includes('financial')) {
                 financialAnalysisView.init(statsContainer);
             } else if (path.includes('weekly-change')) {
                 weeklyChangeView.init(statsContainer);
             }
         }
+    } else if (path === '/heatmap') {
+        switchTab('heatmap-tab', false);
+        const heatmapContainer = document.getElementById('heatmap-tab-container');
+        if (heatmapContainer) heatmapView.init(heatmapContainer);
     }
+    
+    // 최상위 탭 전환 시 히트맵 동적 렌더링 연동
+    document.querySelectorAll('.nav-links .nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const targetTab = item.getAttribute('data-tab');
+            if (targetTab === 'heatmap-tab') {
+                const container = document.getElementById('heatmap-tab-container');
+                if (container) heatmapView.init(container);
+            }
+        });
+    });
 
     // 통계 서브 내비게이션 이벤트 (SPA 처리)
     const statsSubNav = document.querySelector('.stats-subnav');
@@ -224,6 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     newListingView.render(statsContainer);
                 } else if (route === 'stock-split') {
                     stockSplitView.render(statsContainer);
+                } else if (route === 'heatmap') {
+                    heatmapView.init(statsContainer);
                 } else if (route === 'growth') {
                     consecutiveGrowthView.init(statsContainer);
                 } else if (route === 'financial') {
@@ -287,12 +307,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     newListingView.render(statsContainer);
                 } else if (currentPath.includes('stock-split')) {
                     stockSplitView.render(statsContainer);
+                } else if (currentPath.includes('heatmap')) {
+                    heatmapView.init(statsContainer);
                 } else if (currentPath.includes('financial')) {
                     financialAnalysisView.init(statsContainer);
                 } else if (currentPath.includes('weekly-change')) {
                     weeklyChangeView.init(statsContainer);
                 }
             }
+        } else if (currentPath === '/heatmap') {
+            switchTab('heatmap-tab', false);
+            const heatmapContainer = document.getElementById('heatmap-tab-container');
+            if (heatmapContainer) heatmapView.init(heatmapContainer);
         }
     });
 });

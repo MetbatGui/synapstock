@@ -22,6 +22,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js for Financial Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Plotly.js for Heatmap Charts -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 
 <body class="dark-theme">
     <nav class="navbar">
@@ -30,6 +32,7 @@
             <a href="#" class="nav-item active" data-tab="mindmap-tab">마인드맵 관리</a>
             <a href="#" class="nav-item" data-tab="dashboard-tab">종목정보</a>
             <a href="#" class="nav-item" data-tab="statistics-tab">통계 분석</a>
+            <a href="#" class="nav-item" data-tab="heatmap-tab">테마 히트맵</a>
         </div>
         <!-- 공통 상단바 검색창 통합 (모든 도메인에서 접근 가능) -->
         <div class="global-search-container navbar-search">
@@ -181,6 +184,13 @@
                 <div id="statistics-container">
                     <!-- statistics_view.js 등에 의해 동적 렌더링됨 -->
                 </div>
+            </div>
+        </section>
+
+        <!-- 테마 히트맵 탭 -->
+        <section id="heatmap-tab" class="tab-content">
+            <div id="heatmap-tab-container" style="padding: 20px; height: 100%; min-height: 750px;">
+                <!-- heatmap_view.js에 의해 동적 렌더링됨 -->
             </div>
         </section>
     </main>
