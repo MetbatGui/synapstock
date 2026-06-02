@@ -1,5 +1,6 @@
 import pandas as pd
 from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
 from synapstock.domain.heatmap.models import Stock, Theme, ThemeGroup, Heatmap
 from synapstock.domain.heatmap.value_objects import MarketCap, ChangeRatio
 from synapstock.domain.heatmap.services import ThemeStatisticsService, StockValidator
@@ -14,6 +15,10 @@ class HeatmapService:
     - Domain Model로 변환
     - Domain Service 활용
     """
+    
+    # 런타임 캐시 데이터 버퍼 (10분 만료 TTL)
+    _cache_data: Optional[List[Theme]] = None
+    _expired_at: Optional[datetime] = None
     
     def __init__(
         self, 
@@ -53,8 +58,26 @@ class HeatmapService:
         return self._convert_themes_to_dataframe(themes)
 
     def get_themes(self) -> List[Theme]:
-        """도메인 모델로 테마 목록을 반환합니다."""
-        return self._build_theme_models()
+        """도메인 모델로 테마 목록을 반환합니다. (10분 캐시 적용)"""
+        now = datetime.now()
+        
+        # 1. 캐시 만료 여부 확인 및 제거
+        if HeatmapService._expired_at and now >= HeatmapService._expired_at:
+            HeatmapService._cache_data = None
+            HeatmapService._expired_at = None
+            
+        # 2. 캐시가 비어있다면 신규 수집 후 캐싱
+        if HeatmapService._cache_data is None:
+            themes = self._build_theme_models()
+            if themes:
+                HeatmapService._cache_data = themes
+                # 10분 후 만료 시각 설정
+                HeatmapService._expired_at = now + timedelta(minutes=10)
+            else:
+                return []
+                
+        # 3. 유효한 캐시 즉시 반환
+        return HeatmapService._cache_data
 
     def calculate_group_stats(self, df_final: pd.DataFrame) -> Dict[str, Dict[str, float]]:
         """테마 그룹별 통계를 계산합니다. (기존 API 유지)"""
