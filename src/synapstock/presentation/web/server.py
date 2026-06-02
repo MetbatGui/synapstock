@@ -31,6 +31,7 @@ from synapstock.presentation.web.routes import (
     report_routes,
     statistics_routes,
     stock_routes,
+    heatmap_routes,
 )
 
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ app.include_router(stock_routes.router)
 app.include_router(report_routes.router)
 app.include_router(statistics_routes.router)
 app.include_router(financial_routes.router)
+app.include_router(heatmap_routes.router)
 
 
 # ── 페이지 라우트 ────────────────────────────────────────────────────────────
@@ -91,6 +93,12 @@ async def get_stock_dashboard(request: Request, ticker: str):
 async def get_statistics_page(request: Request):
     """수급 통계 분석 페이지 기본 진입점을 서빙합니다."""
     return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "statistics"})
+
+
+@app.get("/heatmap", response_class=HTMLResponse)
+async def get_heatmap_page(request: Request):
+    """테마 히트맵 분석 최상위 탭 페이지를 서빙합니다."""
+    return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "heatmap"})
 
 
 @app.get("/statistics/{subpath:path}", response_class=HTMLResponse)
