@@ -74,7 +74,7 @@ export async function initGlobalSearch(jumpToStock) {
                 div.onclick = () => {
                     searchInput.value = item.name;
                     resultsContainer.style.display = 'none';
-                    jumpToStock(item.ticker, item.board, item.path);
+                    jumpToStock(item.ticker, item.board, item.path, item.name);
                 };
                 resultsContainer.appendChild(div);
             });

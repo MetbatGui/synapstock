@@ -132,7 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initSyncButton();
     initHistoryState((t, n) => loadStockDashboard(t, n, loadBoardData, window._globalLocalReportCounts));
     initFinancialSidebar();
-    initGlobalSearch((ticker, boardName, path) => jumpToStock(ticker, boardName, path, loadBoardData));
+    initGlobalSearch((ticker, boardName, path, name) => {
+        if (window._jumpToStock) {
+            window._jumpToStock(ticker, name || '');
+        }
+    });
     initMindmapModals(loadBoardData);
     initNewsEvents(loadBoardData, fetchStockInfo, window._globalLocalReportCounts);
 
