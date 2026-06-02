@@ -114,9 +114,6 @@ class Container:
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
-        self.sync_financial_statements_from_drive()
-        self.sync_boards_from_drive_in_background()
-        self.sync_stock_splits_from_drive_in_background()
 
 
         # 5. 도메인 서비스 싱글톤
@@ -180,6 +177,11 @@ class Container:
 
         self._report_service = None
         self._init_report_service()
+
+        # 백그라운드 동기화 기동 (모든 서비스 초기화 완비 후 안전하게 실행)
+        self.sync_financial_statements_from_drive()
+        self.sync_boards_from_drive_in_background()
+        self.sync_stock_splits_from_drive_in_background()
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
