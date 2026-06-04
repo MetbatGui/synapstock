@@ -471,6 +471,9 @@ class NewListing(BaseModel):
     listing_day_close: int = 0
     listing_day_change_pct: float = 0.0
     note: str | None = None
+    status: str = "PENDING"
+    current_board: str = "virtual_신규상장주"
+    current_path: list[str] = Field(default_factory=list)
 
 
 class WeeklyChangeItem(BaseModel):

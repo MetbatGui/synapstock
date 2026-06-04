@@ -52,13 +52,33 @@ async def get_board_data(name: str) -> dict | JSONResponse:
     try:
         board = query_service.load_board(name)
 
+        # 가상보드인 경우 매니페스트 로드하여 할당 메타데이터 확보
+        manifest_meta = {}
+        if name == "virtual_신규상장주":
+            try:
+                from synapstock.presentation.web.core.dependencies import container
+                manifest_path = container.config.board_dir / "board_sync_manifest.json"
+                if manifest_path.exists():
+                    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    manifest_meta = manifest_data.get("new_listings", {})
+            except Exception as e:
+                logger.error(f"Failed to load manifest for virtual board info: {e}")
+
         def to_dict(node):
+            stocks_list = []
+            for s in node.stocks:
+                stock_dict = {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news}
+                if name == "virtual_신규상장주" and s.ticker in manifest_meta:
+                    meta = manifest_meta[s.ticker]
+                    stock_dict["status"] = meta.get("status", "PENDING")
+                    stock_dict["current_board"] = meta.get("current_board", "virtual_신규상장주")
+                    stock_dict["current_path"] = meta.get("current_path", [])
+                stocks_list.append(stock_dict)
+
             return {
                 "name": node.name,
                 "nodes": [to_dict(n) for n in node.nodes],
-                "stocks": [
-                    {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news} for s in node.stocks
-                ],
+                "stocks": stocks_list,
             }
 
         return cast(dict, to_dict(board.root))

@@ -197,12 +197,24 @@ export const newListingView = {
             const ret = it.listing_day_change_pct || 0;
             const noteHtml = it.note ? `<i class="fas fa-info-circle ipo-note-icon" title="${it.note}"></i>` : '';
 
+            // 상태 뱃지 생성
+            let statusBadgeHtml = '';
+            if (it.status === 'ASSIGNED') {
+                const displayBoardName = (it.current_board || '').replace('theme_', '').replace('virtual_', '');
+                statusBadgeHtml = `<span class="ipo-status-badge assigned" title="배치 완료: ${displayBoardName}">배치 완료</span>`;
+            } else if (it.status === 'IGNORED') {
+                statusBadgeHtml = `<span class="ipo-status-badge ignored">제외됨</span>`;
+            } else {
+                statusBadgeHtml = `<span class="ipo-status-badge pending">대기 중</span>`;
+            }
+
             tr.innerHTML = `
                 <td style="color:#9ca3af;">${it.listing_date}</td>
                 <td>
                     <div style="display:flex; flex-direction:column;">
                         <div style="display:flex; align-items:center;">
                             ${it.market ? `<span class="ipo-market-badge">${it.market}</span>` : ''}
+                            ${statusBadgeHtml}
                             <span style="font-weight:700; color:#f3f4f6;">${it.name}</span>
                             ${noteHtml}
                         </div>
@@ -253,6 +265,7 @@ export const newListingView = {
                     const container = detailTr.querySelector('.detail-container');
                     if (!container.innerHTML) {
                         container.innerHTML = this.generateDetailHtml(it);
+                        this.bindDetailRowEvents(container, it); // 동적 버튼 이벤트 바인딩
                     }
                     detailTr.classList.add('expanded');
                     tr.classList.add('active');
@@ -269,6 +282,24 @@ export const newListingView = {
     generateDetailHtml: function (it) {
         const openRet = it.offer_price > 0 ? ((it.listing_day_open - it.offer_price) / it.offer_price * 100) : 0;
         const highRet = it.offer_price > 0 ? ((it.listing_day_high - it.offer_price) / it.offer_price * 100) : 0;
+
+        let actionButtons = '';
+        if (it.status === 'ASSIGNED') {
+            const displayBoardName = (it.current_board || '').replace('theme_', '').replace('virtual_', '');
+            actionButtons = `
+                <span style="font-size:0.8rem; color:#34d399; font-weight:600; margin-right:8px;"><i class="fas fa-check-circle"></i> 배치됨: ${displayBoardName}</span>
+                <button class="stats-btn-action btn-assign btn-jump" data-board="${it.current_board}" style="background:#10b981; border:none; color:white; cursor:pointer;"><i class="fas fa-external-link-alt"></i> 보드로 가기</button>
+            `;
+        } else if (it.status === 'IGNORED') {
+            actionButtons = `
+                <span style="font-size:0.8rem; color:#64748b; margin-right:8px;"><i class="fas fa-ban"></i> 제외된 종목</span>
+            `;
+        } else {
+            actionButtons = `
+                <button class="stats-btn-action btn-assign" data-ticker="${it.ticker}" data-name="${it.name}" style="background:#3b82f6; border:none; color:white; cursor:pointer;"><i class="fas fa-th-large"></i> 보드에 배치</button>
+                <button class="stats-btn-action btn-ignore" data-ticker="${it.ticker}" style="background:#475569; border:none; color:white; cursor:pointer;"><i class="fas fa-eye-slash"></i> 제외</button>
+            `;
+        }
 
         return `
             <div class="ipo-detail-grid animate-fade-in">
@@ -359,12 +390,201 @@ export const newListingView = {
                 <div style="font-size:0.8rem; color:#64748b;">
                     <i class="fas fa-university"></i> 주간사: ${it.lead_manager || '-'}
                 </div>
-                <div style="display:flex; gap:10px;">
+                <div style="display:flex; gap:10px; align-items:center;">
+                    ${actionButtons}
                     ${it.ticker ? `<a href="/stock/${it.ticker}" onclick="event.preventDefault(); window._jumpToStock('${it.ticker}', '${it.name}')" class="stats-btn-action stats-btn-stock"><i class="fas fa-search-dollar"></i> 종목 분석</a>` : ''}
                     <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=" target="_blank" class="stats-btn-action stats-btn-dart" style="opacity:0.5; pointer-events:none;">DART 원문 <i class="fas fa-external-link-alt"></i></a>
                 </div>
             </div>
         `;
+    },
+
+    /**
+     * 상세 보기 행 내부의 동적 조작 버튼 이벤트를 바인딩합니다.
+     */
+    bindDetailRowEvents: function (container, it) {
+        const btnAssign = container.querySelector('.btn-assign');
+        if (btnAssign) {
+            btnAssign.onclick = () => {
+                this.showAssignModal(it.ticker, it.name);
+            };
+        }
+
+        const btnIgnore = container.querySelector('.btn-ignore');
+        if (btnIgnore) {
+            btnIgnore.onclick = async () => {
+                if (confirm(`종목 [${it.name}]을 대기 목록에서 제외하시겠습니까?`)) {
+                    try {
+                        const res = await fetch(`/api/stock/delete?board=virtual_신규상장주&ticker=${it.ticker}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            alert('대기 목록에서 제외되었습니다.');
+                            await this.loadData();
+                        } else {
+                            throw new Error('API request failed');
+                        }
+                    } catch (e) {
+                        alert(`제외 처리 중 오류 발생: ${e.message}`);
+                    }
+                }
+            };
+        }
+
+        const btnJump = container.querySelector('.btn-jump');
+        if (btnJump) {
+            btnJump.onclick = () => {
+                const board = btnJump.dataset.board;
+                if (window._jumpToBoard) {
+                    window._jumpToBoard(board);
+                } else {
+                    alert(`마인드맵 탭으로 이동하여 보드 '${board}'를 직접 선택하세요.`);
+                }
+            };
+        }
+    },
+
+    /**
+     * 테마 보드 배치 모달 윈도우를 출력하고 API 연동을 수행합니다.
+     */
+    showAssignModal: async function (ticker, name) {
+        // 기존 덮어쓰기 모달 제거
+        const existing = document.getElementById('ipo-assign-modal-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ipo-assign-modal-overlay';
+        overlay.className = 'ipo-modal-overlay';
+        overlay.innerHTML = `
+            <div class="ipo-modal">
+                <h3><i class="fas fa-th-large" style="color:#3b82f6;"></i> 신규상장주 보드 배치</h3>
+                <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:20px;">
+                    종목 <strong>[${name} (${ticker})]</strong>을(를) 마인드맵 보드에 할당합니다.
+                </p>
+                
+                <div class="ipo-modal-field">
+                    <label>대상 테마 보드</label>
+                    <select id="ipo-board-select" class="ipo-modal-select">
+                        <option value="">보드를 불러오는 중...</option>
+                    </select>
+                </div>
+                
+                <div class="ipo-modal-field">
+                    <label>배치할 섹터(부모) 노드</label>
+                    <select id="ipo-node-select" class="ipo-modal-select" disabled>
+                        <option value="">보드를 먼저 선택해 주세요.</option>
+                    </select>
+                </div>
+                
+                <div class="ipo-modal-footer">
+                    <button id="ipo-btn-cancel" class="ipo-modal-btn cancel">취소</button>
+                    <button id="ipo-btn-confirm" class="ipo-modal-btn confirm" disabled>배치 확정</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const boardSelect = document.getElementById('ipo-board-select');
+        const nodeSelect = document.getElementById('ipo-node-select');
+        const confirmBtn = document.getElementById('ipo-btn-confirm');
+        const cancelBtn = document.getElementById('ipo-btn-cancel');
+
+        // 모달 닫기 함수
+        const closeModal = () => overlay.remove();
+        cancelBtn.onclick = closeModal;
+        overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+        try {
+            // 1. 보드 목록 로드
+            const resBoards = await fetch('/api/boards');
+            const boards = await resBoards.json();
+            
+            // theme_* 보드만 필터링
+            const themeBoards = boards.filter(b => b.id.startsWith('theme_'));
+            
+            boardSelect.innerHTML = '<option value="">-- 보드 선택 --</option>';
+            themeBoards.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = b.name;
+                boardSelect.appendChild(opt);
+            });
+
+            // 2. 보드 선택 이벤트 바인딩
+            boardSelect.onchange = async () => {
+                const selectedBoard = boardSelect.value;
+                if (!selectedBoard) {
+                    nodeSelect.innerHTML = '<option value="">보드를 먼저 선택해 주세요.</option>';
+                    nodeSelect.disabled = true;
+                    confirmBtn.disabled = true;
+                    return;
+                }
+
+                nodeSelect.innerHTML = '<option value="">노드를 불러오는 중...</option>';
+                nodeSelect.disabled = true;
+                
+                try {
+                    // 보드 트리 로드 및 flat 노드 추출
+                    const resTree = await fetch(`/api/board?name=${selectedBoard}`);
+                    const treeData = await resTree.json();
+                    
+                    const flatNodes = [];
+                    const extractNodes = (node) => {
+                        if (node.name) flatNodes.push(node.name);
+                        if (node.nodes) node.nodes.forEach(extractNodes);
+                    };
+                    extractNodes(treeData);
+
+                    nodeSelect.innerHTML = '<option value="">-- 노드 선택 --</option>';
+                    flatNodes.forEach(n => {
+                        const opt = document.createElement('option');
+                        opt.value = n;
+                        opt.textContent = n;
+                        nodeSelect.appendChild(opt);
+                    });
+                    
+                    nodeSelect.disabled = false;
+                } catch (e) {
+                    nodeSelect.innerHTML = '<option value="">노드 조회 실패</option>';
+                    console.error(e);
+                }
+            };
+
+            // 3. 노드 선택에 따른 배치 확정 활성화
+            nodeSelect.onchange = () => {
+                confirmBtn.disabled = !nodeSelect.value;
+            };
+
+            // 4. 배치 확정 처리
+            confirmBtn.onclick = async () => {
+                const selectedBoard = boardSelect.value;
+                const selectedNode = nodeSelect.value;
+                
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = '배치 중...';
+
+                try {
+                    // Step 1: 가상보드 대기목록에서 제거
+                    const delRes = await fetch(`/api/stock/delete?board=virtual_신규상장주&ticker=${ticker}`, { method: 'DELETE' });
+                    if (!delRes.ok) throw new Error('가상보드 제거 실패');
+
+                    // Step 2: 타겟 보드에 추가 (동시에 백엔드 훅이 매니페스트 ASSIGNED 갱신 및 Gdrive 싱크 실행)
+                    const addRes = await fetch(`/api/stock/add?board=${selectedBoard}&parent=${encodeURIComponent(selectedNode)}&name=${encodeURIComponent(name)}&ticker=${ticker}`, { method: 'POST' });
+                    if (!addRes.ok) throw new Error('테마 보드 추가 실패');
+
+                    alert(`종목 [${name}]이 [${boardSelect.options[boardSelect.selectedIndex].text} > ${selectedNode}] 보드에 성공적으로 배치되었습니다.`);
+                    closeModal();
+                    await this.loadData();
+                } catch (err) {
+                    alert(`배치 오류: ${err.message}`);
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '배치 확정';
+                }
+            };
+
+        } catch (e) {
+            boardSelect.innerHTML = '<option value="">보드 조회 실패</option>';
+            console.error(e);
+        }
     },
 
     /**

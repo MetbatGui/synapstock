@@ -70,6 +70,31 @@ window._jumpToStock = (ticker, name) => {
     loadStockDashboard(ticker, name, loadBoardData, window._globalLocalReportCounts);
 };
 
+/**
+ * 특정 보드로 즉시 점프하여 마인드맵을 로드하고 탭을 전환하는 전역 함수
+ * @param {string} boardName - 보드 파일명 (theme_IT 등)
+ */
+window._jumpToBoard = (boardName) => {
+    if (!boardName) return;
+    
+    // URL 상태 업데이트 (뒤로가기 지원)
+    history.pushState({ tab: 'mindmap' }, '', '/');
+    
+    // 탭 전환
+    switchTab('mindmap-tab', false);
+    
+    // 보드 드롭다운 변경 및 보드 로드 트리거
+    const select = document.getElementById('board-select');
+    if (select) {
+        select.value = boardName;
+        // 체인지 이벤트 트리거
+        select.dispatchEvent(new Event('change'));
+    } else {
+        // 셀렉트 박스가 없는 경우 수동 데이터 로드
+        loadBoardData(boardName);
+    }
+};
+
 // 인자(loadBoardData) 주입이 필요한 함수 래핑
 window.deleteNode = (nodeName) => deleteNode(nodeName, loadBoardData);
 window.deleteStock = (ticker) => deleteStock(ticker, loadBoardData);
@@ -119,7 +144,7 @@ function renderTree(data) {
     treeContainer.innerHTML = '';
     const rootList = document.createElement('div');
     rootList.className = 'tree-root';
-    renderNode(data, rootList, 0, window._globalLocalReportCounts, data, (t, n) => loadStockDashboard(t, n, loadBoardData, window._globalLocalReportCounts));
+    renderNode(data, rootList, 0, window._globalLocalReportCounts, data, (t, n) => loadStockDashboard(t, n, loadBoardData, window._globalLocalReportCounts), loadBoardData);
     treeContainer.appendChild(rootList);
     updateStockCount(data);
 }
