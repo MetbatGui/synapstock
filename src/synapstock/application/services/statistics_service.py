@@ -1,4 +1,7 @@
 import logging
+import json
+from pathlib import Path
+from datetime import datetime, UTC
 from typing import Any, cast
 
 from synapstock.application.services.ceiling_analysis_service import CeilingAnalysisService
@@ -30,9 +33,13 @@ class StatisticsService:
         bonus_issue_repository: Any = None,
         convertible_bond_repository: Any = None,
         bw_repository: Any = None,
+        manifest_path: Path = Path("data/board/board_sync_manifest.json"),
+        virtual_board_path: Path = Path("data/board/virtual_신규상장주.json"),
     ):
         self._storage = storage
         self._query_service = query_service
+        self._manifest_path = manifest_path
+        self._virtual_board_path = virtual_board_path
 
         # 도메인 서비스 초기화 및 의존성 주입
         self.ranking_svc = RankingService(storage, "", repository)
@@ -141,12 +148,92 @@ class StatisticsService:
     # --- 신규 상장 (IPO) ---
     async def get_new_listing_data(self, force_sync: bool = False, year: str = "2026") -> list[NewListing]:
         items = await self.ipo_svc.get_data(year, force_sync=force_sync)
-        return self._enrich_tickers(items)
+        enriched_items = self._enrich_tickers(items)
+        self.sync_new_listings_to_virtual_board(enriched_items)
+        return enriched_items
 
     # --- 동기화 명령 (Sync) ---
     async def sync_new_listing_data(self, year: str = "2026") -> list[NewListing]:
         items = await self.ipo_svc.sync_data(year)
-        return self._enrich_tickers(items)
+        enriched_items = self._enrich_tickers(items)
+        self.sync_new_listings_to_virtual_board(enriched_items)
+        return enriched_items
+
+    def sync_new_listings_to_virtual_board(self, listings: list[NewListing]) -> None:
+        """신규 상장된 종목들을 매니페스트와 가상보드에 자동으로 적재합니다. (정합성 보장)"""
+        if not listings:
+            return
+            
+        manifest_path = self._manifest_path
+        virtual_board_path = self._virtual_board_path
+        
+        # 1. 통합 매니페스트 로드
+        manifest = {"last_updated": "", "boards": {}, "new_listings": {}}
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                logger.error(f"[StatisticsService] 매니페스트 로드 및 파싱 실패(데이터 보호를 위해 처리를 중단합니다): {e}")
+                return
+                
+        if "new_listings" not in manifest:
+            manifest["new_listings"] = {}
+            
+        # 2. 가상보드 로드
+        virtual_board = {"name": "신규상장주", "root": {"name": "신규상장주", "depth": 0, "stocks": []}}
+        if virtual_board_path.exists():
+            try:
+                virtual_board = json.loads(virtual_board_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                logger.error(f"[StatisticsService] 가상보드 로드 및 파싱 실패(데이터 보호를 위해 처리를 중단합니다): {e}")
+                return
+                
+        if "stocks" not in virtual_board["root"]:
+            virtual_board["root"]["stocks"] = []
+            
+        changed = False
+        now_str = datetime.now(UTC).isoformat()
+        
+        # 3. 새로운 종목들 중 매니페스트에 없는 항목을 PENDING으로 등록
+        for item in listings:
+            if not item.ticker or item.ticker == "none":
+                continue
+                
+            ticker = item.ticker
+            # 매니페스트에 아직 등록되지 않은 경우
+            if ticker not in manifest["new_listings"]:
+                manifest["new_listings"][ticker] = {
+                    "ticker": ticker,
+                    "name": item.name,
+                    "status": "PENDING",
+                    "updated_at": now_str,
+                    "current_board": "virtual_신규상장주",
+                    "current_path": []
+                }
+                changed = True
+                
+            # 가상보드 대기 목록에 등록 (PENDING이고 아직 가상보드에 기록되지 않은 경우)
+            if manifest["new_listings"][ticker]["status"] == "PENDING":
+                exists_in_board = any(s.get("ticker") == ticker for s in virtual_board["root"]["stocks"])
+                if not exists_in_board:
+                    virtual_board["root"]["stocks"].append({
+                        "name": item.name,
+                        "ticker": ticker
+                    })
+                    changed = True
+                    
+        # 4. 변경사항이 있으면 저장
+        if changed:
+            try:
+                # 매니페스트 저장
+                manifest["last_updated"] = now_str
+                manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+                
+                # 가상보드 저장
+                virtual_board_path.write_text(json.dumps(virtual_board, indent=2, ensure_ascii=False), encoding="utf-8")
+                logger.info(f"[StatisticsService] 신규 상장주 {len(listings)}건 가상보드 및 매니페스트 갱신 완료")
+            except Exception as e:
+                logger.error(f"[StatisticsService] 가상보드 및 매니페스트 갱신 저장 실패: {e}")
 
     async def sync_capital_increase_data(self, year: str = "2026") -> list:
         items = await self.disclosure_svc.sync_data("capital_increase", year)
