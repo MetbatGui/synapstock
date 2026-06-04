@@ -157,7 +157,7 @@ async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict | J
     Returns:
         dict: ``{"status": "success"}`` 또는 404 오류 응답.
     """
-    success = command_service.add_stock(board, parent, name, ticker)
+    success = await command_service.add_stock(board, parent, name, ticker)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Parent node not found"})
@@ -174,7 +174,7 @@ async def delete_stock(board: str, ticker: str) -> dict | JSONResponse:
     Returns:
         dict: ``{"status": "success"}`` 또는 404 오류 응답.
     """
-    success = command_service.delete_stock(board, ticker)
+    success = await command_service.delete_stock(board, ticker)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Stock not found in board"})
