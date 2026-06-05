@@ -296,13 +296,16 @@ async def get_bonus_issue(force_sync: bool = Query(False, description="강제 �
 #         logger.error(f"Error in sync_bond_with_warrants: {e}")
 #         raise HTTPException(status_code=500, detail=str(e))
 @router.get("/new-listing", response_model=None)
-async def get_new_listing(force_sync: bool = Query(False, description="강제 동기화 여부")):
+async def get_new_listing(
+    year: str = Query("2026", description="조회 연도 (YYYY)"),
+    force_sync: bool = Query(False, description="강제 동기화 여부"),
+):
     """신규상장주(IPO) 분석 데이터를 가져옵니다."""
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
 
-        items = await statistics_service.get_new_listing_data(force_sync=force_sync)
+        items = await statistics_service.get_new_listing_data(force_sync=force_sync, year=year)
         return {"count": len(items), "items": items}
     except Exception as e:
         logger.error(f"Error in get_new_listing: {e}")

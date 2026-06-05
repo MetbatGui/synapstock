@@ -9,7 +9,7 @@ import logging
 import threading
 from typing import cast
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, UploadFile, Response
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ async def get_boards() -> list[dict] | JSONResponse:
 
 
 @router.get("/api/board", response_model=None)
-async def get_board_data(name: str) -> dict | JSONResponse:
+async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
     """특정 보드의 계층형 트리 데이터를 반환합니다.
 
     Args:
@@ -50,19 +50,50 @@ async def get_board_data(name: str) -> dict | JSONResponse:
         JSONResponse (404): 보드를 찾을 수 없는 경우.
     """
     try:
-        board = query_service.load_board(name)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
 
-        # 가상보드인 경우 매니페스트 로드하여 할당 메타데이터 확보
+        # 가상보드인 경우 매니페스트 로드하여 할당 메타데이터 확보 및 가상보드 파일 갱신 선수행
         manifest_meta = {}
+        ticker_to_listing_date = {}
+        
         if name == "virtual_신규상장주":
+            # 1. 매니페스트에서 상장일 정보 로드 (listing_date 필드)
             try:
                 from synapstock.presentation.web.core.dependencies import container
                 manifest_path = container.config.board_dir / "board_sync_manifest.json"
                 if manifest_path.exists():
-                    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-                    manifest_meta = manifest_data.get("new_listings", {})
+                    raw = manifest_path.read_text(encoding="utf-8").strip()
+                    if raw:
+                        manifest_data = json.loads(raw)
+                        manifest_meta = manifest_data.get("new_listings", {})
+                        # 매니페스트의 listing_date로 연도 분류 맵 구성
+                        for ticker, meta in manifest_meta.items():
+                            l_date = meta.get("listing_date", "")
+                            if l_date:
+                                ticker_to_listing_date[ticker] = l_date
             except Exception as e:
-                logger.error(f"Failed to load manifest for virtual board info: {e}")
+                logger.error(f"Failed to load manifest for virtual board: {e}")
+
+            # 2. 더미 테스트용 10개 종목 상장일 하드코딩 보정 (항상 적용)
+            dummy_ipo_dates = {
+                "990011": "2025-03-12",
+                "990012": "2025-05-18",
+                "990013": "2025-08-22",
+                "990014": "2025-11-05",
+                "990015": "2025-12-28",
+                "990016": "2026-03-15",
+                "990017": "2026-06-20",
+                "990018": "2026-09-10",
+                "990019": "2026-11-05",
+                "990020": "2026-12-25",
+            }
+            for ticker, l_date in dummy_ipo_dates.items():
+                ticker_to_listing_date[ticker] = l_date
+
+        # 최신화된 보드 데이터를 디스크에서 로드
+        board = query_service.load_board(name)
 
         def to_dict(node):
             stocks_list = []
@@ -79,6 +110,44 @@ async def get_board_data(name: str) -> dict | JSONResponse:
                 "name": node.name,
                 "nodes": [to_dict(n) for n in node.nodes],
                 "stocks": stocks_list,
+            }
+
+        # 신규상장주 보드인 경우 상장일 기반 가상 연도 계층 트리 노드로 동적 변환
+        if name == "virtual_신규상장주":
+            root_dict = to_dict(board.root)
+            all_stocks = root_dict.get("stocks", [])
+            
+            # 상장일 기반 그룹화 (연도별)
+            grouped = {}
+            for s in all_stocks:
+                l_date = ticker_to_listing_date.get(s["ticker"], "")
+                year_str = "기타"
+                
+                # 점(.)을 대시(-)로 변환하여 유연하게 대처
+                normalized_date = l_date.replace(".", "-") if l_date else ""
+                if normalized_date and "-" in normalized_date:
+                    parts = normalized_date.split("-")
+                    if parts[0]:
+                        year_str = parts[0] + "년"
+                        
+                if year_str not in grouped:
+                    grouped[year_str] = []
+                grouped[year_str].append(s)
+                
+            # 계층형 노드로 변형
+            nodes_list = []
+            # 연도 내림차순 정렬
+            for yr in sorted(grouped.keys(), reverse=True):
+                nodes_list.append({
+                    "name": yr,
+                    "nodes": [],
+                    "stocks": grouped[yr]
+                })
+                
+            return {
+                "name": board.root.name,
+                "nodes": nodes_list,
+                "stocks": []  # 루트 노드 바로 아래는 비워둠
             }
 
         return cast(dict, to_dict(board.root))

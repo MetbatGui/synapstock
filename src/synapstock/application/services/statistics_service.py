@@ -100,8 +100,9 @@ class StatisticsService:
         new_listings_meta = manifest.get("new_listings", {})
         
         for item in items:
-            if hasattr(item, "ticker") and not item.ticker and item.name in ticker_map:
-                item.ticker = ticker_map[item.name]
+            if hasattr(item, "ticker") and not item.ticker:
+                if item.name in ticker_map:
+                    item.ticker = ticker_map[item.name]
                 
             # 매니페스트 내 상태 데이터 맵핑
             # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
@@ -230,12 +231,19 @@ class StatisticsService:
                 manifest["new_listings"][ticker] = {
                     "ticker": ticker,
                     "name": item.name,
+                    "listing_date": item.listing_date or "",
                     "status": "PENDING",
                     "updated_at": now_str,
                     "current_board": "virtual_신규상장주",
                     "current_path": []
                 }
                 changed = True
+            else:
+                # 이미 등록된 항목에 listing_date가 없으면 보강
+                entry = manifest["new_listings"][ticker]
+                if not entry.get("listing_date") and item.listing_date:
+                    entry["listing_date"] = item.listing_date
+                    changed = True
                 
             # 가상보드 대기 목록에 등록 (PENDING이고 아직 가상보드에 기록되지 않은 경우)
             if manifest["new_listings"][ticker]["status"] == "PENDING":

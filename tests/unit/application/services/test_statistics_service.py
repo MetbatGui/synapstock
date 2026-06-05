@@ -83,6 +83,7 @@ class TestStatisticsService:
         assert enriched_items[0].ticker == "079550"
         assert enriched_items[1].ticker == "005930"
 
+
     @pytest.mark.asyncio
     async def test_get_convertible_bond_data_delegation(self, service):
         """CB 데이터 조회 시 disclosure_svc에 위임하고 티커를 보강해야 한다."""
