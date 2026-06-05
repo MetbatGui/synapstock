@@ -354,3 +354,134 @@ h2 {
     background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
     transition: width 0.3s;
 }
+
+/* IPO Quick List Tree Styling */
+.ipo-quick-list {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.ipo-quick-list-node {
+    margin: 4px 0;
+}
+
+.ipo-quick-list-folder {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    color: #94a3b8;
+    font-weight: 600;
+    user-select: none;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.ipo-quick-list-folder:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+}
+
+/* 폴더 접기/펼치기 화살표 인디케이터 */
+.ipo-quick-list-folder::before {
+    content: '▼';
+    font-size: 0.6rem;
+    margin-right: 6px;
+    color: #facc15;
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+
+.ipo-quick-list-folder.collapsed::before {
+    transform: rotate(-90deg);
+}
+
+.ipo-quick-list-folder i {
+    color: #facc15;
+    margin-right: 6px;
+    font-size: 0.9rem;
+}
+
+.ipo-quick-list-children {
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-in;
+    overflow: hidden;
+}
+
+.ipo-quick-list-children.collapsed {
+    display: none;
+}
+
+.ipo-quick-list-stock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    margin: 3px 0 3px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    transition: all 0.2s;
+}
+
+.ipo-quick-list-stock:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.ipo-quick-list-stock.assigned {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.ipo-quick-list-stock.assigned:hover {
+    background: rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 255, 255, 0.03);
+}
+
+.ipo-quick-list-stock-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.ipo-quick-list-stock-checkbox {
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    accent-color: #3b82f6;
+}
+
+.ipo-quick-list-stock-info i {
+    color: #4ade80;
+    font-size: 0.8rem;
+}
+
+.ipo-quick-list-stock-name {
+    font-weight: 500;
+}
+
+.ipo-quick-list-stock-ticker {
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.ipo-quick-list-stock-status {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ipo-quick-list-stock.assigned .ipo-quick-list-stock-status {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+}
+
