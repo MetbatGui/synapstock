@@ -99,11 +99,11 @@ export function renderNode(node, container, depth, globalLocalReportCounts, curr
                     overviewPanel.style.display = 'block';
 
                     // 가상보드 신규상장주이고, 배치 완료 상태인 경우 "보드로 이동" 버튼 활성화
-                    const isIpoAssigned = currentBoardData && currentBoardData.name === "신규상장주" && stock.status === "ASSIGNED" && stock.current_board && stock.current_board !== "virtual_신규상장주";
+                    const isIpoAssigned = currentBoardData && (currentBoardData.name === "신규상장주" || window._currentBoardName === "virtual_신규상장주") && stock.status === "ASSIGNED" && stock.current_board && stock.current_board !== "virtual_신규상장주";
                     const jumpBtnHtml = isIpoAssigned ? `<button class="btn btn-success btn-sm btn-jump" style="background:#22c55e;color:white;border:none;">보드로 이동</button>` : '';
 
                     // 가상보드 신규상장주이고, 미배치 상태(PENDING)인 경우 "분류" 버튼 활성화
-                    const isIpoPending = currentBoardData && currentBoardData.name === "신규상장주" && stock.status === "PENDING";
+                    const isIpoPending = currentBoardData && (currentBoardData.name === "신규상장주" || window._currentBoardName === "virtual_신규상장주") && stock.status === "PENDING";
                     const assignBtnHtml = isIpoPending ? `<button class="btn btn-warning btn-sm btn-assign" style="background:#f59e0b;color:white;border:none;">분류</button>` : '';
 
                     overviewPanel.innerHTML = `
@@ -222,54 +222,130 @@ export async function showAssignModal(ticker, name, loadBoardData) {
     overlay.id = 'ipo-assign-modal-overlay';
     overlay.className = 'ipo-modal-overlay';
     overlay.innerHTML = `
-        <div class="ipo-modal" style="position:fixed;top:50%;left:50%;transform:translate(-50%, -50%);background:#1e293b;padding:25px;border-radius:12px;z-index:99999;box-shadow:0 10px 25px rgba(0,0,0,0.5);width:360px;color:white;border:1px solid #334155;">
-            <h3 style="margin-top:0;font-size:1.1rem;display:flex;align-items:center;gap:8px;"><i class="fas fa-th-large" style="color:#3b82f6;"></i> 신규상장주 보드 배치</h3>
-            <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:20px;">
+        <div class="ipo-modal">
+            <h3><i class="fas fa-th-large" style="color:#3b82f6;"></i> 신규상장주 보드 배치</h3>
+            <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:15px;">
                 종목 <strong>[${name} (${ticker})]</strong>을(를) 마인드맵 보드에 할당합니다.
             </p>
             
-            <div class="ipo-modal-field" style="margin-bottom:15px;">
-                <label style="display:block;font-size:0.8rem;color:#94a3b8;margin-bottom:5px;">대상 테마 보드</label>
-                <select id="ipo-board-select" class="ipo-modal-select" style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:white;">
+            <div class="ipo-modal-field">
+                <label>대상 테마 보드 (1뎁스)</label>
+                <select id="ipo-board-select" class="ipo-modal-select">
                     <option value="">보드를 불러오는 중...</option>
                 </select>
             </div>
             
-            <div class="ipo-modal-field" style="margin-bottom:20px;">
-                <label style="display:block;font-size:0.8rem;color:#94a3b8;margin-bottom:5px;">배치할 섹터(부모) 노드</label>
-                <select id="ipo-node-select" class="ipo-modal-select" disabled style="width:100%;padding:8px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:white;opacity:0.5;">
-                    <option value="">보드를 먼저 선택해 주세요.</option>
-                </select>
+            <!-- 동적 하위 노드 선택상자들이 추가될 영역 -->
+            <div id="ipo-dynamic-fields-container"></div>
+
+            <!-- 현재 실시간 선택 경로 표시 영역 -->
+            <div id="ipo-current-path-wrapper" style="margin-top:15px; display:none;">
+                <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:5px;">배치될 최종 위치 경로</label>
+                <div id="ipo-current-path" style="font-size:0.85rem; color:#3b82f6; font-weight:600; padding:10px; background:#0f172a; border-radius:8px; border:1px solid rgba(255,255,255,0.05); word-break:break-all; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                    (선택되지 않음)
+                </div>
             </div>
             
-            <div class="ipo-modal-footer" style="display:flex;justify-content:flex-end;gap:10px;">
-                <button id="ipo-btn-cancel" class="ipo-modal-btn cancel" style="padding:6px 12px;background:#475569;color:white;border:none;border-radius:6px;cursor:pointer;">취소</button>
-                <button id="ipo-btn-confirm" class="ipo-modal-btn confirm" disabled style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;">배치 확정</button>
+            <div class="ipo-modal-footer">
+                <button id="ipo-btn-cancel" class="ipo-modal-btn cancel">취소</button>
+                <button id="ipo-btn-confirm" class="ipo-modal-btn confirm" disabled>배치 확정</button>
             </div>
         </div>
     `;
 
-    // 백그라운드 클릭 차단을 위한 뒷배경 오버레이 스타일 부여
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.background = 'rgba(0,0,0,0.6)';
-    overlay.style.backdropFilter = 'blur(4px)';
-    overlay.style.zIndex = '99998';
-
     document.body.appendChild(overlay);
 
     const boardSelect = document.getElementById('ipo-board-select');
-    const nodeSelect = document.getElementById('ipo-node-select');
+    const dynamicContainer = document.getElementById('ipo-dynamic-fields-container');
+    const pathWrapper = document.getElementById('ipo-current-path-wrapper');
+    const pathDiv = document.getElementById('ipo-current-path');
     const confirmBtn = document.getElementById('ipo-btn-confirm');
     const cancelBtn = document.getElementById('ipo-btn-cancel');
+
+    let treeData = null;
+    let levels = []; // { parentNode, selectEl, fieldDiv } 배열
 
     // 모달 닫기 함수
     const closeModal = () => overlay.remove();
     cancelBtn.onclick = closeModal;
     overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+    // 현재 실시간 선택된 경로와 최종 노드 타겟을 계산하여 UI 업데이트 및 확정 활성화
+    function updateCurrentPath() {
+        const boardName = boardSelect.options[boardSelect.selectedIndex].text;
+        let pathSegments = [boardName];
+        let lastSelectedNode = treeData ? treeData.name : null;
+
+        for (let i = 0; i < levels.length; i++) {
+            const val = levels[i].selectEl.value;
+            if (val) {
+                pathSegments.push(val);
+                lastSelectedNode = val;
+            } else {
+                break;
+            }
+        }
+
+        if (lastSelectedNode) {
+            pathWrapper.style.display = 'block';
+            pathDiv.innerHTML = `<i class="fas fa-folder-open" style="color:#facc15; margin-right:5px;"></i> ${pathSegments.join(' <i class="fas fa-chevron-right" style="font-size:0.7rem;color:#64748b;margin:0 3px;"></i> ')}`;
+            confirmBtn.disabled = false; // 중간 섹터에도 삽입 가능하므로 루트 이상 선택되면 언제든 확정 가능
+            confirmBtn.dataset.targetNode = lastSelectedNode;
+        } else {
+            pathWrapper.style.display = 'none';
+            confirmBtn.disabled = true;
+        }
+    }
+
+    // 하위 자식이 존재하는지 확인하고, 있으면 다음 뎁스의 선택 상자를 생성하는 함수
+    function createNextLevel(parentNode, depth) {
+        if (!parentNode.nodes || parentNode.nodes.length === 0) {
+            updateCurrentPath();
+            return;
+        }
+
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'ipo-modal-field';
+        fieldDiv.style.marginTop = '12px';
+        fieldDiv.innerHTML = `
+            <label style="display:block; font-size:0.8rem; color:#94a3b8; margin-bottom:5px;">배치할 하위 섹터 (${depth + 2}뎁스)</label>
+            <select class="ipo-modal-select" id="ipo-select-level-${depth}">
+                <option value="">-- 하위 섹터 선택 (선택 사항) --</option>
+            </select>
+        `;
+
+        dynamicContainer.appendChild(fieldDiv);
+
+        const selectEl = fieldDiv.querySelector('select');
+        parentNode.nodes.forEach(child => {
+            const opt = document.createElement('option');
+            opt.value = child.name;
+            opt.textContent = child.name;
+            selectEl.appendChild(opt);
+        });
+
+        levels.push({ parentNode, selectEl, fieldDiv });
+
+        selectEl.onchange = () => {
+            // 현재보다 더 깊은 레벨의 선택 박스들 제거
+            while (levels.length > depth + 1) {
+                const removed = levels.pop();
+                removed.fieldDiv.remove();
+            }
+
+            const selectedVal = selectEl.value;
+            if (selectedVal) {
+                const nextNode = parentNode.nodes.find(n => n.name === selectedVal);
+                if (nextNode) {
+                    createNextLevel(nextNode, depth + 1);
+                }
+            } else {
+                updateCurrentPath();
+            }
+        };
+
+        updateCurrentPath();
+    }
 
     try {
         // 1. 보드 목록 로드
@@ -290,54 +366,31 @@ export async function showAssignModal(ticker, name, loadBoardData) {
         // 2. 보드 선택 이벤트 바인딩
         boardSelect.onchange = async () => {
             const selectedBoard = boardSelect.value;
-            if (!selectedBoard) {
-                nodeSelect.innerHTML = '<option value="">보드를 먼저 선택해 주세요.</option>';
-                nodeSelect.disabled = true;
-                nodeSelect.style.opacity = '0.5';
-                confirmBtn.disabled = true;
-                return;
-            }
+            dynamicContainer.innerHTML = '';
+            pathWrapper.style.display = 'none';
+            confirmBtn.disabled = true;
+            levels = [];
+            treeData = null;
 
-            nodeSelect.innerHTML = '<option value="">노드를 불러오는 중...</option>';
-            nodeSelect.disabled = true;
-            nodeSelect.style.opacity = '0.5';
-            
+            if (!selectedBoard) return;
+
             try {
                 const resTree = await fetch(`/api/board?name=${selectedBoard}`);
-                const treeData = await resTree.json();
+                treeData = await resTree.json();
                 
-                const flatNodes = [];
-                const extractNodes = (node) => {
-                    if (node.name) flatNodes.push(node.name);
-                    if (node.nodes) node.nodes.forEach(extractNodes);
-                };
-                extractNodes(treeData);
-
-                nodeSelect.innerHTML = '<option value="">-- 노드 선택 --</option>';
-                flatNodes.forEach(n => {
-                    const opt = document.createElement('option');
-                    opt.value = n;
-                    opt.textContent = n;
-                    nodeSelect.appendChild(opt);
-                });
-                
-                nodeSelect.disabled = false;
-                nodeSelect.style.opacity = '1.0';
+                // 보드의 루트 노드 하위(2뎁스) 탐색기 띄우기
+                createNextLevel(treeData, 0);
             } catch (e) {
-                nodeSelect.innerHTML = '<option value="">노드 조회 실패</option>';
                 console.error(e);
+                dynamicContainer.innerHTML = '<div style="color:#ef4444;font-size:0.8rem;margin-top:10px;">보드 노드 정보를 불러오지 못했습니다.</div>';
             }
         };
 
-        // 3. 노드 선택에 따른 배치 확정 활성화
-        nodeSelect.onchange = () => {
-            confirmBtn.disabled = !nodeSelect.value;
-        };
-
-        // 4. 배치 확정 처리
+        // 3. 배치 확정 처리
         confirmBtn.onclick = async () => {
             const selectedBoard = boardSelect.value;
-            const selectedNode = nodeSelect.value;
+            const selectedNode = confirmBtn.dataset.targetNode;
+            if (!selectedNode) return;
             
             confirmBtn.disabled = true;
             confirmBtn.textContent = '배치 중...';
