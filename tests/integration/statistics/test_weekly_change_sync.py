@@ -25,7 +25,7 @@ async def test_weekly_change_sync_logic_subfolder_mock(monkeypatch):
 
     async def mock_list_files(folder_path, **kwargs):
         list_calls.append(folder_path)
-        if folder_path == "2026/05":
+        if folder_path in ("2026/05", "2026/05월"):
             return [{"id": "file_sub", "name": "weekly_gainers_2026_W19_05M1W_0504~0508.xlsx"}]
         return [] # 루트 등 다른 폴더엔 없음
         
@@ -37,16 +37,20 @@ async def test_weekly_change_sync_logic_subfolder_mock(monkeypatch):
         df.to_excel(out, index=False)
         return out.getvalue()
 
-    if service.drive_adapter:
-        monkeypatch.setattr(service.drive_adapter, "list_files_in_folder", mock_list_files)
-        monkeypatch.setattr(service.drive_adapter, "get_file", mock_get_file)
-        
-        # 2026-05-08 날짜로 동기화 시도 -> 2026/05 폴더 검색 기대
-        report = await service.sync_data("2026-05-08")
-        
-        assert report is not None
-        assert "2026/05" in list_calls
-        assert report.date == "2026-05-08"
-        assert report.month == 5
-        assert report.week_of_month == 1
-        assert report.items[0].name == "삼성전자"
+    class MockDriveAdapter:
+        async def list_files_in_folder(self, folder_path, **kwargs):
+            return await mock_list_files(folder_path, **kwargs)
+        async def get_file(self, filename, **kwargs):
+            return await mock_get_file(filename, **kwargs)
+
+    mock_adapter = MockDriveAdapter()
+    monkeypatch.setattr(service, "drive_adapter", mock_adapter)
+    # 2026-05-08 날짜로 동기화 시도 -> 2026/05 폴더 검색 기대
+    report = await service.sync_data("2026-05-08")
+    
+    assert report is not None
+    assert any("2026/05" in call for call in list_calls)
+    assert report.date == "2026-05-08"
+    assert report.month == 5
+    assert report.week_of_month == 1
+    assert report.items[0].name == "삼성전자"
