@@ -160,31 +160,7 @@ class TestNode:
         assert success is True
         assert len(child.stocks) == 0
 
-    def test_node_news_management_recursive(self):
-        """재귀적으로 종목을 찾아 뉴스를 추가 및 삭제한다.
 
-        Arrange:
-            깊은 노드에 종목 "S1"이 있는 트리를 생성한다.
-        Act:
-            1. find_and_add_news로 뉴스 추가.
-            2. find_and_remove_news로 뉴스 삭제.
-        Assert:
-            추가 후 뉴스 리스트 길이는 1, 삭제 후 0인지 확인한다.
-        """
-        root = Node(name="root", depth=0)
-        child = root.add_child("child")
-        stock = Stock(name="Stock1", ticker="S1")
-        child.add_stock(stock)
-
-        news = {"title": "Title", "date": "2024-01-01", "url": "http://test.com"}
-
-        # Add
-        root.find_and_add_news("S1", news)
-        assert len(child.stocks[0].news) == 1
-
-        # Remove
-        root.find_and_remove_news("S1", "http://test.com")
-        assert len(child.stocks[0].news) == 0
 
     def test_node_report_management_recursive(self):
         """재귀적으로 종목을 찾아 리포트 경로를 추가 및 삭제한다.

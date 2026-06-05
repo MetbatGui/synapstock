@@ -86,11 +86,36 @@ class StatisticsService:
             return ticker_map
 
     def _enrich_tickers(self, items: list) -> list:
-        """아이템 리스트의 티커 정보를 보강합니다."""
+        """아이템 리스트의 티커 정보를 보강하고, 매니페스트 상의 실제 할당 상태를 매핑합니다."""
         ticker_map = self._build_local_ticker_map()
+        
+        # 로컬 매니페스트 로드
+        manifest = {"new_listings": {}}
+        if self._manifest_path.exists():
+            try:
+                manifest = json.loads(self._manifest_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+                
+        new_listings_meta = manifest.get("new_listings", {})
+        
         for item in items:
             if hasattr(item, "ticker") and not item.ticker and item.name in ticker_map:
                 item.ticker = ticker_map[item.name]
+                
+            # 매니페스트 내 상태 데이터 맵핑
+            # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
+            if hasattr(type(item), "model_fields") and "status" in type(item).model_fields:
+                if hasattr(item, "ticker") and item.ticker:
+                    meta = new_listings_meta.get(item.ticker, {})
+                    item.status = meta.get("status", "PENDING")
+                    item.current_board = meta.get("current_board", "virtual_신규상장주")
+                    item.current_path = meta.get("current_path", [])
+                else:
+                    item.status = "PENDING"
+                    item.current_board = "virtual_신규상장주"
+                    item.current_path = []
+                
         return items
 
     async def get_daily_ranking(

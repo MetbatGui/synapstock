@@ -68,8 +68,8 @@ async def get_board_data(name: str) -> dict | JSONResponse:
             stocks_list = []
             for s in node.stocks:
                 stock_dict = {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news}
-                if name == "virtual_신규상장주" and s.ticker in manifest_meta:
-                    meta = manifest_meta[s.ticker]
+                if name == "virtual_신규상장주":
+                    meta = manifest_meta.get(s.ticker, {})
                     stock_dict["status"] = meta.get("status", "PENDING")
                     stock_dict["current_board"] = meta.get("current_board", "virtual_신규상장주")
                     stock_dict["current_path"] = meta.get("current_path", [])

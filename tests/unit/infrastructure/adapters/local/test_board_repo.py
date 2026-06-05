@@ -62,10 +62,10 @@ class TestLocalBoardRepository:
 
     def test_list_boards(self, repo):
         """저장된 Board 이름 목록을 알파벳 정렬로 반환해야 한다."""
-        repo.save(Board(name="B보드"))
-        repo.save(Board(name="A보드"))
-        repo.save(Board(name="C보드"))
-        assert repo.list_boards() == ["A보드", "B보드", "C보드"]
+        repo.save(Board(id="theme_B", name="B보드"))
+        repo.save(Board(id="theme_A", name="A보드"))
+        repo.save(Board(id="theme_C", name="C보드"))
+        assert repo.list_boards() == ["theme_A", "theme_B", "theme_C"]
 
     def test_save_overwrites_existing(self, repo):
         """같은 이름으로 다시 save()하면 덮어써야 한다."""
@@ -115,6 +115,10 @@ class TestFixtureBoardRepository:
         tickers = [s.ticker for s in internet.stocks]
         assert "035420" in tickers
 
-    def test_list_fixture_boards(self, fixture_repo):
-        """fixtures/boards/ 목록에 'IT'가 포함되어야 한다."""
-        assert "IT" in fixture_repo.list_boards()
+    def test_list_fixture_boards(self, repo):
+        """저장된 Board 중 theme_ 또는 virtual_ 접두사가 있는 보드만 목록에 반환되어야 한다."""
+        repo.save(Board(id="theme_IT", name="IT"))
+        repo.save(Board(id="normal_board", name="Normal"))
+        boards = repo.list_boards()
+        assert "theme_IT" in boards
+        assert "normal_board" not in boards
