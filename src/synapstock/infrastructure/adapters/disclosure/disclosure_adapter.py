@@ -28,6 +28,10 @@ class DartDisclosureAdapter(DisclosurePort):
             "Origin": self.base_url,
             "X-Requested-With": "XMLHttpRequest",
         }
+        # 캐시 저장소: dict[str, tuple[list[dict], datetime]]
+        self._cache = {}
+        # 캐시 유지 시간 (15분)
+        self.cache_ttl = timedelta(minutes=15)
 
     def get_recent_disclosures(self, ticker: str) -> list[dict]:
         """DART 상세검색 POST 요청을 통해 최근 1년치 공시를 가져옵니다.
@@ -38,8 +42,18 @@ class DartDisclosureAdapter(DisclosurePort):
         Returns:
             list[dict]: 공시 항목 목록 (최대 10건).
         """
-        end_date = datetime.now().strftime("%Y%m%d")
-        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d")
+        now = datetime.now()
+        if ticker in self._cache:
+            cached_results, expired_at = self._cache[ticker]
+            if now < expired_at:
+                logger.info(f"[DART CACHE] Cache hit for {ticker}")
+                return cached_results
+            else:
+                logger.info(f"[DART CACHE] Cache expired for {ticker}")
+                del self._cache[ticker]
+
+        end_date = now.strftime("%Y%m%d")
+        start_date = (now - timedelta(days=365)).strftime("%Y%m%d")
 
         # 사용자가 제공한 페이로드 기반 구성
         payload = {
@@ -96,8 +110,21 @@ class DartDisclosureAdapter(DisclosurePort):
                         }
                     )
 
-            return cast(list[dict], results[:10])  # 최신 10건만 반환
+            parsed_results = cast(list[dict], results[:10])  # 최신 10건만 반환
+            self._cache[ticker] = (parsed_results, now + self.cache_ttl)
+            logger.info(f"[DART CACHE] Cache populated for {ticker} (TTL: 15m)")
+            return parsed_results
 
         except Exception as e:
             logger.error(f"[DART ERROR] Failed to fetch disclosures for {ticker}: {e}")
             return []
+
+    def clear_cache(self, ticker: str | None = None) -> None:
+        """캐시를 초기화합니다. 특정 ticker가 주어지면 해당 종목 캐시만 삭제합니다."""
+        if ticker:
+            if ticker in self._cache:
+                del self._cache[ticker]
+                logger.info(f"[DART CACHE] Cache cleared for ticker: {ticker}")
+        else:
+            self._cache.clear()
+            logger.info("[DART CACHE] All caches cleared")
