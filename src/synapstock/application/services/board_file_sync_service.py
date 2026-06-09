@@ -315,3 +315,28 @@ class BoardFileSyncService:
                 })
                 self.save_local_manifest(manifest)
                 logger.info(f"[BoardFileSync] 가상보드 수동 삭제 감지 (IGNORED 상태 전환): {ticker}")
+
+    async def handle_batch_stock_deletion_trigger(self, tickers: list[str], board_id: str) -> None:
+        """보드에서 여러 종목이 일괄 제거되었을 때 호출되는 훅.
+        가상 보드('virtual_신규상장주') 대기 목록에서 제외된 종목들의 상태를 'IGNORED'로 일괄 업데이트합니다.
+        """
+        if board_id != "virtual_신규상장주" or not tickers:
+            return
+
+        manifest = self.load_local_manifest()
+        changed = False
+        now_str = datetime.now(UTC).isoformat()
+
+        for ticker in tickers:
+            if ticker in manifest.get("new_listings", {}):
+                item = manifest["new_listings"][ticker]
+                if item.get("status") == "PENDING":
+                    item.update({
+                        "status": "IGNORED",
+                        "updated_at": now_str
+                    })
+                    changed = True
+
+        if changed:
+            self.save_local_manifest(manifest)
+            logger.info(f"[BoardFileSync] 가상보드 일괄 삭제 감지 (종목 {len(tickers)}개 중 대기 중인 항목 IGNORED 전환)")

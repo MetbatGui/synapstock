@@ -93,3 +93,27 @@ class BoardCommandService:
         except Exception:
             return False
 
+    async def batch_ignore_stocks(self, board_name: str, tickers: list[str]) -> bool:
+        """가상 보드에서 여러 종목을 일괄 제거하고 매니페스트 상의 상태를 IGNORED로 업데이트합니다."""
+        if not tickers:
+            return True
+
+        board = self._repository.load(board_name)
+        any_success = False
+
+        for ticker in tickers:
+            # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 삭제)
+            if board.root.find_and_remove_stock(ticker):
+                any_success = True
+
+        if any_success:
+            self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(board_name, deleted=False)
+                # 가상보드 일괄 삭제 감지 훅 호출
+                await self._sync_service.handle_batch_stock_deletion_trigger(tickers, board_name)
+                # 구글 드라이브 동기화 강제 트리거
+                await self._sync_service.sync_with_drive()
+                
+        return any_success
+

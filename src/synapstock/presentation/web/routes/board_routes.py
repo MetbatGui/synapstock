@@ -386,3 +386,21 @@ async def sync_virtual_boards() -> dict | JSONResponse:
     except Exception as e:
         logger.error(f"Error executing board drive sync: {str(e)}")
         return JSONResponse(status_code=500, content={"message": f"서버 동기화 오류: {str(e)}"})
+
+
+from pydantic import BaseModel
+
+class BatchIgnoreRequest(BaseModel):
+    tickers: list[str]
+
+@router.post("/api/board/virtual/batch-ignore", response_model=None)
+async def batch_ignore_virtual_board_stocks(request: BatchIgnoreRequest) -> dict | JSONResponse:
+    """가상 보드 대기열에서 여러 종목을 일괄 제외 처리합니다."""
+    try:
+        success = await command_service.batch_ignore_stocks("virtual_신규상장주", request.tickers)
+        if success:
+            return {"status": "success", "message": f"성공적으로 {len(request.tickers)}개 종목이 일괄 제외되었습니다."}
+        return JSONResponse(status_code=400, content={"message": "일괄 제외 처리에 실패했습니다."})
+    except Exception as e:
+        logger.error(f"Error executing batch ignore for virtual board: {str(e)}")
+        return JSONResponse(status_code=500, content={"message": f"서버 내부 오류: {str(e)}"})
