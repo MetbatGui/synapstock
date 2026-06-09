@@ -703,13 +703,19 @@ export const newListingView = {
                 confirmBtn.textContent = '배치 중...';
 
                 try {
-                    // Step 1: 가상보드 대기목록에서 제거
+                    // Step 1: 타겟 보드에 추가 시도 (중복 검사 훅이 적용되어 있으므로 먼저 검사됨)
+                    const addRes = await fetch(`/api/stock/add?board=${selectedBoard}&parent=${encodeURIComponent(selectedNode)}&name=${encodeURIComponent(name)}&ticker=${ticker}`, { method: 'POST' });
+                    if (!addRes.ok) {
+                        if (addRes.status === 409) {
+                            const errData = await addRes.json();
+                            throw new Error(errData.message);
+                        }
+                        throw new Error('테마 보드 추가 실패');
+                    }
+
+                    // Step 2: 타겟 보드 추가 성공 후, 가상보드 대기목록에서 제거
                     const delRes = await fetch(`/api/stock/delete?board=virtual_신규상장주&ticker=${ticker}`, { method: 'DELETE' });
                     if (!delRes.ok) throw new Error('가상보드 제거 실패');
-
-                    // Step 2: 타겟 보드에 추가 (동시에 백엔드 훅이 매니페스트 ASSIGNED 갱신 및 Gdrive 싱크 실행)
-                    const addRes = await fetch(`/api/stock/add?board=${selectedBoard}&parent=${encodeURIComponent(selectedNode)}&name=${encodeURIComponent(name)}&ticker=${ticker}`, { method: 'POST' });
-                    if (!addRes.ok) throw new Error('테마 보드 추가 실패');
 
                     alert(`종목 [${name}]이 [${boardSelect.options[boardSelect.selectedIndex].text} > ${selectedNode}] 보드에 성공적으로 배치되었습니다.`);
                     closeModal();

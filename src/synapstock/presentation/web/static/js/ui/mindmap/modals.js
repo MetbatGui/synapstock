@@ -323,17 +323,30 @@ export function initMindmapModals(loadBoardData) {
         confirmBtn.textContent = '추가 중...';
 
         try {
-            // 다중 종목 비동기 배치 연달아 추가
-            const addPromises = SELECTED_STOCKS.map(stock => 
-                fetch(`/api/stock/add?board=${encodeURIComponent(currentBoard)}&parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}&name=${encodeURIComponent(stock.name)}&ticker=${encodeURIComponent(stock.ticker)}`, { method: 'POST' })
-            );
-            const results = await Promise.all(addPromises);
-            const successCount = results.filter(res => res.ok).length;
+            const results = [];
+            const errorMessages = [];
+
+            // 순차적으로 종목을 추가하며 결과 체크 (중복 에러 피드백 수집)
+            for (const stock of SELECTED_STOCKS) {
+                const url = `/api/stock/add?board=${encodeURIComponent(currentBoard)}&parent=${encodeURIComponent(LAST_CLICKED_NODE_NAME)}&name=${encodeURIComponent(stock.name)}&ticker=${encodeURIComponent(stock.ticker)}`;
+                const res = await fetch(url, { method: 'POST' });
+                if (res.ok) {
+                    results.push(res);
+                } else if (res.status === 409) {
+                    const errData = await res.json();
+                    errorMessages.push(errData.message);
+                } else {
+                    errorMessages.push(`[${stock.name}] 추가 중 오류 발생`);
+                }
+            }
             
+            const successCount = results.length;
             if (successCount > 0) {
-                addLogEntry(`[SYSTEM] 종목 일괄 추가 완료 (${successCount}/${SELECTED_STOCKS.length}개 성공)`, 'success');
-            } else {
-                addLogEntry(`[SYSTEM] 종목 추가 실패`, 'error');
+                addLogEntry(`[SYSTEM] 종목 추가 완료 (${successCount}/${SELECTED_STOCKS.length}개 성공)`, 'success');
+            }
+            if (errorMessages.length > 0) {
+                alert(errorMessages.join('\n'));
+                addLogEntry(`[SYSTEM] 일부 종목 추가 실패:\n${errorMessages.join('\n')}`, 'error');
             }
         } catch (err) {
             console.error('Batch add failed:', err);

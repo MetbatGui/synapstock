@@ -237,6 +237,8 @@ async def delete_node(board: str, name: str) -> dict | JSONResponse:
 async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict | JSONResponse:
     """지정된 부모 노드 아래에 새 종목을 추가합니다.
 
+    중복 등록 방지: 기등록된 테마 보드에 해당 종목이 존재할 경우 추가를 거부합니다.
+
     Args:
         board (str): 대상 보드 파일명.
         parent (str): 종목을 추가할 부모 노드 이름.
@@ -244,8 +246,28 @@ async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict | J
         ticker (str): 종목 티커 심볼.
 
     Returns:
-        dict: ``{"status": "success"}`` 또는 404 오류 응답.
+        dict: ``{"status": "success"}`` 또는 404/409 오류 응답.
     """
+    # 중복 등록 여부 검증 (가상 보드 대기 종목은 검사에서 제외)
+    existing_stock_info = query_service.get_stock_by_ticker(ticker)
+    if existing_stock_info:
+        _, existing_board, path = existing_stock_info
+        if existing_board != "virtual_신규상장주" and board != "virtual_신규상장주":
+            try:
+                existing_board_obj = query_service.load_board(existing_board)
+                board_display_name = existing_board_obj.name
+            except Exception:
+                board_display_name = existing_board.replace("theme_", "")
+            
+            path_str = " > ".join(path)
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "status": "duplicate",
+                    "message": f"이미 '{name}({ticker})' 종목이 [{board_display_name}] > {path_str} 에 존재하므로 추가할 수 없습니다."
+                }
+            )
+
     success = await command_service.add_stock(board, parent, name, ticker)
     if success:
         return {"status": "success"}
