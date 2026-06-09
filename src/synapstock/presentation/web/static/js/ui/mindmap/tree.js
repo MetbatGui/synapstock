@@ -41,6 +41,19 @@ export function updateNodeOverview(node, currentBoardData) {
     const totalStocksCount = countRecursiveStocks(node);
     const isRoot = currentBoardData && currentBoardData.name === node.name;
 
+    // 가상보드의 연도 노드(예: 2025년, 2026년)인지 여부 판별
+    const isVirtualYearNode = window._currentBoardName === "virtual_신규상장주" && /^\d{4}년$/.test(node.name);
+
+    let footerButtonsHtml = '';
+    if (isVirtualYearNode) {
+        footerButtonsHtml = `<button class="btn btn-danger btn-sm" onclick="deleteNode('${node.name}')" style="background:#ef4444;color:white;">일괄 제거</button>`;
+    } else {
+        const addNodeBtn = `<button class="btn btn-secondary btn-sm" onclick="showAddNodeModal('${node.name}')">새 노드</button>`;
+        const addStockBtn = `<button class="btn btn-secondary btn-sm" onclick="showAddStockModal('${node.name}')">종목 추가</button>`;
+        const deleteBtn = !isRoot ? `<button class="btn btn-danger btn-sm" onclick="deleteNode('${node.name}')" style="background:#ef4444;color:white;">제거</button>` : '';
+        footerButtonsHtml = `${addNodeBtn} ${addStockBtn} ${deleteBtn}`;
+    }
+
     overviewPanel.style.display = 'block';
     overviewPanel.innerHTML = `
         <div class="overview-header">
@@ -51,9 +64,7 @@ export function updateNodeOverview(node, currentBoardData) {
             <div class="stat-item">🚀 <span>전체 종목</span> <span class="count">${totalStocksCount}</span></div>
         </div>
         <div class="overview-footer" style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="showAddNodeModal('${node.name}')">새 노드</button>
-            <button class="btn btn-secondary btn-sm" onclick="showAddStockModal('${node.name}')">종목 추가</button>
-            ${!isRoot ? `<button class="btn btn-danger btn-sm" onclick="deleteNode('${node.name}')" style="background:#ef4444;color:white;">제거</button>` : ''}
+            ${footerButtonsHtml}
         </div>
     `;
     addLogEntry(`[UI] 노드 선택됨: ${node.name}`, 'info');
