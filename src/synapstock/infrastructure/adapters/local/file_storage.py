@@ -15,11 +15,21 @@ class LocalFileStorageAdapter(StoragePort):
         self.base_dir = Path(base_dir)
 
     def _get_abs_path(self, path: str) -> Path:
-        """상대 경로를 인스턴스 기준의 절대 경로로 변환한다."""
+        """상대 경로를 인스턴스 기준의 절대 경로로 변환한다.
+        경로 순회(Path Traversal) 공격 방지를 위해 base_dir 내에 위치하는지 검증한다.
+        """
         p = Path(path)
+        base_resolved = self.base_dir.resolve()
+        
         if p.is_absolute():
-            return p
-        return self.base_dir / p
+            resolved_path = p.resolve()
+        else:
+            resolved_path = (base_resolved / p).resolve()
+            
+        if not resolved_path.is_relative_to(base_resolved):
+            raise ValueError(f"Access Denied: Path traversal detected for path '{path}'")
+            
+        return resolved_path
 
     async def path_exists(self, path: str, **kwargs) -> bool:
         """경로 존재 여부를 확인한다."""

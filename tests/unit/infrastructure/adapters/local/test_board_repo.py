@@ -91,6 +91,19 @@ class TestLocalBoardRepository:
         assert loaded.root.nodes[0].nodes[0].depth == 2
         assert loaded.root.nodes[0].nodes[0].stocks[0].ticker == "999999"
 
+    def test_path_traversal_protection(self, repo, simple_board):
+        """허용되지 않는 외부 경로 접근 시 ValueError를 발생시켜야 한다."""
+        invalid_name = "../outside"
+
+        with pytest.raises(ValueError, match="Access Denied"):
+            repo.load(invalid_name)
+
+        with pytest.raises(ValueError, match="Access Denied"):
+            repo.save(Board(id=invalid_name, name="테스트"))
+
+        with pytest.raises(ValueError, match="Access Denied"):
+            repo.delete(invalid_name)
+
 
 class TestFixtureBoardRepository:
     """tests/fixtures/boards/ 기반 실제 파일 로드 테스트."""

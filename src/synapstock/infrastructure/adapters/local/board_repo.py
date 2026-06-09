@@ -21,7 +21,16 @@ class LocalBoardRepository(BoardRepositoryPort):
         self.root_dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, name: str) -> Path:
-        return self.root_dir / f"{name}.json"
+        """보드 파일명을 기준으로 저장소 디렉터리 하위 경로를 생성한다.
+        경로 순회(Path Traversal) 공격 방지를 위해 root_dir 내에 위치하는지 검증한다.
+        """
+        base_resolved = self.root_dir.resolve()
+        target_path = (base_resolved / f"{name}.json").resolve()
+        
+        if not target_path.is_relative_to(base_resolved):
+            raise ValueError(f"Access Denied: Path traversal detected for board name '{name}'")
+            
+        return target_path
 
     def load(self, name: str) -> Board:
         """name.json 파일을 읽어 Board로 파싱한다. 테마별 JSON 구조를 지원한다."""
