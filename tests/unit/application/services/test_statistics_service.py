@@ -19,8 +19,7 @@ def service(mock_query_service):
         capital_increase_repository=MagicMock(),
         bonus_issue_repository=MagicMock(),
         convertible_bond_repository=MagicMock(),
-        bw_repository=MagicMock(),
-        market_data_service=MagicMock()
+        bw_repository=MagicMock()
     )
 
 class TestStatisticsService:
@@ -83,6 +82,7 @@ class TestStatisticsService:
         # Assert
         assert enriched_items[0].ticker == "079550"
         assert enriched_items[1].ticker == "005930"
+
 
     @pytest.mark.asyncio
     async def test_get_convertible_bond_data_delegation(self, service):

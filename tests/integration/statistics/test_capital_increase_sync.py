@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @pytest.mark.asyncio
-
+@pytest.mark.skip(reason="유상증자 분석 기능 DEPRECATED")
 async def test_actual_capital_increase_sync_robust():
     """실제 구글 드라이브 데이터를 활용하여 동기화 및 파싱 전 과정을 정밀 검증합니다."""
 

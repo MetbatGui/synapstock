@@ -18,3 +18,5 @@ stock_cache.json
 /tmp
 
 .coverage
+
+/scratch

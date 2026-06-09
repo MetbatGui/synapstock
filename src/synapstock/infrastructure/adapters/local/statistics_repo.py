@@ -20,6 +20,33 @@ class LocalStatisticsRepository:
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
+    def save_new_listings(self, items: list, year: str = "2026"):
+        """신규 상장 데이터 리스트를 로컬 JSON 파일에 저장합니다."""
+        folder = self.root.parent / "new_listing"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"new_listing_data_{year}.json"
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            # Pydantic 모델 직렬화 지원
+            data = [item.model_dump() if hasattr(item, "model_dump") else item for item in items]
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def get_new_listings(self, year: str = "2026") -> list:
+        """로컬에 저장된 신규 상장 데이터 리스트를 불러옵니다."""
+        folder = self.root.parent / "new_listing"
+        path = folder / f"new_listing_data_{year}.json"
+        if not path.exists():
+            return []
+        import json
+
+        from synapstock.domain.statistics.models import NewListing
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+                return [NewListing.model_validate(item) for item in data]
+        except Exception:
+            return []
+
     def save_daily_ranking(self, ranking: DailyMarketRanking):
         """일별 순위를 저장한다."""
         self.root.mkdir(parents=True, exist_ok=True)
@@ -274,7 +301,13 @@ class LocalWeeklyChangeRepository:
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def _get_report_path(self, date_str: str, year: int | None = None, month: int | None = None, date_range: str | None = None) -> Path:
+    def _get_report_path(
+        self,
+        date_str: str,
+        year: int | None = None,
+        month: int | None = None,
+        date_range: str | None = None,
+    ) -> Path:
         """리포트 파일의 저장/조회 경로를 반환한다. (예: 2026년/05월/weekly_change_0511~0515.json)"""
         if not year or not month:
             if len(date_str) >= 10:

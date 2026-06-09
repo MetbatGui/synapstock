@@ -73,13 +73,13 @@ class TestBoardServiceIntegration:
 
     def test_list_boards_after_save(self, query_service, command_service):
         """save한 Board 이름이 list_boards()에 포함되어야 한다."""
-        command_service._repository.save(Board(name="A보드"))
-        command_service._repository.save(Board(name="B보드"))
+        command_service._repository.save(Board(id="theme_A보드", name="A보드"))
+        command_service._repository.save(Board(id="theme_B보드", name="B보드"))
 
         boards = query_service.list_boards()
 
-        assert "A보드" in boards
-        assert "B보드" in boards
+        assert "theme_A보드" in boards
+        assert "theme_B보드" in boards
 
     def test_load_not_found_raises(self, query_service):
         """존재하지 않는 Board를 load하면 FileNotFoundError가 발생해야 한다."""

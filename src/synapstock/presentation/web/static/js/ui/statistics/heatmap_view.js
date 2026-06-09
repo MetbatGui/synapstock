@@ -114,7 +114,7 @@ export const heatmapView = {
             
             // 클릭 바인딩용 전역 캐시 저장
             window._heatmapRawTickers = data.tickers || [];
-            
+
             // 2. Plotly.js 옵션 튜닝
             const trace = {
                 type: 'treemap',

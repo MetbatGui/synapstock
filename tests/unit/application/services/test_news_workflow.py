@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 import pytest
 
@@ -22,6 +22,10 @@ class MockBoardRepository(BoardRepositoryPort):
 
     def list_boards(self) -> list[str]:
         return list(self._store.keys())
+
+    def delete(self, name: str) -> None:
+        if name in self._store:
+            del self._store[name]
 
 class MockMindmapAdapter(MindmapPort):
     def load(self, board_name: str, progress_callback=None) -> Board:
@@ -61,7 +65,9 @@ async def test_search_path_and_add_news(mock_board):
     storage = Mock(spec=StoragePort)
 
     query_service = BoardQueryService(repository=repo, ticker_search=ticker_search)
-    media_service = StockMediaService(repository=repo, storage=storage)
+    mock_news_service = Mock()
+    mock_news_service.save_news = AsyncMock()
+    media_service = StockMediaService(repository=repo, storage=storage, news_service=mock_news_service)
 
     # 1. 경로 검색 기능 검증 (단순 탐색 알고리즘 또는 BoardService 내의 함수 모방)
     # 현재 BoardService에 경로(Path)를 리스트로 반환하는 기능이 없다면,
@@ -85,13 +91,8 @@ async def test_search_path_and_add_news(mock_board):
     # 2. 경로 쿼리의 뉴스 추가 POST 가 잘 반영되는지 확인
     # /api/news/add/반도체/IDM/삼성전자 와 같은 요청에서 마지막 "삼성전자"(또는 ticker)를 추출하여 추가
     target_ticker = "005930"
-
-    # 추가 전 확인
-    samsung_node = query_service.find_node_by_name(board.root, "IDM") # 삼성전자가 속한 부모 등
-    assert len(samsung_node.stocks[0].news) == 0
-
-    # 뉴스 추가 (경로 또는 티커 기반. StockMediaService.add_stock_news 이용)
     url_to_add = "https://news.example.com/123"
+
     result = await media_service.add_stock_news(
         board_name="theme_data",
         ticker=target_ticker,
@@ -102,11 +103,10 @@ async def test_search_path_and_add_news(mock_board):
 
     assert result is True
 
-    # 뉴스 배열(news []) 업데이트 확인
-    updated_board = query_service.load_board("theme_data")
-    updated_parent_node = query_service.find_node_by_name(updated_board.root, "IDM")
-    updated_stock = next(s for s in updated_parent_node.stocks if s.ticker == target_ticker)
-
-    assert len(updated_stock.news) == 1
-    assert updated_stock.news[0]["url"] == url_to_add
-    assert updated_stock.news[0]["title"] == "삼성전자 어닝 서프라이즈"
+    # 뉴스 저장 호출 검증
+    mock_news_service.save_news.assert_called_once_with(
+        title="삼성전자 어닝 서프라이즈",
+        url=url_to_add,
+        ticker=target_ticker,
+        stock_name="삼성전자"
+    )

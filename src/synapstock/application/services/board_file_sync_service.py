@@ -37,13 +37,19 @@ class BoardFileSyncService:
 
     def load_local_manifest(self) -> dict[str, Any]:
         """로컬의 board_sync_manifest.json 상태 매니페스트를 로드합니다."""
+        default_manifest = {"last_updated": "", "boards": {}, "new_listings": {}}
         if not self._manifest_path.exists():
-            return {"last_updated": "", "boards": {}}
+            return default_manifest
         try:
-            return json.loads(self._manifest_path.read_text(encoding="utf-8"))
+            manifest = json.loads(self._manifest_path.read_text(encoding="utf-8"))
+            if "boards" not in manifest or not isinstance(manifest["boards"], dict):
+                manifest["boards"] = {}
+            if "new_listings" not in manifest or not isinstance(manifest["new_listings"], dict):
+                manifest["new_listings"] = {}
+            return manifest
         except Exception as e:
             logger.error(f"[BoardFileSync] 로컬 매니페스트 파싱 실패: {e}")
-            return {"last_updated": "", "boards": {}}
+            return default_manifest
 
     def save_local_manifest(self, manifest: dict[str, Any]) -> None:
         """로컬 상태 매니페스트를 물리 파일로 영속화합니다."""
@@ -90,11 +96,15 @@ class BoardFileSyncService:
         manifest_filename = self._manifest_path.name
 
         # 1. 드라이브에서 원격 매니페스트 다운로드 시도
-        remote_manifest: dict[str, Any] = {"last_updated": "", "boards": {}}
+        remote_manifest: dict[str, Any] = {"last_updated": "", "boards": {}, "new_listings": {}}
         try:
             remote_data = await self._drive_adapter.get_file(manifest_filename, root_id=self._theme_folder_id)
             if remote_data:
                 remote_manifest = json.loads(remote_data.decode("utf-8"))
+                if "boards" not in remote_manifest or not isinstance(remote_manifest["boards"], dict):
+                    remote_manifest["boards"] = {}
+                if "new_listings" not in remote_manifest or not isinstance(remote_manifest["new_listings"], dict):
+                    remote_manifest["new_listings"] = {}
                 logger.info("[BoardFileSync] 원격 상태 매니페스트 로드 성공.")
         except Exception as e:
             logger.error(f"[BoardFileSync] 원격 매니페스트 다운로드 실패: {e}")
@@ -114,9 +124,39 @@ class BoardFileSyncService:
                 if l_modified > r_modified:
                     merged_boards[b_id] = l_info
 
+        # --- 신규상장주(IPO) 동기화 정합성 병합 추가 ---
+        merged_listings = dict(remote_manifest.get("new_listings", {}))
+        for ticker, l_item in local_manifest.get("new_listings", {}).items():
+            if ticker not in merged_listings:
+                merged_listings[ticker] = l_item
+            else:
+                r_item = merged_listings[ticker]
+                l_status = l_item.get("status", "PENDING")
+                r_status = r_item.get("status", "PENDING")
+                
+                # 병합 규칙 1: ASSIGNED 상태가 최우선
+                if l_status == "ASSIGNED" and r_status != "ASSIGNED":
+                    merged_listings[ticker] = l_item
+                elif r_status == "ASSIGNED" and l_status != "ASSIGNED":
+                    pass # 이미 원격(merged_listings)의 ASSIGNED 상태 보존
+                
+                # 병합 규칙 2: IGNORED 상태가 PENDING보다 우선
+                elif l_status == "IGNORED" and r_status == "PENDING":
+                    merged_listings[ticker] = l_item
+                elif r_status == "IGNORED" and l_status == "PENDING":
+                    pass
+                
+                # 병합 규칙 3: 상태가 같으면 updated_at 타임스탬프 최신성 우선
+                else:
+                    l_updated = l_item.get("updated_at", "")
+                    r_updated = r_item.get("updated_at", "")
+                    if l_updated > r_updated:
+                        merged_listings[ticker] = l_item
+
         merged_manifest = {
             "last_updated": datetime.now(UTC).isoformat(),
             "boards": merged_boards,
+            "new_listings": merged_listings,
         }
 
         # 3. 병합된 최신 매니페스트를 기준으로 개별 보드 파일 병렬 동기화 집행
@@ -225,3 +265,78 @@ class BoardFileSyncService:
         if progress_callback:
             progress_callback(f"양방향 파일 동기화 완료! (성공: {success_count}/{total_items})", 1.0)
         return success_count == total_items
+
+    async def handle_stock_addition_trigger(self, ticker: str, board_id: str, path: list[str]) -> None:
+        """보드에 종목이 추가되었을 때, 만약 신규상장주(IPO) 대기 목록에 있던 녀석이면 상태를 ASSIGNED로 전이시킵니다."""
+        manifest = self.load_local_manifest()
+        if ticker in manifest.get("new_listings", {}):
+            item = manifest["new_listings"][ticker]
+            if item.get("status") != "ASSIGNED":
+                item.update({
+                    "status": "ASSIGNED",
+                    "current_board": board_id,
+                    "current_path": path,
+                    "updated_at": datetime.now(UTC).isoformat()
+                })
+                self.save_local_manifest(manifest)
+                logger.info(f"[BoardFileSync] 신규상장주 배치 완료 감지: {ticker} -> {board_id}")
+                
+                # 가상보드 대기 목록에서 자동 제거
+                await self._remove_from_virtual_ipo_board(ticker)
+
+    async def _remove_from_virtual_ipo_board(self, ticker: str) -> None:
+        """가상보드(virtual_신규상장주.json) 파일이 존재하고 해당 종목이 있으면 제거하고 저장합니다."""
+        try:
+            # virtual_신규상장주 보드가 존재하는지 확인 후 제거
+            if "virtual_신규상장주" in self._repository.list_boards():
+                board = self._repository.load("virtual_신규상장주")
+                if board.root.find_and_remove_stock(ticker):
+                    self._repository.save(board)
+                    logger.info(f"[BoardFileSync] 가상보드 대기목록에서 종목 자동 제거 완료: {ticker}")
+        except Exception as e:
+            logger.error(f"[BoardFileSync] 가상보드에서 종목 제거 중 오류: {e}")
+
+    async def handle_stock_deletion_trigger(self, ticker: str, board_id: str) -> None:
+        """보드에서 종목이 제거되었을 때 호출되는 훅.
+        만약 제거된 보드가 'virtual_신규상장주' 이고, 신규상장주 대기 목록에 등록된 종목이라면
+        이 종목의 상태를 'IGNORED'로 업데이트하여 다음 동기화 때 다시 유입되는 것을 방지합니다.
+        """
+        if board_id != "virtual_신규상장주":
+            return
+            
+        manifest = self.load_local_manifest()
+        if ticker in manifest.get("new_listings", {}):
+            item = manifest["new_listings"][ticker]
+            # PENDING 상태인 경우에만 IGNORED 상태로 전환
+            if item.get("status") == "PENDING":
+                item.update({
+                    "status": "IGNORED",
+                    "updated_at": datetime.now(UTC).isoformat()
+                })
+                self.save_local_manifest(manifest)
+                logger.info(f"[BoardFileSync] 가상보드 수동 삭제 감지 (IGNORED 상태 전환): {ticker}")
+
+    async def handle_batch_stock_deletion_trigger(self, tickers: list[str], board_id: str) -> None:
+        """보드에서 여러 종목이 일괄 제거되었을 때 호출되는 훅.
+        가상 보드('virtual_신규상장주') 대기 목록에서 제외된 종목들의 상태를 'IGNORED'로 일괄 업데이트합니다.
+        """
+        if board_id != "virtual_신규상장주" or not tickers:
+            return
+
+        manifest = self.load_local_manifest()
+        changed = False
+        now_str = datetime.now(UTC).isoformat()
+
+        for ticker in tickers:
+            if ticker in manifest.get("new_listings", {}):
+                item = manifest["new_listings"][ticker]
+                if item.get("status") == "PENDING":
+                    item.update({
+                        "status": "IGNORED",
+                        "updated_at": now_str
+                    })
+                    changed = True
+
+        if changed:
+            self.save_local_manifest(manifest)
+            logger.info(f"[BoardFileSync] 가상보드 일괄 삭제 감지 (종목 {len(tickers)}개 중 대기 중인 항목 IGNORED 전환)")

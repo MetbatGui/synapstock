@@ -33,7 +33,6 @@ def test_container(tmp_path):
         bonus_issue_repository=container._bonus_issue_repo,
         convertible_bond_repository=container._convertible_bond_repo,
         bw_repository=container._bw_repo,
-        market_data_service=container._market_data_service,
     )
 
     return container

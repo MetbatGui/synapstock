@@ -28,7 +28,7 @@ class BoardCommandService:
                 self._sync_service.update_local_manifest(board_name, deleted=False)
         return success
 
-    def add_stock(self, board_name: str, parent_name: str, stock_name: str, ticker: str) -> bool:
+    async def add_stock(self, board_name: str, parent_name: str, stock_name: str, ticker: str) -> bool:
         """특정 부모 노드 아래에 새 종목을 추가합니다."""
         board = self._repository.load(board_name)
         # Board 도메인 모델의 비즈니스 로직 호출
@@ -37,6 +37,10 @@ class BoardCommandService:
             self._repository.save(board)
             if self._sync_service:
                 self._sync_service.update_local_manifest(board_name, deleted=False)
+                # 신규상장주 상태 자동 감지 훅 호출
+                await self._sync_service.handle_stock_addition_trigger(ticker, board_name, [parent_name])
+                # 구글 드라이브 동기화 강제 트리거
+                await self._sync_service.sync_with_drive()
         return success
 
     def delete_node(self, board_name: str, node_name: str) -> bool:
@@ -50,7 +54,7 @@ class BoardCommandService:
                 self._sync_service.update_local_manifest(board_name, deleted=False)
         return success
 
-    def delete_stock(self, board_name: str, ticker: str) -> bool:
+    async def delete_stock(self, board_name: str, ticker: str) -> bool:
         """보드 내에서 특정 종목(티커 기준)을 찾아 삭제합니다."""
         board = self._repository.load(board_name)
         # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 삭제)
@@ -59,6 +63,10 @@ class BoardCommandService:
             self._repository.save(board)
             if self._sync_service:
                 self._sync_service.update_local_manifest(board_name, deleted=False)
+                # 가상보드 삭제 감지 훅 호출
+                await self._sync_service.handle_stock_deletion_trigger(ticker, board_name)
+                # 구글 드라이브 동기화 강제 트리거
+                await self._sync_service.sync_with_drive()
         return success
 
     def create_board(self, name: str) -> bool:
@@ -84,4 +92,28 @@ class BoardCommandService:
             return True
         except Exception:
             return False
+
+    async def batch_ignore_stocks(self, board_name: str, tickers: list[str]) -> bool:
+        """가상 보드에서 여러 종목을 일괄 제거하고 매니페스트 상의 상태를 IGNORED로 업데이트합니다."""
+        if not tickers:
+            return True
+
+        board = self._repository.load(board_name)
+        any_success = False
+
+        for ticker in tickers:
+            # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 삭제)
+            if board.root.find_and_remove_stock(ticker):
+                any_success = True
+
+        if any_success:
+            self._repository.save(board)
+            if self._sync_service:
+                self._sync_service.update_local_manifest(board_name, deleted=False)
+                # 가상보드 일괄 삭제 감지 훅 호출
+                await self._sync_service.handle_batch_stock_deletion_trigger(tickers, board_name)
+                # 구글 드라이브 동기화 강제 트리거
+                await self._sync_service.sync_with_drive()
+                
+        return any_success
 

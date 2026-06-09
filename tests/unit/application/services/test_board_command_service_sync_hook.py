@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
@@ -14,6 +14,9 @@ class TestBoardCommandServiceSyncHook:
         """Mock 리포지토리와 Mock 동기화 서비스를 생성하여 주입받습니다."""
         self.mock_repo = MagicMock()
         self.mock_sync = MagicMock()
+        self.mock_sync.handle_stock_addition_trigger = AsyncMock()
+        self.mock_sync.handle_stock_deletion_trigger = AsyncMock()
+        self.mock_sync.sync_with_drive = AsyncMock()
         self.service = BoardCommandService(repository=self.mock_repo, sync_service=self.mock_sync)
 
         # 기본 테스트 보드 모형
@@ -34,10 +37,11 @@ class TestBoardCommandServiceSyncHook:
         # 매니페스트 갱신 훅 검증
         self.mock_sync.update_local_manifest.assert_called_once_with("theme_test", deleted=False)
 
+    @pytest.mark.asyncio
     @pytest.mark.usefixtures("setup_mocks")
-    def test_add_stock_sync_hook(self):
+    async def test_add_stock_sync_hook(self):
         """종목 추가 성공 시 동기화 매니페스트 갱신 훅이 격발되는지 검증."""
-        success = self.service.add_stock("theme_test", "test", "삼성전자", "005930")
+        success = await self.service.add_stock("theme_test", "test", "삼성전자", "005930")
 
         assert success is True
         self.mock_repo.save.assert_called_once_with(self.test_board)
@@ -57,14 +61,15 @@ class TestBoardCommandServiceSyncHook:
         # 매니페스트 갱신 훅 검증
         self.mock_sync.update_local_manifest.assert_called_once_with("theme_test", deleted=False)
 
+    @pytest.mark.asyncio
     @pytest.mark.usefixtures("setup_mocks")
-    def test_delete_stock_sync_hook(self):
+    async def test_delete_stock_sync_hook(self):
         """종목 삭제 성공 시 동기화 매니페스트 갱신 훅이 격발되는지 검증."""
         # 삭제 대상 종목 추가
         from synapstock.domain.models import Stock
         self.test_board.root.add_stock(Stock(name="삼성전자", ticker="005930"))
 
-        success = self.service.delete_stock("theme_test", "005930")
+        success = await self.service.delete_stock("theme_test", "005930")
 
         assert success is True
         self.mock_repo.save.assert_called_once_with(self.test_board)

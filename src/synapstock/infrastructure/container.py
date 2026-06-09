@@ -160,6 +160,8 @@ class Container:
             bonus_issue_repository=self._bonus_issue_repo,
             convertible_bond_repository=self._convertible_bond_repo,
             bw_repository=self._bw_repo,
+            manifest_path=self.config.board_dir / "board_sync_manifest.json",
+            virtual_board_path=self.config.board_dir / "virtual_신규상장주.json",
         )
 
         self._financial_service = FinancialService(repository=self._financial_repo)

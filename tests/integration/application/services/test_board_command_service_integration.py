@@ -38,7 +38,8 @@ class TestBoardCommandServiceIntegration:
         if self.test_dir.exists():
             shutil.rmtree(self.test_dir)
 
-    def test_board_creation_and_node_modification_physical_flow(self):
+    @pytest.mark.asyncio
+    async def test_board_creation_and_node_modification_physical_flow(self):
         """보드 생성 및 노드/종목 변경 시 물리 파일시스템과 매니페스트의 갱신 라이프사이클을 실계측 검증."""
         board_id = "virtual_test_integration"
 
@@ -70,7 +71,7 @@ class TestBoardCommandServiceIntegration:
         assert updated_modified > initial_modified
 
         # --- PHASE 3: 종목 추가 및 물리 보드 파싱 검증 ---
-        success = self.service.add_stock(board_id, "인프라노드", "삼성전자", "005930")
+        success = await self.service.add_stock(board_id, "인프라노드", "삼성전자", "005930")
         assert success is True
 
         # 검증 D: 디스크 상의 JSON을 직접 열어서 종목 정보가 안전하게 영속화되었는지 무결성 검증

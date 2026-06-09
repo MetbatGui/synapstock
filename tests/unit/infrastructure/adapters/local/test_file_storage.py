@@ -111,3 +111,24 @@ class TestLocalFileStorageAdapter:
         """
         result = await storage.get_file("no_such_file.txt")
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_path_traversal_protection(self, storage):
+        """허용되지 않는 외부 경로 접근 시 ValueError를 발생시켜야 한다.
+
+        Arrange:
+            base_dir 외부를 가리키는 상대 경로와 절대 경로를 준비한다.
+        Act & Assert:
+            ValueError가 발생하는지 검증한다.
+        """
+        invalid_relative_path = "../outside.txt"
+        invalid_absolute_path = "/etc/passwd"
+
+        with pytest.raises(ValueError, match="Access Denied"):
+            await storage.put_file(invalid_relative_path, b"test")
+
+        with pytest.raises(ValueError, match="Access Denied"):
+            await storage.get_file(invalid_relative_path)
+
+        with pytest.raises(ValueError, match="Access Denied"):
+            await storage.put_file(invalid_absolute_path, b"test")

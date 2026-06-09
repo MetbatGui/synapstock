@@ -160,12 +160,12 @@ async def startup_event():
 def run_server(port: int = 8090):
     """Uvicorn 서버를 실행합니다.
 
-    ``0.0.0.0`` 에 바인딩하며 언급된 포트로 서버를 구동합니다.
+    보안을 위해 기본적으로 로컬호스트(``127.0.0.1``)에 바인딩하며 언급된 포트로 서버를 구동합니다.
 
     Args:
         port (int): 리스닝할 TCP 포트 번호. 기본값은 ``8090``.
     """
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
 
 
 def start_web_server_background(port: int = 8090):
