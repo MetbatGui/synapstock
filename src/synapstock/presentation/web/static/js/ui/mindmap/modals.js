@@ -347,14 +347,135 @@ export function initMindmapModals(loadBoardData) {
 }
 
 export async function deleteNode(nodeName, loadBoardData) {
-    if (!confirm(`'${nodeName}' 노드를 삭제하시겠습니까?`)) return;
     const currentBoard = document.getElementById('board-select').value;
+    
+    // 가상보드의 가상 연도 노드(2025년, 2026년 등) 삭제 시도 시 일괄 무시 모달로 가로챔
+    if (currentBoard === "virtual_신규상장주" && /^\d{4}년$/.test(nodeName)) {
+        showBatchIgnoreModal(nodeName, loadBoardData);
+        return;
+    }
+
+    if (!confirm(`'${nodeName}' 노드를 삭제하시겠습니까?`)) return;
     const res = await fetch(`/api/node/delete?board=${encodeURIComponent(currentBoard)}&name=${encodeURIComponent(nodeName)}`, { method: 'DELETE' });
     if (res.ok) {
         addLogEntry(`[SYSTEM] 노드 삭제 완료: ${nodeName}`, 'success');
         document.getElementById('stock-overview-panel').style.display = 'none';
         loadBoardData(window._currentBoardName);
     }
+}
+
+export function showBatchIgnoreModal(yearNodeName, loadBoardData) {
+    if (!window._currentBoardData) {
+        alert("보드 데이터를 불러오지 못했습니다. 잠시 후 다시 시도하십시오.");
+        return;
+    }
+
+    const yearNode = window._currentBoardData.nodes.find(n => n.name === yearNodeName);
+    if (!yearNode || !yearNode.stocks || yearNode.stocks.length === 0) {
+        alert(`'${yearNodeName}' 에 등록된 대기 종목이 없습니다.`);
+        return;
+    }
+
+    // PENDING 또는 상태가 지정되지 않은 대기 종목 추출
+    const pendingStocks = yearNode.stocks.filter(s => s.status === "PENDING" || !s.status);
+    if (pendingStocks.length === 0) {
+        alert(`'${yearNodeName}' 에 제외 가능한 대기 종목이 없습니다.`);
+        return;
+    }
+
+    // 모달 오버레이 생성
+    const existing = document.getElementById('batch-ignore-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'batch-ignore-modal-overlay';
+    overlay.className = 'ipo-modal-overlay';
+    overlay.style.zIndex = '2000';
+
+    let listHtml = '';
+    pendingStocks.forEach(s => {
+        listHtml += `
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; background:rgba(255,255,255,0.02); padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                <input type="checkbox" class="batch-ignore-checkbox" data-ticker="${s.ticker}" style="transform:scale(1.2); cursor:pointer;" checked />
+                <span style="font-weight:600; color:#e2e8f0; font-size:0.9rem;">${s.name}</span>
+                <span style="color:#64748b; font-size:0.8rem; font-family:monospace;">(${s.ticker})</span>
+            </div>
+        `;
+    });
+
+    overlay.innerHTML = `
+        <div class="ipo-modal" style="max-width: 450px;">
+            <h3><i class="fas fa-eye-slash" style="color:#ef4444; margin-right:8px;"></i> ${yearNodeName} 일괄 제외 설정</h3>
+            <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:15px;">
+                대기 목록에서 제외(무시)할 종목들을 선택해주세요. <br/>제외된 종목은 향후 동기화 시 다시 대기열에 들어오지 않습니다.
+            </p>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-size:0.8rem; color:#64748b;">선택 대상</span>
+                <button id="batch-ignore-toggle-all" style="background:none; border:none; color:#3b82f6; font-size:0.8rem; cursor:pointer; font-weight:600;"><i class="fas fa-check-double"></i> 전체선택/해제</button>
+            </div>
+
+            <div style="max-height: 250px; overflow-y: auto; padding-right:5px; margin-bottom:20px;" id="batch-ignore-list-container">
+                ${listHtml}
+            </div>
+
+            <div class="ipo-modal-footer">
+                <button id="batch-ignore-btn-cancel" class="ipo-modal-btn cancel">취소</button>
+                <button id="batch-ignore-btn-confirm" class="ipo-modal-btn confirm" style="background:#ef4444; color:white;">선택 항목 제외</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const cbs = overlay.querySelectorAll('.batch-ignore-checkbox');
+    const toggleAllBtn = document.getElementById('batch-ignore-toggle-all');
+    const confirmBtn = document.getElementById('batch-ignore-btn-confirm');
+    const cancelBtn = document.getElementById('batch-ignore-btn-cancel');
+
+    // 전체 토글 기능
+    toggleAllBtn.onclick = () => {
+        const anyChecked = Array.from(cbs).some(cb => cb.checked);
+        cbs.forEach(cb => cb.checked = !anyChecked);
+    };
+
+    const closeModal = () => overlay.remove();
+    cancelBtn.onclick = closeModal;
+    overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+    confirmBtn.onclick = async () => {
+        const selectedTickers = Array.from(cbs)
+            .filter(cb => cb.checked)
+            .map(cb => cb.dataset.ticker);
+
+        if (selectedTickers.length === 0) {
+            alert("제외할 종목이 선택되지 않았습니다.");
+            return;
+        }
+
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "제외 중...";
+
+        try {
+            const response = await fetch('/api/board/virtual/batch-ignore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tickers: selectedTickers })
+            });
+
+            if (response.ok) {
+                addLogEntry(`[SYSTEM] 가상보드 일괄 제외 완료 (${selectedTickers.length}개 종목 제외)`, 'success');
+                closeModal();
+                loadBoardData(window._currentBoardName);
+            } else {
+                throw new Error("API 요청 실패");
+            }
+        } catch (e) {
+            alert(`일괄 제외 중 오류 발생: ${e.message}`);
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = "선택 항목 제외";
+        }
+    };
 }
 
 export async function deleteStock(ticker, loadBoardData) {
