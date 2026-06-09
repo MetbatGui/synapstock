@@ -38,6 +38,7 @@ class LocalStatisticsRepository:
         if not path.exists():
             return []
         import json
+
         from synapstock.domain.statistics.models import NewListing
         try:
             with open(path, encoding="utf-8") as f:
@@ -300,7 +301,13 @@ class LocalWeeklyChangeRepository:
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def _get_report_path(self, date_str: str, year: int | None = None, month: int | None = None, date_range: str | None = None) -> Path:
+    def _get_report_path(
+        self,
+        date_str: str,
+        year: int | None = None,
+        month: int | None = None,
+        date_range: str | None = None,
+    ) -> Path:
         """리포트 파일의 저장/조회 경로를 반환한다. (예: 2026년/05월/weekly_change_0511~0515.json)"""
         if not year or not month:
             if len(date_str) >= 10:

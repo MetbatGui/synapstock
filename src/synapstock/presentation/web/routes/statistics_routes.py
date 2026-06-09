@@ -12,11 +12,10 @@ from fastapi.responses import JSONResponse
 from synapstock.domain.statistics.models import MarketType, SupplySubject
 from synapstock.presentation.web.core.dependencies import (
     statistics_service,
-    weekly_change_service,
     stock_split_repo,
     stock_split_sync_service,
+    weekly_change_service,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -123,13 +122,17 @@ async def get_monthly_summary(month: str = Query(..., description="조회 월 (Y
         return {
             "month": month,
             "KOSPI": {
-                "FOREIGN": await statistics_service.get_monthly_ranking(month, MarketType.KOSPI, SupplySubject.FOREIGN),
+                "FOREIGN": await statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSPI, SupplySubject.FOREIGN
+                ),
                 "INSTITUTION": await statistics_service.get_monthly_ranking(
                     month, MarketType.KOSPI, SupplySubject.INSTITUTION
                 ),
             },
             "KOSDAQ": {
-                "FOREIGN": await statistics_service.get_monthly_ranking(month, MarketType.KOSDAQ, SupplySubject.FOREIGN),
+                "FOREIGN": await statistics_service.get_monthly_ranking(
+                    month, MarketType.KOSDAQ, SupplySubject.FOREIGN
+                ),
                 "INSTITUTION": await statistics_service.get_monthly_ranking(
                     month, MarketType.KOSDAQ, SupplySubject.INSTITUTION
                 ),

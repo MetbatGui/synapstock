@@ -9,7 +9,7 @@ import logging
 import threading
 from typing import cast
 
-from fastapi import APIRouter, File, UploadFile, Response
+from fastapi import APIRouter, File, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
         # 가상보드인 경우 매니페스트 로드하여 할당 메타데이터 확보 및 가상보드 파일 갱신 선수행
         manifest_meta = {}
         ticker_to_listing_date = {}
-        
+
         if name == "virtual_신규상장주":
             # 1. 매니페스트에서 상장일 정보 로드 (listing_date 필드)
             try:
@@ -116,24 +116,24 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
         if name == "virtual_신규상장주":
             root_dict = to_dict(board.root)
             all_stocks = root_dict.get("stocks", [])
-            
+
             # 상장일 기반 그룹화 (연도별)
             grouped = {}
             for s in all_stocks:
                 l_date = ticker_to_listing_date.get(s["ticker"], "")
                 year_str = "기타"
-                
+
                 # 점(.)을 대시(-)로 변환하여 유연하게 대처
                 normalized_date = l_date.replace(".", "-") if l_date else ""
                 if normalized_date and "-" in normalized_date:
                     parts = normalized_date.split("-")
                     if parts[0]:
                         year_str = parts[0] + "년"
-                        
+
                 if year_str not in grouped:
                     grouped[year_str] = []
                 grouped[year_str].append(s)
-                
+
             # 계층형 노드로 변형
             nodes_list = []
             # 연도 내림차순 정렬
@@ -143,7 +143,7 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
                     "nodes": [],
                     "stocks": grouped[yr]
                 })
-                
+
             return {
                 "name": board.root.name,
                 "nodes": nodes_list,
