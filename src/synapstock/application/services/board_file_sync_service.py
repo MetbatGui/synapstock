@@ -284,7 +284,7 @@ class BoardFileSyncService:
             # virtual_신규상장주 보드가 존재하는지 확인 후 제거
             if "virtual_신규상장주" in self._repository.list_boards():
                 board = self._repository.load("virtual_신규상장주")
-                if board.root.find_and_remove_stock(ticker):
+                if board.delete_stock(ticker):
                     self._repository.save(board)
                     logger.info(f"[BoardFileSync] 가상보드 대기목록에서 종목 자동 제거 완료: {ticker}")
         except Exception as e:

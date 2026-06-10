@@ -256,6 +256,18 @@ class Board(BaseModel):
 
         return find_and_remove(self.root, node_name)
 
+    def delete_stock(self, ticker: str) -> bool:
+        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 삭제합니다."""
+        return self.root.find_and_remove_stock(ticker)
+
+    def add_report_to_stock(self, ticker: str, report_path: str) -> bool:
+        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 리포트 경로를 추가합니다."""
+        return self.root.find_and_add_report(ticker, report_path)
+
+    def remove_report_from_stock(self, ticker: str, report_path: str) -> bool:
+        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 리포트 경로를 삭제합니다."""
+        return self.root.find_and_remove_report(ticker, report_path)
+
     def __repr__(self) -> str:
         return f"Board({self.name!r})\n{self.root!r}"
 

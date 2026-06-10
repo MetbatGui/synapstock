@@ -186,6 +186,38 @@ class TestBoard:
         assert board.root is not None
         assert board.root.name == "IT"
 
+    def test_board_delete_stock(self):
+        """Board 애그리게이트 루트를 통해 재귀적으로 종목을 삭제할 수 있어야 한다."""
+        board = Board(name="IT")
+        internet = board.root.add_child("인터넷")
+        internet.add_stock(Stock(name="카카오", ticker="035720"))
+
+        assert board.find_stock("035720") is not None
+        
+        # 삭제 수행
+        success = board.delete_stock("035720")
+        assert success is True
+        assert board.find_stock("035720") is None
+
+    def test_board_report_management(self):
+        """Board 애그리게이트 루트를 통해 재귀적으로 종목에 리포트 링크를 추가하고 삭제할 수 있어야 한다."""
+        board = Board(name="IT")
+        internet = board.root.add_child("인터넷")
+        stock = Stock(name="카카오", ticker="035720")
+        internet.add_stock(stock)
+
+        report_path = "data/pdf/kakao_report.pdf"
+
+        # 리포트 추가
+        success_add = board.add_report_to_stock("035720", report_path)
+        assert success_add is True
+        assert report_path in stock.reports
+
+        # 리포트 삭제
+        success_remove = board.remove_report_from_stock("035720", report_path)
+        assert success_remove is True
+        assert report_path not in stock.reports
+
 
 # ── IT 보드 트리 테스트 ───────────────────────────────────────────────────────
 

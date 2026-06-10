@@ -33,8 +33,8 @@ class StockMediaService:
 
         # 2. 보드 데이터 로드 및 업데이트
         board = self._repository.load(board_name)
-        # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 탐색 및 추가)
-        success = board.root.find_and_add_report(ticker, target_path)
+        # Board 도메인 모델의 비즈니스 로직 호출 (애그리게이트 루트 위임)
+        success = board.add_report_to_stock(ticker, target_path)
         if success:
             self._repository.save(board)
         return success
@@ -42,7 +42,8 @@ class StockMediaService:
     async def remove_stock_report(self, board_name: str, ticker: str, report_path: str) -> bool:
         """종목에서 리포트 파일 링크를 제거합니다. (물리 파일 삭제는 정책에 따라 별도로 처리 가능)"""
         board = self._repository.load(board_name)
-        success = board.root.find_and_remove_report(ticker, report_path)
+        # Board 도메인 모델의 비즈니스 로직 호출 (애그리게이트 루트 위임)
+        success = board.remove_report_from_stock(ticker, report_path)
         if success:
             self._repository.save(board)
         return success
@@ -50,7 +51,8 @@ class StockMediaService:
     async def add_stock_report_link(self, board_name: str, ticker: str, report_path: str) -> bool:
         """종목에 물리 파일 저장 없이 리포트 파일 링크만 보드 데이터에 추가 기록합니다."""
         board = self._repository.load(board_name)
-        success = board.root.find_and_add_report(ticker, report_path)
+        # Board 도메인 모델의 비즈니스 로직 호출 (애그리게이트 루트 위임)
+        success = board.add_report_to_stock(ticker, report_path)
         if success:
             self._repository.save(board)
         return success
