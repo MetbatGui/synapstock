@@ -47,6 +47,14 @@ class StockMediaService:
             self._repository.save(board)
         return success
 
+    async def add_stock_report_link(self, board_name: str, ticker: str, report_path: str) -> bool:
+        """종목에 물리 파일 저장 없이 리포트 파일 링크만 보드 데이터에 추가 기록합니다."""
+        board = self._repository.load(board_name)
+        success = board.root.find_and_add_report(ticker, report_path)
+        if success:
+            self._repository.save(board)
+        return success
+
     async def add_stock_news(
         self, board_name: str, ticker: str, title: str, date: str, url: str, stock_name: str = ""
     ) -> bool:

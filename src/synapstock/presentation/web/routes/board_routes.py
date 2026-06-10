@@ -291,22 +291,7 @@ async def delete_stock(board: str, ticker: str) -> dict | JSONResponse:
     return JSONResponse(status_code=404, content={"message": "Stock not found in board"})
 
 
-@router.post("/api/stock/news/add", response_model=None)
-async def add_stock_news(board: str, ticker: str, title: str, date: str, url: str) -> dict | JSONResponse:
-    """지정된 종목에 새 뉴스를 추가합니다."""
-    success = command_service.add_stock_news(board, ticker, title, date, url)
-    if success:
-        return {"status": "success"}
-    return JSONResponse(status_code=404, content={"message": "Stock not found"})
 
-
-@router.delete("/api/stock/news/delete", response_model=None)
-async def delete_stock_news(board: str, ticker: str, url: str) -> dict | JSONResponse:
-    """보드에서 특정 뉴스를 삭제합니다."""
-    success = command_service.delete_stock_news(board, ticker, url)
-    if success:
-        return {"status": "success"}
-    return JSONResponse(status_code=404, content={"message": "Stock or news not found"})
 
 
 @router.post("/api/stock/report/upload", response_model=None)
@@ -331,7 +316,7 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
 
     try:
         content = await file.read()
-        success = media_service.add_stock_report(board, ticker, content, file.filename)
+        success = await media_service.add_stock_report(board, ticker, content, file.filename)
         if success:
             return {"status": "success", "filename": str(file.filename)}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -342,7 +327,7 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
 @router.post("/api/stock/report/add_link", response_model=None)
 async def add_stock_report_link(board: str, ticker: str, report_path: str) -> dict | JSONResponse:
     """종목에 리포트 링크를 추가합니다."""
-    success = media_service.add_stock_report_link(board, ticker, report_path)
+    success = await media_service.add_stock_report_link(board, ticker, report_path)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -365,7 +350,7 @@ async def delete_stock_report(board: str, ticker: str, report_path: str) -> dict
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = media_service.remove_stock_report(board, ticker, report_path)
+        success = await media_service.remove_stock_report(board, ticker, report_path)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or report not found"})
