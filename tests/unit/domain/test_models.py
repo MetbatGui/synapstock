@@ -92,6 +92,32 @@ class TestStock:
         # 매칭 실패
         assert stock.matches("kakao") is False
 
+    def test_has_valid_ticker(self):
+        """has_valid_ticker가 유효성을 정확히 판단하는지 확인한다."""
+        s_valid = Stock(name="삼성전자", ticker="005930")
+        assert s_valid.has_valid_ticker is True
+
+        s_invalid_len = Stock(name="에러", ticker="123456")
+        s_invalid_len.ticker = "12345"  # 5자리
+        assert s_invalid_len.has_valid_ticker is False
+
+        s_invalid_char = Stock(name="에러", ticker="123456")
+        s_invalid_char.ticker = "12345A"  # 문자
+        assert s_invalid_char.has_valid_ticker is False
+
+    def test_rename(self):
+        """rename() 호출 시 이름이 바뀌고 기존 이름이 aliases에 들어가는지 확인한다."""
+        stock = Stock(name="삼성전자", ticker="005930", aliases=["삼전"])
+        stock.rename("삼성전자")  # 이름이 같을 때
+        assert stock.name == "삼성전자"
+        assert stock.aliases == ["삼전"]
+
+        stock.rename("새삼성")  # 이름이 다를 때
+        assert stock.name == "새삼성"
+        assert "삼성전자" in stock.aliases
+        assert "삼전" in stock.aliases
+        assert len(stock.aliases) == 2
+
 
 class TestNode:
     """Node 모델 테스트."""

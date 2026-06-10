@@ -127,7 +127,7 @@ class BoardQueryService:
 
             def search_recursive(node: Node, current_path: list[str]):
                 for s in node.stocks:
-                    if query in s.name or any(query in alias for alias in s.aliases):
+                    if s.matches(query):
                         results.append(
                             {
                                 "board": b_name,

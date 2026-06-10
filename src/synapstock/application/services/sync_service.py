@@ -30,7 +30,7 @@ class BoardSyncService:
         def normalize_node(n):
             for s in n.stocks:
                 # 1. 티커가 부실한 경우 검색하여 채워줌
-                current_ticker_valid = s.ticker and s.ticker.isdigit() and len(s.ticker) == 6
+                current_ticker_valid = s.has_valid_ticker
 
                 # 검색을 통한 티커 확인 및 사명 변경 감지
                 results = self._ticker_search.search(s.name)
@@ -50,12 +50,8 @@ class BoardSyncService:
                         if progress_callback:
                             progress_callback(f"사명 변경 감지: {s.name} -> {new_name}", 0.0)
 
-                        # 기존 이름을 별칭으로 격하
-                        if s.name not in s.aliases:
-                            s.aliases.append(s.name)
-
-                        # 신규 사명으로 교체
-                        s.name = new_name
+                        # 사명 변경 처리 (기존 이름은 별칭으로 격하)
+                        s.rename(new_name)
 
             for child in n.nodes:
                 normalize_node(child)

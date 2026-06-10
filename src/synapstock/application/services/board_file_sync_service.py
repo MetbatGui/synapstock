@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from synapstock.domain.models import Board
-from synapstock.domain.ports import BoardRepositoryPort
-from synapstock.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from synapstock.domain.ports import BoardRepositoryPort, StoragePort
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ class BoardFileSyncService:
     def __init__(
         self,
         repository: BoardRepositoryPort,
-        drive_adapter: GoogleDriveAdapter | None,
+        drive_adapter: StoragePort | None,
         theme_folder_id: str | None,
         manifest_path: Path = Path("data/board/board_sync_manifest.json"),
     ) -> None:

@@ -38,6 +38,18 @@ class Stock(BaseModel):
             return True
         return any(normalized_query in alias.lower() for alias in self.aliases)
 
+    @property
+    def has_valid_ticker(self) -> bool:
+        """티커가 유효한 6자리 숫자 구조인지 여부를 반환합니다."""
+        return bool(self.ticker and self.ticker.strip().isdigit() and len(self.ticker.strip()) == 6)
+
+    def rename(self, new_name: str) -> None:
+        """사명 변경 시 기존 사명을 aliases로 격하하고 새 사명을 적용합니다."""
+        if self.name != new_name:
+            if self.name not in self.aliases:
+                self.aliases.append(self.name)
+            self.name = new_name
+
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"
 
