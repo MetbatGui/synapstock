@@ -474,6 +474,37 @@ class NewListing(BaseModel):
     status: str = "PENDING"
     current_board: str = "virtual_신규상장주"
     current_path: list[str] = Field(default_factory=list)
+    updated_at: str | None = None
+
+    def merge_with(self, other: "NewListing") -> "NewListing":
+        """비즈니스 우선순위 규칙에 근거하여 다른 IPO 정보와 병합한 최종 버전을 반환합니다.
+
+        병합 규칙:
+        1. ASSIGNED 상태가 최우선
+        2. IGNORED 상태가 PENDING보다 우선
+        3. 상태가 같은 경우 updated_at 타임스탬프가 최신인 쪽을 우선
+        """
+        l_status = self.status
+        r_status = other.status
+
+        # 1. ASSIGNED 상태 최우선
+        if l_status == "ASSIGNED" and r_status != "ASSIGNED":
+            return self
+        if r_status == "ASSIGNED" and l_status != "ASSIGNED":
+            return other
+
+        # 2. IGNORED 상태가 PENDING보다 우선
+        if l_status == "IGNORED" and r_status == "PENDING":
+            return self
+        if r_status == "IGNORED" and l_status == "PENDING":
+            return other
+
+        # 3. 상태가 같으면 updated_at 최신성 우선
+        l_updated = self.updated_at or ""
+        r_updated = other.updated_at or ""
+        if l_updated >= r_updated:
+            return self
+        return other
 
 
 class WeeklyChangeItem(BaseModel):
