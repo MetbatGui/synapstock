@@ -119,11 +119,9 @@ class KrxRepository(KrxDataPort):
                 
                 if not output:
                     logger.debug(f"{display_date}은(는) 영업일이 아니거나 데이터가 존재하지 않습니다. 이전 날짜로 재시도합니다.")
-                    if i < 9:
-                        continue
-                    else:
+                    if i == 9:
                         logger.error("최근 10일 이내의 영업일 데이터를 찾을 수 없습니다.")
-                        return pd.DataFrame()
+                    continue
                 
                 rows = []
                 for row in output:
@@ -145,8 +143,6 @@ class KrxRepository(KrxDataPort):
                 
             except Exception as e:
                 logger.error(f"{display_date} 기준 데이터 수집 중 오류: {e}")
-                if i < 9:
-                    continue
-                return pd.DataFrame()
+                continue
                 
         return pd.DataFrame()
