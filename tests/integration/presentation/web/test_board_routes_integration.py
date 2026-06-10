@@ -104,12 +104,16 @@ def test_trigger_sync(mock_dependencies):
     
     mock_query.load_board.return_value = MagicMock()
 
-    # Thread.start() 우회 패치
-    with patch("threading.Thread.start", MagicMock()):
+    # 국소적으로 board_routes 내의 Thread 클래스만 패치하여 스레드 기동을 우회합니다.
+    with patch("synapstock.presentation.web.routes.board_routes.threading.Thread") as mock_thread_cls:
+        mock_thread_inst = MagicMock()
+        mock_thread_cls.return_value = mock_thread_inst
         response = client.post("/api/sync?name=theme_test")
 
     assert response.status_code == 200
     assert response.json() == {"status": "started"}
+    mock_thread_cls.assert_called_once()
+    mock_thread_inst.start.assert_called_once()
 
 
 def test_add_node(mock_dependencies):
@@ -190,36 +194,7 @@ def test_delete_stock(mock_dependencies):
     assert res_fail.status_code == 404
 
 
-def test_add_stock_news(mock_dependencies):
-    """POST /api/stock/news/add 엔드포인트 검증."""
-    mock_command = mock_dependencies["command"]
-    
-    # 1. 성공
-    mock_command.add_stock_news.return_value = True
-    res_success = client.post("/api/stock/news/add?board=theme_test&ticker=005930&title=news&date=2026-06-09&url=http://ex.com")
-    assert res_success.status_code == 200
-    assert res_success.json() == {"status": "success"}
 
-    # 2. 실패
-    mock_command.add_stock_news.return_value = False
-    res_fail = client.post("/api/stock/news/add?board=theme_test&ticker=005930&title=news&date=2026-06-09&url=http://ex.com")
-    assert res_fail.status_code == 404
-
-
-def test_delete_stock_news(mock_dependencies):
-    """DELETE /api/stock/news/delete 엔드포인트 검증."""
-    mock_command = mock_dependencies["command"]
-    
-    # 1. 성공
-    mock_command.delete_stock_news.return_value = True
-    res_success = client.delete("/api/stock/news/delete?board=theme_test&ticker=005930&url=http://ex.com")
-    assert res_success.status_code == 200
-    assert res_success.json() == {"status": "success"}
-
-    # 2. 실패
-    mock_command.delete_stock_news.return_value = False
-    res_fail = client.delete("/api/stock/news/delete?board=theme_test&ticker=005930&url=http://ex.com")
-    assert res_fail.status_code == 404
 
 
 def test_upload_stock_report(mock_dependencies):

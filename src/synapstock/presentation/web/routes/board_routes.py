@@ -316,7 +316,7 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
 
     try:
         content = await file.read()
-        success = media_service.add_stock_report(board, ticker, content, file.filename)
+        success = await media_service.add_stock_report(board, ticker, content, file.filename)
         if success:
             return {"status": "success", "filename": str(file.filename)}
         return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -327,7 +327,7 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
 @router.post("/api/stock/report/add_link", response_model=None)
 async def add_stock_report_link(board: str, ticker: str, report_path: str) -> dict | JSONResponse:
     """종목에 리포트 링크를 추가합니다."""
-    success = media_service.add_stock_report_link(board, ticker, report_path)
+    success = await media_service.add_stock_report_link(board, ticker, report_path)
     if success:
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"message": "Stock not found"})
@@ -350,7 +350,7 @@ async def delete_stock_report(board: str, ticker: str, report_path: str) -> dict
         JSONResponse (500): 처리 중 예외 발생 시.
     """
     try:
-        success = media_service.remove_stock_report(board, ticker, report_path)
+        success = await media_service.remove_stock_report(board, ticker, report_path)
         if success:
             return {"status": "success"}
         return JSONResponse(status_code=404, content={"message": "Stock or report not found"})

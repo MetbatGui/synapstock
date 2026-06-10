@@ -177,8 +177,7 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     success = False
     try:
         # MediaService 내부에서 NewsService.save_news를 호출하여 드라이브 동기화까지 수행됨
-        success = await asyncio.to_thread(
-            media_service.add_stock_news,
+        success = await media_service.add_stock_news(
             board_name=target_board,
             ticker=target_ticker,
             title=title,
