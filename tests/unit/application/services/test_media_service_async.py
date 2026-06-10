@@ -17,7 +17,8 @@ def mock_repository():
     board = MagicMock()
     repo.load.return_value = board
     board.root.find_and_add_news.return_value = True
-    board.root.find_and_add_report.return_value = True
+    board.add_report_to_stock.return_value = True
+    board.remove_report_from_stock.return_value = True
     return repo
 
 @pytest.fixture

@@ -23,6 +23,21 @@ class Stock(BaseModel):
     reports: list[str] = []
     news: list[dict] = []
 
+    @model_validator(mode="after")
+    def validate_ticker(self) -> Stock:
+        """티커 규격(예: 6자리 숫자 구조)을 자율 검증합니다."""
+        self.ticker = self.ticker.strip()
+        if not self.ticker.isdigit() or len(self.ticker) != 6:
+            raise ValueError(f"유효하지 않은 주식 티커 심볼입니다 (6자리 숫자여야 함): {self.ticker}")
+        return self
+
+    def matches(self, query: str) -> bool:
+        """사명 또는 별칭에 검색어가 부합하는지 도메인 내부에서 스스로 확인합니다."""
+        normalized_query = query.strip().lower()
+        if normalized_query in self.name.lower():
+            return True
+        return any(normalized_query in alias.lower() for alias in self.aliases)
+
     def __repr__(self) -> str:
         return f"- {self.name} ({self.ticker})"
 
@@ -240,6 +255,18 @@ class Board(BaseModel):
             return False
 
         return find_and_remove(self.root, node_name)
+
+    def delete_stock(self, ticker: str) -> bool:
+        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 삭제합니다."""
+        return self.root.find_and_remove_stock(ticker)
+
+    def add_report_to_stock(self, ticker: str, report_path: str) -> bool:
+        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 리포트 경로를 추가합니다."""
+        return self.root.find_and_add_report(ticker, report_path)
+
+    def remove_report_from_stock(self, ticker: str, report_path: str) -> bool:
+        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 리포트 경로를 삭제합니다."""
+        return self.root.find_and_remove_report(ticker, report_path)
 
     def __repr__(self) -> str:
         return f"Board({self.name!r})\n{self.root!r}"

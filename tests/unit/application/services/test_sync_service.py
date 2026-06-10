@@ -27,8 +27,10 @@ class TestBoardSyncService:
     def test_normalize_board_tickers(self, service, mock_ticker_search):
         """티커가 부정확한 종목의 티커를 자동으로 검색하여 채워넣어야 한다."""
         root = Node(name="Root", depth=0)
-        # 티커가 잘못됨
-        root.stocks.append(Stock(name="삼성전자", ticker="ERROR"))
+        # 티커가 잘못됨 (생성 시 유효성 검사를 통과한 후 수동으로 잘못된 값 대입)
+        stock = Stock(name="삼성전자", ticker="000000")
+        stock.ticker = "ERROR"
+        root.stocks.append(stock)
         board = Board(name="테스트", root=root)
 
         mock_ticker_search.search.return_value = [{"name": "삼성전자", "ticker": "005930"}]

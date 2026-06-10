@@ -57,8 +57,8 @@ class BoardCommandService:
     async def delete_stock(self, board_name: str, ticker: str) -> bool:
         """보드 내에서 특정 종목(티커 기준)을 찾아 삭제합니다."""
         board = self._repository.load(board_name)
-        # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 삭제)
-        success = cast(bool, board.root.find_and_remove_stock(ticker))
+        # Board 도메인 모델의 비즈니스 로직 호출 (애그리게이트 루트 위임)
+        success = cast(bool, board.delete_stock(ticker))
         if success:
             self._repository.save(board)
             if self._sync_service:
@@ -102,8 +102,8 @@ class BoardCommandService:
         any_success = False
 
         for ticker in tickers:
-            # Node 도메인 모델의 비즈니스 로직 호출 (재귀적 삭제)
-            if board.root.find_and_remove_stock(ticker):
+            # Board 도메인 모델의 비즈니스 로직 호출 (애그리게이트 루트 위임)
+            if board.delete_stock(ticker):
                 any_success = True
 
         if any_success:

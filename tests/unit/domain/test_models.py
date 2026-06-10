@@ -66,6 +66,32 @@ class TestStock:
         assert "aliases" in data_with_alias
         assert data_with_alias["aliases"] == ["LIG넥스원"]
 
+    def test_validate_ticker_fail(self):
+        """유효하지 않은 티커 형식(6자리가 아니거나 숫자가 아닌 경우)이면 ValidationError가 발생해야 한다."""
+        with pytest.raises(ValidationError) as exc_info:
+            Stock(name="삼성전자", ticker="00593")  # 5자리
+        assert "6자리 숫자여야 함" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            Stock(name="삼성전자", ticker="00593A")  # 영문 포함
+        assert "6자리 숫자여야 함" in str(exc_info.value)
+
+    def test_matches_query(self):
+        """matches()가 종목명 및 별칭 매칭을 대소문자 무관하게 잘 수행하는지 확인한다."""
+        stock = Stock(name="NAVER", ticker="035420", aliases=["네이버", "네이바"])
+        
+        # 종목명 매칭 (대소문자 무관)
+        assert stock.matches("naver") is True
+        assert stock.matches("Nav") is True
+        assert stock.matches("NAV") is True
+        
+        # 별칭 매칭
+        assert stock.matches("네이버") is True
+        assert stock.matches("네이") is True
+        
+        # 매칭 실패
+        assert stock.matches("kakao") is False
+
 
 class TestNode:
     """Node 모델 테스트."""
@@ -127,16 +153,16 @@ class TestNode:
         """중복된 티커를 가진 종목 추가를 방지한다.
 
         Arrange:
-            종목 "S1"을 가진 노드를 준비한다.
+            종목 "000001"을 가진 노드를 준비한다.
         Act:
-            동일한 티커 "S1"을 가진 다른 종목 객체를 추가한다.
+            동일한 티커 "000001"을 가진 다른 종목 객체를 추가한다.
         Assert:
             종목 리스트의 길이가 여전히 1인지 확인한다.
         """
         node = Node(name="sector", depth=1)
-        node.add_stock(Stock(name="Stock1", ticker="S1"))
+        node.add_stock(Stock(name="Stock1", ticker="000001"))
 
-        node.add_stock(Stock(name="Stock1_Dup", ticker="S1"))
+        node.add_stock(Stock(name="Stock1_Dup", ticker="000001"))
 
         assert len(node.stocks) == 1
         assert node.stocks[0].name == "Stock1"
@@ -145,28 +171,26 @@ class TestNode:
         """재귀적으로 하위 노드에서 종목을 찾아 삭제한다.
 
         Arrange:
-            root -> child 하위에 종목 "S1"을 추가한다.
+            root -> child 하위에 종목 "000001"을 추가한다.
         Act:
-            root.find_and_remove_stock("S1")을 호출한다.
+            root.find_and_remove_stock("000001")을 호출한다.
         Assert:
             child의 종목 리스트가 비어있는지 확인한다.
         """
         root = Node(name="root", depth=0)
         child = root.add_child("child")
-        child.add_stock(Stock(name="Stock1", ticker="S1"))
+        child.add_stock(Stock(name="Stock1", ticker="000001"))
 
-        success = root.find_and_remove_stock("S1")
+        success = root.find_and_remove_stock("000001")
 
         assert success is True
         assert len(child.stocks) == 0
-
-
 
     def test_node_report_management_recursive(self):
         """재귀적으로 종목을 찾아 리포트 경로를 추가 및 삭제한다.
 
         Arrange:
-            깊은 노드에 종목 "S1"이 있는 트리를 생성한다.
+            깊은 노드에 종목 "000001"이 있는 트리를 생성한다.
         Act:
             1. find_and_add_report로 경로 추가.
             2. find_and_remove_report로 경로 삭제.
@@ -175,16 +199,15 @@ class TestNode:
         """
         root = Node(name="root", depth=0)
         child = root.add_child("child")
-        stock = Stock(name="Stock1", ticker="S1")
+        stock = Stock(name="Stock1", ticker="000001")
         child.add_stock(stock)
 
         report_path = "data/pdf/report1.pdf"
 
         # Add
-        root.find_and_add_report("S1", report_path)
+        root.find_and_add_report("000001", report_path)
         assert len(child.stocks[0].reports) == 1
 
-        # Remove
-        root.find_and_remove_report("S1", report_path)
+        root.find_and_remove_report("000001", report_path)
         assert len(child.stocks[0].reports) == 0
 

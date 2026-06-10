@@ -124,30 +124,24 @@ class BoardFileSyncService:
                 if l_modified > r_modified:
                     merged_boards[b_id] = l_info
 
-        # --- 신규상장주(IPO) 동기화 정합성 병합 추가 ---
+        # --- 신규상장주(IPO) 동기화 정합성 병합 추가 (NewListing 도메인 메서드 위임) ---
+        from synapstock.domain.statistics.models import NewListing
+
         merged_listings = dict(remote_manifest.get("new_listings", {}))
         for ticker, l_item in local_manifest.get("new_listings", {}).items():
             if ticker not in merged_listings:
                 merged_listings[ticker] = l_item
             else:
                 r_item = merged_listings[ticker]
-                l_status = l_item.get("status", "PENDING")
-                r_status = r_item.get("status", "PENDING")
-                
-                # 병합 규칙 1: ASSIGNED 상태가 최우선
-                if l_status == "ASSIGNED" and r_status != "ASSIGNED":
-                    merged_listings[ticker] = l_item
-                elif r_status == "ASSIGNED" and l_status != "ASSIGNED":
-                    pass # 이미 원격(merged_listings)의 ASSIGNED 상태 보존
-                
-                # 병합 규칙 2: IGNORED 상태가 PENDING보다 우선
-                elif l_status == "IGNORED" and r_status == "PENDING":
-                    merged_listings[ticker] = l_item
-                elif r_status == "IGNORED" and l_status == "PENDING":
-                    pass
-                
-                # 병합 규칙 3: 상태가 같으면 updated_at 타임스탬프 최신성 우선
-                else:
+                try:
+                    # 도메인 모델로 복원하여 비즈니스 규칙에 따라 병합
+                    l_model = NewListing.model_validate(l_item)
+                    r_model = NewListing.model_validate(r_item)
+                    merged_model = l_model.merge_with(r_model)
+                    merged_listings[ticker] = merged_model.model_dump()
+                except Exception as e:
+                    logger.error(f"[BoardFileSync] 신규상장주 도메인 병합 실패 ({ticker}): {e}")
+                    # 예외 발생 시 타임스탬프 기준으로 단순 덮어쓰기 폴백
                     l_updated = l_item.get("updated_at", "")
                     r_updated = r_item.get("updated_at", "")
                     if l_updated > r_updated:
@@ -290,7 +284,7 @@ class BoardFileSyncService:
             # virtual_신규상장주 보드가 존재하는지 확인 후 제거
             if "virtual_신규상장주" in self._repository.list_boards():
                 board = self._repository.load("virtual_신규상장주")
-                if board.root.find_and_remove_stock(ticker):
+                if board.delete_stock(ticker):
                     self._repository.save(board)
                     logger.info(f"[BoardFileSync] 가상보드 대기목록에서 종목 자동 제거 완료: {ticker}")
         except Exception as e:

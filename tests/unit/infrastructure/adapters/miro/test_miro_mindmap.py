@@ -87,7 +87,7 @@ def test_save_board_logic(adapter, mock_session):
         root=Node(
             name=board_name, depth=0,
             nodes=[Node(name="NodeA", depth=1)],
-            stocks=[Stock(name="Stock1", ticker="S1")]
+            stocks=[Stock(name="Stock1", ticker="000001")]
         )
     )
 

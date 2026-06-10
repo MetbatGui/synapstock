@@ -55,7 +55,7 @@ def it_board() -> Board:
     ctrl.stocks = [Stock(name="에스원", ticker="012750"), Stock(name="이노뎁", ticker="303530")]
 
     equip = sec_svc.add_child("장비")
-    equip.stocks = [Stock(name="아이디스", ticker="054800"), Stock(name="포커스에이치엔에스", ticker="PortFocus")]
+    equip.stocks = [Stock(name="아이디스", ticker="054800"), Stock(name="포커스에이치엔에스", ticker="388050")]
 
     auth_node = sec_svc.add_child("인증서")
     auth_node.stocks = [Stock(name="슈프리마", ticker="094840"), Stock(name="알체라", ticker="347860")]
@@ -158,7 +158,7 @@ class TestBoard:
         board = Board(name="Root")
         sector = board.root.add_child("SectorA")
         sub = sector.add_child("SubSector1")
-        sub.add_stock(Stock(name="Stock1", ticker="S1"))
+        sub.add_stock(Stock(name="Stock1", ticker="000001"))
 
         # Act
         success = board.delete_node("SubSector1")
@@ -166,7 +166,7 @@ class TestBoard:
         # Assert
         assert success is True
         assert board.find_node("SubSector1") is None
-        assert any(s.ticker == "S1" for s in sector.stocks)
+        assert any(s.ticker == "000001" for s in sector.stocks)
 
     def test_board_delete_root_fails(self):
         """루트 노드는 삭제할 수 없어야 한다.
@@ -185,6 +185,38 @@ class TestBoard:
         assert success is False
         assert board.root is not None
         assert board.root.name == "IT"
+
+    def test_board_delete_stock(self):
+        """Board 애그리게이트 루트를 통해 재귀적으로 종목을 삭제할 수 있어야 한다."""
+        board = Board(name="IT")
+        internet = board.root.add_child("인터넷")
+        internet.add_stock(Stock(name="카카오", ticker="035720"))
+
+        assert board.find_stock("035720") is not None
+        
+        # 삭제 수행
+        success = board.delete_stock("035720")
+        assert success is True
+        assert board.find_stock("035720") is None
+
+    def test_board_report_management(self):
+        """Board 애그리게이트 루트를 통해 재귀적으로 종목에 리포트 링크를 추가하고 삭제할 수 있어야 한다."""
+        board = Board(name="IT")
+        internet = board.root.add_child("인터넷")
+        stock = Stock(name="카카오", ticker="035720")
+        internet.add_stock(stock)
+
+        report_path = "data/pdf/kakao_report.pdf"
+
+        # 리포트 추가
+        success_add = board.add_report_to_stock("035720", report_path)
+        assert success_add is True
+        assert report_path in stock.reports
+
+        # 리포트 삭제
+        success_remove = board.remove_report_from_stock("035720", report_path)
+        assert success_remove is True
+        assert report_path not in stock.reports
 
 
 # ── IT 보드 트리 테스트 ───────────────────────────────────────────────────────
