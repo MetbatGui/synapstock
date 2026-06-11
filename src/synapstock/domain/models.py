@@ -25,10 +25,10 @@ class Stock(BaseModel):
 
     @model_validator(mode="after")
     def validate_ticker(self) -> Stock:
-        """티커 규격(예: 6자리 숫자 구조)을 자율 검증합니다."""
+        """티커 규격(예: 6자리 숫자/영문 구조)을 자율 검증합니다."""
         self.ticker = self.ticker.strip()
-        if not self.ticker.isdigit() or len(self.ticker) != 6:
-            raise ValueError(f"유효하지 않은 주식 티커 심볼입니다 (6자리 숫자여야 함): {self.ticker}")
+        if not self.ticker.isalnum() or len(self.ticker) != 6:
+            raise ValueError(f"유효하지 않은 주식 티커 심볼입니다 (6자리 숫자 혹은 영문이어야 함): {self.ticker}")
         return self
 
     def matches(self, query: str) -> bool:
@@ -40,8 +40,9 @@ class Stock(BaseModel):
 
     @property
     def has_valid_ticker(self) -> bool:
-        """티커가 유효한 6자리 숫자 구조인지 여부를 반환합니다."""
-        return bool(self.ticker and self.ticker.strip().isdigit() and len(self.ticker.strip()) == 6)
+        """티커가 유효한 6자리 숫자/영문 구조인지 여부를 반환합니다."""
+        ticker_stripped = self.ticker.strip() if self.ticker else ""
+        return bool(ticker_stripped and ticker_stripped.isalnum() and len(ticker_stripped) == 6)
 
     def rename(self, new_name: str) -> None:
         """사명 변경 시 기존 사명을 aliases로 격하하고 새 사명을 적용합니다."""

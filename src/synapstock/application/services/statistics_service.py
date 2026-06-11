@@ -115,7 +115,7 @@ class StatisticsService:
                                 res_name = unicodedata.normalize("NFC", res.get("name", "")).strip().lower()
                                 if res_name == clean_item_name or clean_item_name in res_name:
                                     ticker = res.get("ticker")
-                                    if ticker and ticker.isdigit() and len(ticker) == 6:
+                                    if ticker and ticker.isalnum() and len(ticker) == 6:
                                         item.ticker = ticker
                                         logger.info(f"[StatisticsService] 신규 종목 티커 검색 성공: {item.name} -> {ticker}")
                                         found = True
