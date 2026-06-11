@@ -17,9 +17,6 @@ export const newListingView = {
                 <div class="stats-header">
                     <h2><i class="fas fa-gem"></i> 신규 상장주(IPO) 분석 대시보드</h2>
                     <div class="stats-filters" style="display: flex; gap: 8px; align-items: center;">
-                        <button id="batch-ignore-year-btn" class="stats-btn-action" style="background:#ef4444; border:none; color:white; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" title="이 연도 대기 종목 일괄 제거">
-                            <i class="fas fa-trash-alt"></i> 이 연도 일괄 제거
-                        </button>
                         <select id="ipo-year-select" class="stats-select" title="연도 선택">
                             <option value="2026">2026년</option>
                             <option value="all">전체</option>
@@ -79,37 +76,6 @@ export const newListingView = {
             yearSelect.onchange = () => {
                 this.renderTable(this.cachedItems, yearSelect.value);
                 this.renderSummary(this.cachedItems);
-                this.updateBatchIgnoreButtonState();
-            };
-        }
-
-        const batchBtn = document.getElementById('batch-ignore-year-btn');
-        if (batchBtn) {
-            batchBtn.onclick = async () => {
-                if (batchBtn.disabled) return;
-                const selectedYear = yearSelect ? yearSelect.value : 'all';
-                if (selectedYear === 'all') return;
-
-                const yearNodeName = `${selectedYear}년`;
-                batchBtn.disabled = true;
-
-                try {
-                    const res = await fetch(`/api/board?name=${encodeURIComponent('virtual_신규상장주')}`);
-                    if (!res.ok) throw new Error("가상보드 데이터를 가져오지 못했습니다.");
-                    const boardData = await res.json();
-                    
-                    window._currentBoardData = boardData;
-                    window._currentBoardName = 'virtual_신규상장주';
-
-                    const { showBatchIgnoreModal } = await import('../mindmap/modals.js');
-                    showBatchIgnoreModal(yearNodeName, async () => {
-                        await this.loadData();
-                    });
-                } catch (err) {
-                    alert(`일괄 제거 준비 중 오류가 발생했습니다: ${err.message}`);
-                } finally {
-                    this.updateBatchIgnoreButtonState();
-                }
             };
         }
     },
@@ -134,7 +100,6 @@ export const newListingView = {
             const yearSelect = document.getElementById('ipo-year-select');
             this.renderTable(items, yearSelect ? yearSelect.value : 'all');
             this.renderSummary(items);
-            this.updateBatchIgnoreButtonState();
 
         } catch (err) {
             console.error('Failed to load IPO data:', err);
@@ -143,44 +108,6 @@ export const newListingView = {
         }
     },
 
-    /**
-     * 연도별 일괄 제거 버튼의 활성/비활성 상태를 업데이트합니다.
-     */
-    updateBatchIgnoreButtonState: function () {
-        const yearSelect = document.getElementById('ipo-year-select');
-        const batchBtn = document.getElementById('batch-ignore-year-btn');
-        if (!batchBtn) return;
-        if (!yearSelect) {
-            batchBtn.disabled = true;
-            batchBtn.style.opacity = '0.5';
-            batchBtn.style.cursor = 'not-allowed';
-            return;
-        }
-
-        const selectedYear = yearSelect.value;
-        if (selectedYear === 'all') {
-            batchBtn.disabled = true;
-            batchBtn.style.opacity = '0.5';
-            batchBtn.style.cursor = 'not-allowed';
-            return;
-        }
-
-        const hasPending = this.cachedItems.some(it => 
-            (it.listing_date || "").startsWith(selectedYear) && 
-            it.status !== 'ASSIGNED' && 
-            it.status !== 'IGNORED'
-        );
-
-        if (hasPending) {
-            batchBtn.disabled = false;
-            batchBtn.style.opacity = '1';
-            batchBtn.style.cursor = 'pointer';
-        } else {
-            batchBtn.disabled = true;
-            batchBtn.style.opacity = '0.5';
-            batchBtn.style.cursor = 'not-allowed';
-        }
-    },
 
     /**
      * 연도 필터 옵션을 동적으로 업데이트합니다.
