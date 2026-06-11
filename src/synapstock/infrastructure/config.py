@@ -21,6 +21,7 @@ class AppConfig(BaseModel):
     board_dir: Path = Path("data/board")
     report_dir: Path = Path("data/report")
     pdf_dir: Path = Path("data/pdf")
+    heatmap_dir: Path = Path("data/heatmap")
     financial_dir: Path = Path("data/financial_statements")
     statistics_dir: Path = Path("data/statistics")
     netbuy_dir: Path = Path("data/statistics/netbuy")
@@ -56,6 +57,7 @@ class AppConfig(BaseModel):
     theme_folder_id: str | None = None
     financial_statements_id: str | None = None
     stock_split_folder_id: str | None = None
+    heatmap_folder_id: str | None = None
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
@@ -73,6 +75,7 @@ class AppConfig(BaseModel):
             board_dir=data_root / "board",
             report_dir=data_root / "report",
             pdf_dir=data_root / "pdf",
+            heatmap_dir=data_root / "heatmap",
             financial_dir=data_root / "financial_statements",
             statistics_dir=data_root / "statistics",
             netbuy_dir=data_root / "statistics" / "netbuy",
@@ -101,4 +104,5 @@ class AppConfig(BaseModel):
             theme_folder_id=os.getenv("GOOGLE_DRIVE_THEME_FOLDER_ID"),
             financial_statements_id=os.getenv("GOOGLE_DRIVE_FINANCIAL_STATEMENTS_ID"),
             stock_split_folder_id=os.getenv("GOOGLE_DRIVE_STOCK_SPLIT_ID"),
+            heatmap_folder_id=os.getenv("GOOGLE_DRIVE_HEATMAP_FOLDER_ID"),
         )
