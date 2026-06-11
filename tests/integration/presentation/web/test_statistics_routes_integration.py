@@ -154,6 +154,22 @@ def test_get_new_listing(client):
         assert data["items"] == mock_ipo_data
 
 
+def test_get_new_listing_default_all_years_real(client):
+    """GET /api/statistics/new-listing - year 파라미터 누락 시 'all'로 연동되어 다년도 실제 캐시/드라이브 데이터를 고스란히 긁어와 리턴하는지 검증합니다."""
+    response = client.get("/api/statistics/new-listing")
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert "count" in data
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    
+    if data["count"] > 0:
+        years = [it.get("listing_date")[:4] for it in data["items"] if it.get("listing_date") and len(it.get("listing_date")) >= 4]
+        unique_years = set(years)
+        assert len(unique_years) > 0
+
+
 def test_get_bonus_issue(client):
     """GET /api/statistics/bonus-issue - 무상증자 분석 조회 검증."""
     from synapstock.presentation.web.core.dependencies import statistics_service

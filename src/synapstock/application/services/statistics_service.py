@@ -35,11 +35,13 @@ class StatisticsService:
         bw_repository: Any = None,
         manifest_path: Path = Path("data/board/board_sync_manifest.json"),
         virtual_board_path: Path = Path("data/board/virtual_신규상장주.json"),
+        board_file_sync_service: Any = None,
     ):
         self._storage = storage
         self._query_service = query_service
         self._manifest_path = manifest_path
         self._virtual_board_path = virtual_board_path
+        self._board_file_sync_service = board_file_sync_service
 
         # 도메인 서비스 초기화 및 의존성 주입
         self.ranking_svc = RankingService(storage, "", repository)
@@ -85,7 +87,7 @@ class StatisticsService:
             logger.error(f"[StatisticsService] 티커 맵 생성 실패: {e}")
             return ticker_map
 
-    def _enrich_tickers(self, items: list) -> list:
+    def _enrich_tickers(self, items: list, skip_search: bool = False) -> list:
         """아이템 리스트의 티커 정보를 보강하고, 매니페스트 상의 실제 할당 상태를 매핑합니다."""
         ticker_map = self._build_local_ticker_map()
 
@@ -103,7 +105,7 @@ class StatisticsService:
             if hasattr(item, "ticker") and not item.ticker:
                 if item.name in ticker_map:
                     item.ticker = ticker_map[item.name]
-                elif self._query_service:
+                elif self._query_service and not skip_search:
                     # 로컬 보드에 등록되지 않은 신규 종목은 네이버 API를 통해 티커 검색을 수행
                     try:
                         search_results = self._query_service.search_ticker(item.name)
@@ -159,8 +161,12 @@ class StatisticsService:
     async def get_monthly_ranking(self, month: str, market: Any, subject: Any) -> Any:
         result = await self.ranking_svc.get_monthly_ranking(month, market, subject)
         if result and result.items:
-            self._enrich_tickers(result.items)
+            self._enrich_tickers(result.items, skip_search=True)
+            for item in result.items:
+                if item.ticker == "none":
+                    item.ticker = None
         return result
+
 
     # --- 상한가 분석 (Price Stats) ---
     async def get_ceiling_analysis(self, date: str, force_sync: bool = False) -> CeilingAnalysisReport | None:
@@ -194,14 +200,35 @@ class StatisticsService:
 
     # --- 신규 상장 (IPO) ---
     async def get_new_listing_data(self, force_sync: bool = False, year: str = "2026") -> list[NewListing]:
-        items = await self.ipo_svc.get_data(year, force_sync=force_sync)
-        enriched_items = self._enrich_tickers(items)
-        try:
-            self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
-        except Exception as ex:
-            logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({year}): {ex}")
-        self.sync_new_listings_to_virtual_board(enriched_items)
-        return enriched_items
+        if year == "all":
+            years = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+            all_items = []
+            for y in years:
+                try:
+                    items = await self.ipo_svc.get_data(y, force_sync=force_sync)
+                    enriched = self._enrich_tickers(items)
+                    try:
+                        self.ipo_svc.repository.save_new_listings(enriched, year=y)
+                    except Exception as ex:
+                        logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({y}): {ex}")
+                    all_items.extend(enriched)
+                except Exception as e:
+                    logger.error(f"[StatisticsService] {y}년 신규상장 데이터 로드 실패: {e}")
+            changed = self.sync_new_listings_to_virtual_board(all_items)
+            if changed and self._board_file_sync_service:
+                await self._board_file_sync_service.sync_with_drive()
+            return all_items
+        else:
+            items = await self.ipo_svc.get_data(year, force_sync=force_sync)
+            enriched_items = self._enrich_tickers(items)
+            try:
+                self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
+            except Exception as ex:
+                logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({year}): {ex}")
+            changed = self.sync_new_listings_to_virtual_board(enriched_items)
+            if changed and self._board_file_sync_service:
+                await self._board_file_sync_service.sync_with_drive()
+            return enriched_items
 
     # --- 동기화 명령 (Sync) ---
     async def sync_new_listing_data(self, year: str = "2026") -> list[NewListing]:
@@ -211,12 +238,14 @@ class StatisticsService:
             self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
         except Exception as ex:
             logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({year}): {ex}")
-        self.sync_new_listings_to_virtual_board(enriched_items)
+        changed = self.sync_new_listings_to_virtual_board(enriched_items)
+        if changed and self._board_file_sync_service:
+            await self._board_file_sync_service.sync_with_drive()
         return enriched_items
 
     async def sync_all_new_listings(self, force_sync: bool = False) -> list[NewListing]:
-        """2024년부터 2026년까지의 모든 신규상장주 데이터를 루프 돌며 일괄 동기화 및 가상보드에 병합 적재합니다."""
-        years = ["2024", "2025", "2026"]
+        """2020년부터 2026년까지의 모든 신규상장주 데이터를 루프 돌며 일괄 동기화 및 가상보드에 병합 적재합니다."""
+        years = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"]
         all_enriched_items = []
         
         for year in years:
@@ -234,13 +263,15 @@ class StatisticsService:
                 logger.error(f"[StatisticsService] {year}년 신규상장 동기화 중 오류 발생: {e}")
                 
         # 병합된 전체 연도의 PENDING 항목들을 가상보드 및 매니페스트에 일괄 반영
-        self.sync_new_listings_to_virtual_board(all_enriched_items)
+        changed = self.sync_new_listings_to_virtual_board(all_enriched_items)
+        if changed and self._board_file_sync_service:
+            await self._board_file_sync_service.sync_with_drive()
         return all_enriched_items
 
-    def sync_new_listings_to_virtual_board(self, listings: list[NewListing]) -> None:
+    def sync_new_listings_to_virtual_board(self, listings: list[NewListing]) -> bool:
         """신규 상장된 종목들을 매니페스트와 가상보드에 자동으로 적재합니다. (정합성 보장)"""
         if not listings:
-            return
+            return False
 
         manifest_path = self._manifest_path
         virtual_board_path = self._virtual_board_path
@@ -276,6 +307,20 @@ class StatisticsService:
         changed = False
         now_str = datetime.now(UTC).isoformat()
 
+        # 2.5. 마인드맵의 일반 테마 보드들에 기등록된 종목 맵을 캐싱 (O(1) 검색 최적화)
+        assigned_stocks_map = {}
+        if self._query_service:
+            try:
+                flat_stocks = self._query_service.get_all_stocks_flat()
+                for s in flat_stocks:
+                    t = s.get("ticker")
+                    b = s.get("board")
+                    p = s.get("path", [])
+                    if t and b and b != "virtual_신규상장주":
+                        assigned_stocks_map[t] = (b, p)
+            except Exception as e:
+                logger.error(f"[StatisticsService] 마인드맵 등록 종목 캐시 맵 구성 실패: {e}")
+
         # 3. 새로운 종목들 중 매니페스트에 없는 항목을 PENDING으로 등록
         for item in listings:
             if not item.ticker or item.ticker == "none":
@@ -284,22 +329,48 @@ class StatisticsService:
             ticker = item.ticker
             # 매니페스트에 아직 등록되지 않은 경우
             if ticker not in manifest["new_listings"]:
-                manifest["new_listings"][ticker] = {
-                    "ticker": ticker,
-                    "name": item.name,
-                    "listing_date": item.listing_date or "",
-                    "status": "PENDING",
-                    "updated_at": now_str,
-                    "current_board": "virtual_신규상장주",
-                    "current_path": []
-                }
+                res = assigned_stocks_map.get(ticker)
+                if res:
+                    assigned_board, assigned_path = res
+                    manifest["new_listings"][ticker] = {
+                        "ticker": ticker,
+                        "name": item.name,
+                        "listing_date": item.listing_date or "",
+                        "status": "ASSIGNED",
+                        "updated_at": now_str,
+                        "current_board": assigned_board,
+                        "current_path": assigned_path
+                    }
+                else:
+                    manifest["new_listings"][ticker] = {
+                        "ticker": ticker,
+                        "name": item.name,
+                        "listing_date": item.listing_date or "",
+                        "status": "PENDING",
+                        "updated_at": now_str,
+                        "current_board": "virtual_신규상장주",
+                        "current_path": []
+                    }
                 changed = True
             else:
-                # 이미 등록된 항목에 listing_date가 없으면 보강
                 entry = manifest["new_listings"][ticker]
+                # 이미 등록된 항목에 listing_date가 없으면 보강
                 if not entry.get("listing_date") and item.listing_date:
                     entry["listing_date"] = item.listing_date
                     changed = True
+
+                # PENDING 상태인데 캐시 맵 상에서 다른 테마 보드 수록이 확인되면 ASSIGNED로 보정
+                if entry.get("status") == "PENDING":
+                    res = assigned_stocks_map.get(ticker)
+                    if res:
+                        assigned_board, assigned_path = res
+                        entry.update({
+                            "status": "ASSIGNED",
+                            "current_board": assigned_board,
+                            "current_path": assigned_path,
+                            "updated_at": now_str
+                        })
+                        changed = True
 
             # 가상보드 대기 목록에 등록 (PENDING이고 아직 가상보드에 기록되지 않은 경우)
             if manifest["new_listings"][ticker]["status"] == "PENDING":
@@ -309,6 +380,12 @@ class StatisticsService:
                         "name": item.name,
                         "ticker": ticker
                     })
+                    changed = True
+            else:
+                # PENDING이 아닌데 가상보드에 혹시 남아있다면 제거 (중복 제거 보정)
+                exists_in_board = any(s.get("ticker") == ticker for s in virtual_board["root"]["stocks"])
+                if exists_in_board:
+                    virtual_board["root"]["stocks"] = [s for s in virtual_board["root"]["stocks"] if s.get("ticker") != ticker]
                     changed = True
 
         # 4. 변경사항이 있으면 저장
@@ -321,8 +398,15 @@ class StatisticsService:
                 # 가상보드 저장
                 virtual_board_path.write_text(json.dumps(virtual_board, indent=2, ensure_ascii=False), encoding="utf-8")
                 logger.info(f"[StatisticsService] 신규 상장주 {len(listings)}건 가상보드 및 매니페스트 갱신 완료")
+
+                # 가상보드 갱신 최종 시각을 매니페스트에 영속화
+                if self._board_file_sync_service:
+                    self._board_file_sync_service.update_local_manifest("virtual_신규상장주", deleted=False)
+                return True
             except Exception as e:
                 logger.error(f"[StatisticsService] 가상보드 및 매니페스트 갱신 저장 실패: {e}")
+                return False
+        return False
 
     async def sync_capital_increase_data(self, year: str = "2026") -> list:
         items = await self.disclosure_svc.sync_data("capital_increase", year)

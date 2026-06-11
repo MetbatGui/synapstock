@@ -300,7 +300,7 @@ async def get_bonus_issue(force_sync: bool = Query(False, description="강제 �
 #         raise HTTPException(status_code=500, detail=str(e))
 @router.get("/new-listing", response_model=None)
 async def get_new_listing(
-    year: str = Query("2026", description="조회 연도 (YYYY)"),
+    year: str = Query("all", description="조회 연도 (YYYY) 또는 'all' (모든 연도)"),
     force_sync: bool = Query(False, description="강제 동기화 여부"),
 ):
     """신규상장주(IPO) 분석 데이터를 가져옵니다."""
