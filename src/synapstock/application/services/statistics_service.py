@@ -307,6 +307,25 @@ class StatisticsService:
         changed = False
         now_str = datetime.now(UTC).isoformat()
 
+        # 2.4. 가상 보드 데이터에서 2024년 미만(2020~2023) 종목 청소
+        if "stocks" in virtual_board["root"]:
+            filtered_stocks = []
+            for s in virtual_board["root"]["stocks"]:
+                t = s.get("ticker")
+                meta = manifest["new_listings"].get(t)
+                if meta and meta.get("listing_date"):
+                    try:
+                        y = int(meta["listing_date"][:4])
+                        if y < 2024:
+                            changed = True
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+                filtered_stocks.append(s)
+            if len(filtered_stocks) != len(virtual_board["root"]["stocks"]):
+                virtual_board["root"]["stocks"] = filtered_stocks
+                changed = True
+
         # 2.5. 마인드맵의 일반 테마 보드들에 기등록된 종목 맵을 캐싱 (O(1) 검색 최적화)
         assigned_stocks_map = {}
         if self._query_service:
@@ -325,6 +344,15 @@ class StatisticsService:
         for item in listings:
             if not item.ticker or item.ticker == "none":
                 continue
+
+            # 가상 보드 대기 및 매니페스트 연동은 2024년 이후(2024~2026) 종목들로만 제약
+            if item.listing_date:
+                try:
+                    year_val = int(item.listing_date[:4])
+                    if year_val < 2024:
+                        continue
+                except (ValueError, TypeError):
+                    pass
 
             ticker = item.ticker
             # 매니페스트에 아직 등록되지 않은 경우
