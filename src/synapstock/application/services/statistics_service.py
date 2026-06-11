@@ -103,6 +103,27 @@ class StatisticsService:
             if hasattr(item, "ticker") and not item.ticker:
                 if item.name in ticker_map:
                     item.ticker = ticker_map[item.name]
+                elif self._query_service:
+                    # 로컬 보드에 등록되지 않은 신규 종목은 네이버 API를 통해 티커 검색을 수행
+                    try:
+                        search_results = self._query_service.search_ticker(item.name)
+                        found = False
+                        if search_results:
+                            import unicodedata
+                            clean_item_name = unicodedata.normalize("NFC", item.name).strip().lower()
+                            for res in search_results:
+                                res_name = unicodedata.normalize("NFC", res.get("name", "")).strip().lower()
+                                if res_name == clean_item_name or clean_item_name in res_name:
+                                    ticker = res.get("ticker")
+                                    if ticker and ticker.isdigit() and len(ticker) == 6:
+                                        item.ticker = ticker
+                                        logger.info(f"[StatisticsService] 신규 종목 티커 검색 성공: {item.name} -> {ticker}")
+                                        found = True
+                                        break
+                        if not found:
+                            item.ticker = "none"
+                    except Exception as e:
+                        logger.error(f"[StatisticsService] 신규 종목({item.name}) 티커 검색 실패: {e}")
 
             # 매니페스트 내 상태 데이터 맵핑
             # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
@@ -175,6 +196,10 @@ class StatisticsService:
     async def get_new_listing_data(self, force_sync: bool = False, year: str = "2026") -> list[NewListing]:
         items = await self.ipo_svc.get_data(year, force_sync=force_sync)
         enriched_items = self._enrich_tickers(items)
+        try:
+            self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
+        except Exception as ex:
+            logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({year}): {ex}")
         self.sync_new_listings_to_virtual_board(enriched_items)
         return enriched_items
 
@@ -182,6 +207,10 @@ class StatisticsService:
     async def sync_new_listing_data(self, year: str = "2026") -> list[NewListing]:
         items = await self.ipo_svc.sync_data(year)
         enriched_items = self._enrich_tickers(items)
+        try:
+            self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
+        except Exception as ex:
+            logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({year}): {ex}")
         self.sync_new_listings_to_virtual_board(enriched_items)
         return enriched_items
 
@@ -196,6 +225,10 @@ class StatisticsService:
                 # sync_data 내부에 추가된 스마트 캐싱 조건에 따라 구글 드라이브 파일과 조건부 다운로드 수행함
                 items = await self.ipo_svc.get_data(year, force_sync=force_sync)
                 enriched = self._enrich_tickers(items)
+                try:
+                    self.ipo_svc.repository.save_new_listings(enriched, year=year)
+                except Exception as ex:
+                    logger.warning(f"[StatisticsService] 보강된 티커 캐시 저장 실패 ({year}): {ex}")
                 all_enriched_items.extend(enriched)
             except Exception as e:
                 logger.error(f"[StatisticsService] {year}년 신규상장 동기화 중 오류 발생: {e}")
