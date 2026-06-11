@@ -33,11 +33,26 @@ class NewListingService(BaseStatisticsService[NewListing]):
 
     async def sync_data(self, year: str) -> list[NewListing]:
         """Base 클래스의 동기화 워크플로우를 사용하여 신규 상장 데이터를 업데이트합니다."""
-        save_func = getattr(self.repository, "save_new_listings", lambda x: None)
+        orig_save_func = getattr(self.repository, "save_new_listings", None)
+        if orig_save_func:
+            save_func = lambda items: orig_save_func(items, year=year)
+        else:
+            save_func = lambda x: None
+        
+        # 스마트 캐싱 경로 및 로드 함수 주입
+        from pathlib import Path
+        local_cache_path = None
+        if hasattr(self.repository, "root"):
+            local_cache_path = Path(self.repository.root).parent / "new_listing" / f"new_listing_data_{year}.json"
+            
+        load_cache_func = lambda: getattr(self.repository, "get_new_listings", lambda y: [])(year)
+
         return await self._sync_domain_data(
             year_str=year,
             filename_pattern="신규상장",
             parser_func=self.parser.parse,
             save_func=save_func,
-            folder_name="new_listing"
+            folder_name="new_listing",
+            local_cache_path=local_cache_path,
+            load_cache_func=load_cache_func
         )

@@ -38,13 +38,16 @@ class LocalStatisticsRepository:
         if not path.exists():
             return []
         import json
+        import logging
+        local_logger = logging.getLogger(__name__)
 
         from synapstock.domain.statistics.models import NewListing
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
                 return [NewListing.model_validate(item) for item in data]
-        except Exception:
+        except Exception as e:
+            local_logger.error(f"[LocalStatisticsRepository] '{path.name}' 로드 중 예외 발생: {e}", exc_info=True)
             return []
 
     def save_daily_ranking(self, ranking: DailyMarketRanking):

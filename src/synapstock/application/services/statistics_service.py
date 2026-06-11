@@ -185,6 +185,25 @@ class StatisticsService:
         self.sync_new_listings_to_virtual_board(enriched_items)
         return enriched_items
 
+    async def sync_all_new_listings(self, force_sync: bool = False) -> list[NewListing]:
+        """2024년부터 2026년까지의 모든 신규상장주 데이터를 루프 돌며 일괄 동기화 및 가상보드에 병합 적재합니다."""
+        years = ["2024", "2025", "2026"]
+        all_enriched_items = []
+        
+        for year in years:
+            try:
+                # get_data 내부적으로 force_sync=True 이면 sync_data를 호출하고,
+                # sync_data 내부에 추가된 스마트 캐싱 조건에 따라 구글 드라이브 파일과 조건부 다운로드 수행함
+                items = await self.ipo_svc.get_data(year, force_sync=force_sync)
+                enriched = self._enrich_tickers(items)
+                all_enriched_items.extend(enriched)
+            except Exception as e:
+                logger.error(f"[StatisticsService] {year}년 신규상장 동기화 중 오류 발생: {e}")
+                
+        # 병합된 전체 연도의 PENDING 항목들을 가상보드 및 매니페스트에 일괄 반영
+        self.sync_new_listings_to_virtual_board(all_enriched_items)
+        return all_enriched_items
+
     def sync_new_listings_to_virtual_board(self, listings: list[NewListing]) -> None:
         """신규 상장된 종목들을 매니페스트와 가상보드에 자동으로 적재합니다. (정합성 보장)"""
         if not listings:

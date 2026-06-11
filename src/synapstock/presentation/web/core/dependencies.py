@@ -43,3 +43,14 @@ async def sync_news_archive():
     """뉴스 아카이브를 구글 드라이브와 스마트 동기화합니다."""
     if news_service:
         await news_service.sync_from_drive()
+
+
+async def sync_all_new_listings_if_needed():
+    """서버 기동 시 또는 필요 시 신규상장주(2024~2026) 데이터를 구글 드라이브로부터 백그라운드 동기화합니다."""
+    if statistics_service:
+        try:
+            logger.info("[Startup] 신규상장주(2024~2026) 백그라운드 동기화 시작")
+            await statistics_service.sync_all_new_listings(force_sync=True)
+            logger.info("[Startup] 신규상장주(2024~2026) 백그라운드 동기화 완료")
+        except Exception as e:
+            logger.error(f"[Startup] 신규상장주 백그라운드 동기화 중 오류: {e}")
