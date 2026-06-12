@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
+from synapstock.domain.statistics.models import NewListing
+
 
 
 class Stock(BaseModel):
@@ -335,3 +337,56 @@ class Report(BaseModel):
     @property
     def stock_nfc(self) -> str:
         return unicodedata.normalize("NFC", self.stock)
+
+
+class BoardManifestItem(BaseModel):
+    """개별 보드의 매니페스트 상태 정보."""
+
+    name: str
+    last_modified: float
+    deleted: bool = False
+
+
+class BoardSyncManifest(BaseModel):
+    """통합 보드 및 신규 상장주 동기화 상태를 관리하는 매니페스트 도메인 모델."""
+
+    last_updated: str = ""
+    boards: dict[str, BoardManifestItem] = Field(default_factory=dict)
+    new_listings: dict[str, NewListing] = Field(default_factory=dict)
+
+    def merge_with(self, remote: BoardSyncManifest) -> BoardSyncManifest:
+        """로컬과 원격의 수정 시간(Timestamp) 및 IPO 병합 비즈니스 규칙에 근거하여 두 매니페스트를 통합합니다."""
+        merged_boards = dict(remote.boards)
+        for b_id, l_item in self.boards.items():
+            if b_id not in merged_boards:
+                merged_boards[b_id] = l_item
+            else:
+                r_item = merged_boards[b_id]
+                if l_item.last_modified > r_item.last_modified:
+                    merged_boards[b_id] = l_item
+
+        merged_listings = dict(remote.new_listings)
+        for ticker, l_item in self.new_listings.items():
+            if ticker not in merged_listings:
+                merged_listings[ticker] = l_item
+            else:
+                r_item = merged_listings[ticker]
+                merged_listings[ticker] = l_item.merge_with(r_item)
+
+        from datetime import datetime, UTC
+        return BoardSyncManifest(
+            last_updated=datetime.now(UTC).isoformat(),
+            boards=merged_boards,
+            new_listings=merged_listings,
+        )
+
+    def update_board(self, board_id: str, name: str, deleted: bool = False) -> None:
+        """보드가 생성, 수정, 삭제되었을 때 매니페스트 상의 최종 수정 이력을 기록합니다."""
+        from datetime import datetime, UTC
+        self.boards[board_id] = BoardManifestItem(
+            name=name,
+            last_modified=datetime.now(UTC).timestamp(),
+            deleted=deleted
+        )
+        self.last_updated = datetime.now(UTC).isoformat()
+

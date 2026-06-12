@@ -3,8 +3,9 @@
 import json
 from pathlib import Path
 
-from synapstock.domain.models import Board, Node, Stock
-from synapstock.domain.ports import BoardRepositoryPort
+from synapstock.domain.models import Board, Node, Stock, BoardSyncManifest
+from synapstock.domain.ports import BoardRepositoryPort, BoardSyncManifestRepositoryPort
+
 
 DEFAULT_ROOT = Path("data/board")
 
@@ -90,3 +91,28 @@ class LocalBoardRepository(BoardRepositoryPort):
             path.unlink()
         else:
             raise FileNotFoundError(f"Board '{name}' not found: {path}")
+
+
+class LocalBoardSyncManifestRepository(BoardSyncManifestRepositoryPort):
+    """로컬 JSON 파일을 기반으로 통합 매니페스트를 저장하고 조회하는 어댑터."""
+
+    def __init__(self, manifest_path: Path = Path("data/board/board_sync_manifest.json")) -> None:
+        self.manifest_path = manifest_path
+
+    def load(self) -> BoardSyncManifest:
+        if not self.manifest_path.exists():
+            return BoardSyncManifest()
+        try:
+            raw = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+            return BoardSyncManifest.model_validate(raw)
+        except Exception as e:
+            logger.error(f"[BoardSyncManifestRepository] 매니페스트 로드 중 예외 발생: {e}", exc_info=True)
+            return BoardSyncManifest()
+
+    def save(self, manifest: BoardSyncManifest) -> None:
+        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        self.manifest_path.write_text(
+            manifest.model_dump_json(indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+

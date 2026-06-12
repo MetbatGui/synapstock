@@ -3,9 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from synapstock.domain.models import Board, ScrapedNews
+from synapstock.domain.models import Board, ScrapedNews, BoardSyncManifest
 from synapstock.domain.news.models import NewsBatch
 from synapstock.domain.statistics.models import StockSplit, StockSplitManifest
+
 
 
 
@@ -283,4 +284,17 @@ class StockSplitRepositoryPort(ABC):
     @abstractmethod
     def get_file_mtime(self, filename: str) -> float | None:
         """로컬에 다운로드된 파일의 최종 수정 시간(mtime)을 구합니다."""
+
+
+class BoardSyncManifestRepositoryPort(ABC):
+    """통합 보드 및 신규상장주 상태 매니페스트의 영속성 관리를 위한 추상 포트."""
+
+    @abstractmethod
+    def load(self) -> BoardSyncManifest:
+        """매니페스트 정보를 불러옵니다. 존재하지 않으면 기본 매니페스트 객체를 생성하여 반환합니다."""
+
+    @abstractmethod
+    def save(self, manifest: BoardSyncManifest) -> None:
+        """매니페스트 정보를 영속성 저장소에 저장합니다."""
+
 

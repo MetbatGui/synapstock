@@ -34,7 +34,8 @@ from synapstock.infrastructure.adapters.google.google_drive_adapter import (
     GoogleDriveAdapter,
 )
 from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
+
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
@@ -85,7 +86,11 @@ class Container:
 
         # 3. 인프라 어댑터 싱글톤
         self._repo = LocalBoardRepository(self.config.board_dir)
+        self._board_sync_manifest_repo = LocalBoardSyncManifestRepository(
+            self.config.board_dir / "board_sync_manifest.json"
+        )
         self._miro_adapter = MiroMindmapAdapter(self.config.miro_token)
+
         self._disclosure_adapter = DartDisclosureAdapter()
         self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "재무제표.xlsx")
         self._ticker_search_adapter = NaverTickerSearchAdapter(cache_path=str(self.config.stock_cache_path))
@@ -122,8 +127,9 @@ class Container:
             repository=self._repo,
             drive_adapter=self._drive_adapter,
             theme_folder_id=self.config.theme_folder_id,
-            manifest_path=self.config.board_dir / "board_sync_manifest.json"
+            manifest_repository=self._board_sync_manifest_repo,
         )
+
         self._query_service = BoardQueryService(
             repository=self._repo,
             ticker_search=self._ticker_search_adapter,
@@ -161,11 +167,11 @@ class Container:
             bonus_issue_repository=self._bonus_issue_repo,
             convertible_bond_repository=self._convertible_bond_repo,
             bw_repository=self._bw_repo,
-            manifest_path=self.config.board_dir / "board_sync_manifest.json",
-            virtual_board_path=self.config.board_dir / "virtual_신규상장주.json",
+            manifest_repository=self._board_sync_manifest_repo,
             board_file_sync_service=self._board_file_sync_service,
             board_repository=self._repo,
         )
+
 
         self._financial_service = FinancialService(repository=self._financial_repo)
         self._weekly_change_service = WeeklyChangeService(

@@ -15,6 +15,8 @@ from synapstock.domain.statistics.models import (
     DailyMarketRankingAnalysis,
     NewListing,
 )
+from synapstock.domain.ports import BoardSyncManifestRepositoryPort
+
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +36,16 @@ class StatisticsService:
         bonus_issue_repository: Any = None,
         convertible_bond_repository: Any = None,
         bw_repository: Any = None,
-        manifest_path: Path = Path("data/board/board_sync_manifest.json"),
-        virtual_board_path: Path = Path("data/board/virtual_신규상장주.json"),
+        manifest_repository: BoardSyncManifestRepositoryPort | None = None,
         board_file_sync_service: Any = None,
         board_repository: Any = None,
     ):
         self._storage = storage
         self._query_service = query_service
-        self._manifest_path = manifest_path
-        self._virtual_board_path = virtual_board_path
+        self._manifest_repository = manifest_repository
         self._board_file_sync_service = board_file_sync_service
         self._board_repository = board_repository
+
 
         # 도메인 서비스 초기화 및 의존성 주입
         self.ranking_svc = RankingService(storage, "", repository)
@@ -95,14 +96,10 @@ class StatisticsService:
         ticker_map = self._build_local_ticker_map()
 
         # 로컬 매니페스트 로드
-        manifest = {"new_listings": {}}
-        if self._manifest_path.exists():
-            try:
-                manifest = json.loads(self._manifest_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-
-        new_listings_meta = manifest.get("new_listings", {})
+        manifest = None
+        if self._manifest_repository:
+            manifest = self._manifest_repository.load()
+        new_listings_meta = manifest.new_listings if manifest else {}
 
         for item in items:
             if hasattr(item, "ticker") and not item.ticker:
@@ -134,14 +131,20 @@ class StatisticsService:
             # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
             if hasattr(type(item), "model_fields") and "status" in type(item).model_fields:
                 if hasattr(item, "ticker") and item.ticker:
-                    meta = new_listings_meta.get(item.ticker, {})
-                    item.status = meta.get("status", "PENDING")
-                    item.current_board = meta.get("current_board", "virtual_신규상장주")
-                    item.current_path = meta.get("current_path", [])
+                    meta = new_listings_meta.get(item.ticker)
+                    if meta:
+                        item.status = meta.status
+                        item.current_board = meta.current_board
+                        item.current_path = meta.current_path
+                    else:
+                        item.status = "PENDING"
+                        item.current_board = "virtual_신규상장주"
+                        item.current_path = []
                 else:
                     item.status = "PENDING"
                     item.current_board = "virtual_신규상장주"
                     item.current_path = []
+
 
         return items
 
@@ -276,21 +279,12 @@ class StatisticsService:
         if not listings:
             return False
 
-        manifest_path = self._manifest_path
+        if not self._manifest_repository:
+            logger.error("[StatisticsService] 매니페스트 리포지토리가 설정되지 않아 처리를 중단합니다.")
+            return False
 
         # 1. 통합 매니페스트 로드
-        manifest = {"last_updated": "", "boards": {}, "new_listings": {}}
-        if manifest_path.exists():
-            try:
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            except Exception as e:
-                logger.error(
-                    f"[StatisticsService] 매니페스트 로드 및 파싱 실패(데이터 보호를 위해 처리를 중단합니다): {e}"
-                )
-                return False
-
-        if "new_listings" not in manifest:
-            manifest["new_listings"] = {}
+        manifest = self._manifest_repository.load()
 
         # 2. 가상보드 로드 (BoardRepositoryPort 사용)
         # 로드 실패 시 새 Board 인스턴스 자동 생성
@@ -324,9 +318,12 @@ class StatisticsService:
 
         # 4. 도메인 서비스를 통한 비즈니스 로직 수행
         now_str = datetime.now(UTC).isoformat()
-        virtual_board, updated_listings, changed = NewListingSyncDomainService.sync_listings_to_virtual_board(
+        listings_meta_dict = {
+            ticker: model.model_dump() for ticker, model in manifest.new_listings.items()
+        }
+        virtual_board, updated_listings_dict, changed = NewListingSyncDomainService.sync_listings_to_virtual_board(
             virtual_board=virtual_board,
-            new_listings_meta=manifest["new_listings"],
+            new_listings_meta=listings_meta_dict,
             listings=listings,
             assigned_stocks_map=assigned_stocks_map,
             now_str=now_str
@@ -336,19 +333,17 @@ class StatisticsService:
         if changed:
             try:
                 # 5.1. 매니페스트 저장
-                manifest["new_listings"] = updated_listings
-                manifest["last_updated"] = now_str
-                manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+                manifest.new_listings = {
+                    ticker: NewListing.model_validate(raw) for ticker, raw in updated_listings_dict.items()
+                }
+                manifest.last_updated = now_str
+                self._manifest_repository.save(manifest)
 
                 # 5.2. 가상보드 저장 (BoardRepositoryPort 사용)
                 if self._board_repository:
                     self._board_repository.save(virtual_board)
                 else:
-                    # 폴백: 직접 저장
-                    self._virtual_board_path.write_text(
-                        virtual_board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True),
-                        encoding="utf-8"
-                    )
+                    logger.warning("[StatisticsService] 가상보드 저장 실패: board_repository가 주입되지 않았습니다.")
 
                 logger.info(f"[StatisticsService] 신규 상장주 {len(listings)}건 가상보드 및 매니페스트 갱신 완료")
 
@@ -360,6 +355,7 @@ class StatisticsService:
                 logger.error(f"[StatisticsService] 가상보드 및 매니페스트 갱신 저장 실패: {e}")
                 return False
         return False
+
 
     async def sync_capital_increase_data(self, year: str = "2026") -> list:
         items = await self.disclosure_svc.sync_data("capital_increase", year)

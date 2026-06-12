@@ -444,7 +444,7 @@ class NewListing(BaseModel):
         note (str | None): 비고/참고사항.
     """
 
-    listing_date: str
+    listing_date: str | None = None
     name: str
     ticker: str | None = None
     market: str | None = None

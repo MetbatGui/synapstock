@@ -62,12 +62,16 @@ class TestBoardFileSyncServiceIntegration:
             root=Node(name="test_theme_sandbox", depth=0)
         )
 
+        # 임시 매니페스트 레포지토리 초기화
+        from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+        self.manifest_repository = LocalBoardSyncManifestRepository(self.test_manifest_path)
+
         # 2. 동기화 서비스 초기화
         self.sync_service = BoardFileSyncService(
             repository=self.repository,
             drive_adapter=self.drive_adapter,
             theme_folder_id=self.theme_folder_id,
-            manifest_path=self.test_manifest_path
+            manifest_repository=self.manifest_repository
         )
 
         # 기존 드라이브 잔재 청소를 위한 사전 안전 제거 집행

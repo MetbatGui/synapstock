@@ -21,10 +21,14 @@ def test_ipo_sync_provisions_manifest_and_virtual_board(temp_board_dir):
     virtual_board_path = temp_board_dir / "virtual_신규상장주.json"
     
     # 1. 의존성 없이 StatisticsService 인스턴스 기동 (테스트 경로 명시적 주입)
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository, LocalBoardRepository
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
+    board_repository = LocalBoardRepository(temp_board_dir)
     service = StatisticsService(
-        manifest_path=manifest_path,
-        virtual_board_path=virtual_board_path
+        manifest_repository=manifest_repository,
+        board_repository=board_repository
     )
+
     
     # 2. 더미 신규상장주 데이터 목록 수립 (NewListing 도메인 모델 활용)
     dummy_listings = [
@@ -145,12 +149,15 @@ async def test_stock_addition_automatically_assigns_pending_ipo(temp_board_dir):
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
         drive_adapter=drive_adapter,
         theme_folder_id="dummy_folder",
-        manifest_path=manifest_path
+        manifest_repository=manifest_repository
     )
+
     
     command_service = BoardCommandService(
         repository=repo,
@@ -237,12 +244,15 @@ async def test_stock_deletion_from_ipo_board_turns_status_ignored(temp_board_dir
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
         drive_adapter=drive_adapter,
         theme_folder_id="dummy_folder",
-        manifest_path=manifest_path
+        manifest_repository=manifest_repository
     )
+
     
     command_service = BoardCommandService(
         repository=repo,
@@ -319,12 +329,15 @@ async def test_stock_deletion_from_sector_board_does_not_rollback_to_pending(tem
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
         drive_adapter=drive_adapter,
         theme_folder_id="dummy_folder",
-        manifest_path=manifest_path
+        manifest_repository=manifest_repository
     )
+
     
     command_service = BoardCommandService(
         repository=repo,
@@ -414,12 +427,15 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
         drive_adapter=drive_adapter,
         theme_folder_id="dummy_folder",
-        manifest_path=manifest_path
+        manifest_repository=manifest_repository
     )
+
     
     command_service = BoardCommandService(
         repository=repo,

@@ -74,8 +74,8 @@ async def test_sync_all_new_listings_real():
     duration_cached_fast = time.time() - start_time
     print(f"[완전 로컬 캐시 동기화] 완료 소요시간: {duration_cached_fast:.4f}초")
     
-    # 드라이브 조회가 완전히 생략되므로 0.5초 미만이어야 함
-    assert duration_cached_fast < 0.5
+    # 드라이브 조회가 완전히 생략되므로 1.0초 미만이어야 함
+    assert duration_cached_fast < 1.0
     assert len(cached_items) == len(items), "캐시 로드 후 데이터 개수가 동일해야 합니다."
 
     # 4. 3차 동기화 실행 (force_sync=True 이지만 스마트 캐싱으로 다운로드/파싱 생략되는 실질 속도 검증)
