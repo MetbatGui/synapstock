@@ -5,9 +5,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from synapstock.domain.ports import StockSplitRepositoryPort
+from synapstock.domain.ports import StockSplitRepositoryPort, StoragePort
 from synapstock.domain.statistics.models import StockSplitManifest
-from synapstock.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ class StockSplitSyncService:
     def __init__(
         self,
         repository: StockSplitRepositoryPort,
-        drive_adapter: GoogleDriveAdapter | None,
+        drive_adapter: StoragePort | None,
         stock_split_folder_id: str | None,
     ) -> None:
         self._repository = repository
@@ -38,17 +37,8 @@ class StockSplitSyncService:
             progress_callback("주식 분할 구글 동기화 시작...", 0.1)
 
         try:
-            # 1. 드라이브 폴더 내 파일 목록 조회
-            loop = asyncio.get_running_loop()
-            
-            def _list_files():
-                res = self._drive_adapter.service.files().list(
-                    q=f"'{self._folder_id}' in parents and trashed=false",
-                    fields="files(id, name, mimeType)"
-                ).execute()
-                return res.get("files", [])
-
-            files = await loop.run_in_executor(None, _list_files)
+            # 1. 드라이브 폴더 내 파일 목록 조회 (StoragePort 추상 메서드 사용)
+            files = await self._drive_adapter.list_files_in_folder("", root_id=self._folder_id)
             
             # 매니페스트 파일 찾기
             manifest_file = next((f for f in files if "manifest" in f.get("name", "").lower()), None)

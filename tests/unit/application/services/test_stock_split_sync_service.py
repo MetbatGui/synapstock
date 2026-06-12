@@ -17,16 +17,13 @@ def mock_repository():
 @pytest.fixture
 def mock_drive_adapter():
     adapter = MagicMock()
-    # drive.service.files().list().execute() 모의
-    mock_list = MagicMock()
-    mock_list.execute.return_value = {
-        "files": [
-            {"id": "manifest_id", "name": "stock_splits_manifest.json", "mimeType": "application/json"},
-            {"id": "excel_2024_id", "name": "주식분할_2024년.xlsx", "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
-            {"id": "excel_2025_id", "name": "주식분할_2025년.xlsx", "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-        ]
-    }
-    adapter.service.files.return_value.list.return_value = mock_list
+    
+    # list_files_in_folder 비동기 메소드 모의
+    adapter.list_files_in_folder = AsyncMock(return_value=[
+        {"id": "manifest_id", "name": "stock_splits_manifest.json", "mimeType": "application/json"},
+        {"id": "excel_2024_id", "name": "주식분할_2024년.xlsx", "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+        {"id": "excel_2025_id", "name": "주식분할_2025년.xlsx", "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    ])
     
     # get_file 비동기 메소드 모의
     adapter.get_file = AsyncMock()
