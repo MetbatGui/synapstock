@@ -164,6 +164,7 @@ class Container:
             manifest_path=self.config.board_dir / "board_sync_manifest.json",
             virtual_board_path=self.config.board_dir / "virtual_신규상장주.json",
             board_file_sync_service=self._board_file_sync_service,
+            board_repository=self._repo,
         )
 
         self._financial_service = FinancialService(repository=self._financial_repo)
