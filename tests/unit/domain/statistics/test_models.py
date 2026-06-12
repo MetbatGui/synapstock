@@ -32,7 +32,8 @@ def test_supply_subject_enum():
 
 
 def test_stock_split_model_normalization():
-    """StockSplit 모델의 Pydantic Validator 작동 및 데이터 정규화 검증."""
+    """StockSplitExcelDTO의 Pydantic Validator 작동 및 데이터 정규화, 그리고 도메인 객체 변환 검증."""
+    from synapstock.infrastructure.adapters.local.stock_split_repo import StockSplitExcelDTO
     from synapstock.domain.statistics import StockSplit
 
     # 1. 일반적인 한글 컬럼 매핑 및 포맷 정규화 테스트
@@ -51,8 +52,10 @@ def test_stock_split_model_normalization():
         "주총결의일": "2024-12-12"
     }
 
-    model = StockSplit(**split_data)
+    dto = StockSplitExcelDTO.model_validate(split_data)
+    model = dto.to_domain()
 
+    assert isinstance(model, StockSplit)
     assert model.company_name == "삼성전자"
     assert model.market == "KOSPI"
     assert model.disclosure_type == "공시"
@@ -88,7 +91,8 @@ def test_stock_split_model_normalization():
         "주총결의일": None
     }
 
-    model_edge = StockSplit(**edge_data)
+    dto_edge = StockSplitExcelDTO.model_validate(edge_data)
+    model_edge = dto_edge.to_domain()
 
     assert model_edge.market is None
     assert model_edge.disclosure_type is None
@@ -99,6 +103,49 @@ def test_stock_split_model_normalization():
     assert model_edge.split_ratio is None
     assert model_edge.listing_date is None
     assert model_edge.general_meeting_date is None
+
+
+def test_stock_split_business_rule_validation():
+    """StockSplit 도메인 모델의 자율 비즈니스 룰 검증기 작동 확인."""
+    from synapstock.domain.statistics import StockSplit
+    import pytest
+
+    # 정상 데이터 생성 확인
+    valid = StockSplit(
+        company_name="삼성전자",
+        base_date="2024-12-12",
+        receipt_no="20241212801081",
+        split_ratio=5.0
+    )
+    assert valid.company_name == "삼성전자"
+
+    # 회사명이 비어있는 경우 예외 확인
+    with pytest.raises(ValueError, match="회사명은 필수값이며 비어 있을 수 없습니다"):
+        StockSplit(
+            company_name="  ",
+            base_date="2024-12-12",
+            receipt_no="20241212801081",
+            split_ratio=5.0
+        )
+
+    # 접수번호가 비어있는 경우 예외 확인
+    with pytest.raises(ValueError, match="접수번호는 필수값이며 비어 있을 수 없습니다"):
+        StockSplit(
+            company_name="삼성전자",
+            base_date="2024-12-12",
+            receipt_no="",
+            split_ratio=5.0
+        )
+
+    # 분할 비율이 0 이하인 경우 예외 확인
+    with pytest.raises(ValueError, match="분할 비율은 0보다 커야 합니다"):
+        StockSplit(
+            company_name="삼성전자",
+            base_date="2024-12-12",
+            receipt_no="20241212801081",
+            split_ratio=-1.0
+        )
+
 
 
 def test_stock_split_manifest_model():
