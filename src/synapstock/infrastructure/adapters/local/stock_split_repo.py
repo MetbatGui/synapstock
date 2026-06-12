@@ -2,9 +2,110 @@ import os
 import json
 from pathlib import Path
 import pandas as pd
+from pydantic import BaseModel, Field, AliasChoices, field_validator
 
 from synapstock.domain.ports import StockSplitRepositoryPort
 from synapstock.domain.statistics.models import StockSplit, StockSplitManifest
+
+
+class StockSplitExcelDTO(BaseModel):
+    """엑셀 파일에서 읽어온 주식 분할 날 데이터 가공 및 정제를 위한 DTO."""
+
+    company_name: str = Field(validation_alias=AliasChoices("회사명", "company_name"))
+    market: str | None = Field(default=None, validation_alias=AliasChoices("시장", "market"))
+    disclosure_type: str | None = Field(default=None, validation_alias=AliasChoices("공시구분", "철회여부", "disclosure_type"))
+    base_date: str = Field(validation_alias=AliasChoices("배정기준일", "등록일자", "base_date"))
+    board_resolution_date: str | None = Field(default=None, validation_alias=AliasChoices("이사회결의일", "board_resolution_date"))
+    receipt_no: str = Field(validation_alias=AliasChoices("접수번호", "공시번호", "receipt_no"))
+    original_receipt_no: str | None = Field(default=None, validation_alias=AliasChoices("원접수번호", "이전공시번호", "original_receipt_no"))
+    prev_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이전)", "분할전 보통주식수(주)", "prev_shares"))
+    post_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이후)", "분할후 보통주식수(주)", "post_shares"))
+    split_ratio: float | None = Field(default=None, validation_alias=AliasChoices("분할비율", "분할배율", "split_ratio"))
+    listing_date: str | None = Field(default=None, validation_alias=AliasChoices("신주상장예정일", "listing_date"))
+    general_meeting_date: str | None = Field(default=None, validation_alias=AliasChoices("주총결의일", "general_meeting_date"))
+    first_disclosure_date: str | None = Field(default=None, validation_alias=AliasChoices("최초공시 등록일자", "first_disclosure_date"))
+
+    @field_validator("market", "disclosure_type", mode="before")
+    @classmethod
+    def normalize_strings(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip()
+        if s.lower() in ("nan", ""):
+            return None
+        return s
+
+    @field_validator("base_date", "board_resolution_date", "listing_date", "general_meeting_date", "first_disclosure_date", mode="before")
+    @classmethod
+    def normalize_date(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)): # NaN check
+            return None
+        s = str(v).strip()
+        if s.lower() in ("nan", ""):
+            return None
+        s = s.replace(".", "-")
+        if " " in s:
+            s = s.split(" ")[0]
+        return s
+
+    @field_validator("split_ratio", mode="before")
+    @classmethod
+    def normalize_split_ratio(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip().lower()
+        if s in ("nan", ""):
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+
+    @field_validator("prev_shares", "post_shares", mode="before")
+    @classmethod
+    def normalize_shares(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip().lower()
+        if s in ("nan", ""):
+            return None
+        try:
+            return int(float(s))
+        except ValueError:
+            return None
+
+    @field_validator("receipt_no", "original_receipt_no", mode="before")
+    @classmethod
+    def normalize_receipt_no(cls, v):
+        if not v or (isinstance(v, float) and (v != v or v is None)):
+            return None
+        s = str(v).strip().lower()
+        if s in ("nan", ""):
+            return None
+        try:
+            if "." in s:
+                return str(int(float(s)))
+            return s
+        except ValueError:
+            return s
+
+    def to_domain(self) -> StockSplit:
+        """가공 및 검증이 완료된 DTO 객체를 순수 도메인 모델로 변환합니다."""
+        return StockSplit(
+            company_name=self.company_name,
+            market=self.market,
+            disclosure_type=self.disclosure_type,
+            base_date=self.base_date,
+            board_resolution_date=self.board_resolution_date,
+            receipt_no=self.receipt_no,
+            original_receipt_no=self.original_receipt_no,
+            prev_shares=self.prev_shares,
+            post_shares=self.post_shares,
+            split_ratio=self.split_ratio,
+            listing_date=self.listing_date,
+            general_meeting_date=self.general_meeting_date,
+            first_disclosure_date=self.first_disclosure_date,
+        )
 
 
 class LocalStockSplitRepository(StockSplitRepositoryPort):
@@ -73,7 +174,6 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
                 
             df = xl.parse(sheet_name)
             
-            # 결측치(NaN)는 Pydantic validator에서 처리하나, pandas의 NaN float을 처리하기 위해 정규화 수행
             records = df.to_dict(orient="records")
             splits = []
             for record in records:
@@ -82,7 +182,9 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
                     company = record.get("회사명") or record.get("company_name")
                     if not company or (isinstance(company, float) and pd.isna(company)):
                         continue
-                    splits.append(StockSplit(**record))
+                    # DTO를 통해 데이터를 클렌징하고 검증한 후 도메인 엔티티로 변환
+                    dto = StockSplitExcelDTO.model_validate(record)
+                    splits.append(dto.to_domain())
                 except Exception:
                     # 파싱 에러 엣지 케이스는 조용히 로그만 남기거나 스킵하여 전체 데이터를 보존함
                     continue

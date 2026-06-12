@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import AliasChoices, BaseModel, Field, computed_field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 
 class MarketType(StrEnum):
@@ -563,21 +563,35 @@ class StockSplit(BaseModel):
         split_ratio (float | None): 분할비율.
         listing_date (str | None): 신주상장예정일 (YYYY-MM-DD 포맷 정규화).
         general_meeting_date (str | None): 주총결의일 (YYYY-MM-DD 포맷 정규화).
+        first_disclosure_date (str | None): 최초공시 등록일자.
     """
 
-    company_name: str = Field(validation_alias=AliasChoices("회사명", "company_name"))
-    market: str | None = Field(default=None, validation_alias=AliasChoices("시장", "market"))
-    disclosure_type: str | None = Field(default=None, validation_alias=AliasChoices("공시구분", "철회여부", "disclosure_type"))
-    base_date: str = Field(validation_alias=AliasChoices("배정기준일", "등록일자", "base_date"))
-    board_resolution_date: str | None = Field(default=None, validation_alias=AliasChoices("이사회결의일", "board_resolution_date"))
-    receipt_no: str = Field(validation_alias=AliasChoices("접수번호", "공시번호", "receipt_no"))
-    original_receipt_no: str | None = Field(default=None, validation_alias=AliasChoices("원접수번호", "이전공시번호", "original_receipt_no"))
-    prev_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이전)", "분할전 보통주식수(주)", "prev_shares"))
-    post_shares: int | None = Field(default=None, validation_alias=AliasChoices("발행주식수(이후)", "분할후 보통주식수(주)", "post_shares"))
-    split_ratio: float | None = Field(default=None, validation_alias=AliasChoices("분할비율", "분할배율", "split_ratio"))
-    listing_date: str | None = Field(default=None, validation_alias=AliasChoices("신주상장예정일", "listing_date"))
-    general_meeting_date: str | None = Field(default=None, validation_alias=AliasChoices("주총결의일", "general_meeting_date"))
-    first_disclosure_date: str | None = Field(default=None, validation_alias=AliasChoices("최초공시 등록일자", "first_disclosure_date"))
+    model_config = ConfigDict(frozen=True)
+
+    company_name: str
+    market: str | None = None
+    disclosure_type: str | None = None
+    base_date: str
+    board_resolution_date: str | None = None
+    receipt_no: str
+    original_receipt_no: str | None = None
+    prev_shares: int | None = None
+    post_shares: int | None = None
+    split_ratio: float | None = None
+    listing_date: str | None = None
+    general_meeting_date: str | None = None
+    first_disclosure_date: str | None = None
+
+    @model_validator(mode="after")
+    def validate_business_rules(self) -> "StockSplit":
+        """비즈니스 도메인 규칙을 자율 검증합니다."""
+        if not self.company_name.strip():
+            raise ValueError("회사명은 필수값이며 비어 있을 수 없습니다.")
+        if not self.receipt_no.strip():
+            raise ValueError("접수번호는 필수값이며 비어 있을 수 없습니다.")
+        if self.split_ratio is not None and self.split_ratio <= 0:
+            raise ValueError("분할 비율은 0보다 커야 합니다.")
+        return self
 
     @computed_field
     def rcp_no(self) -> str:
@@ -590,73 +604,6 @@ class StockSplit(BaseModel):
     @computed_field
     def is_correction(self) -> bool:
         return self.original_receipt_no is not None and len(self.original_receipt_no.strip()) > 0
-
-    @field_validator("market", "disclosure_type", mode="before")
-    @classmethod
-    def normalize_strings(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
-            return None
-        s = str(v).strip()
-        if s.lower() in ("nan", ""):
-            return None
-        return s
-
-    @field_validator("base_date", "board_resolution_date", "listing_date", "general_meeting_date", "first_disclosure_date", mode="before")
-    @classmethod
-    def normalize_date(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)): # NaN check
-            return None
-        s = str(v).strip()
-        if s.lower() in ("nan", ""):
-            return None
-        # YYYY.MM.DD 또는 YYYY-MM-DD 등을 YYYY-MM-DD로 통일
-        s = s.replace(".", "-")
-        # 시간 부분이 포함되어 있는 경우 (예: '2024-12-12 00:00:00') 제거
-        if " " in s:
-            s = s.split(" ")[0]
-        return s
-
-    @field_validator("split_ratio", mode="before")
-    @classmethod
-    def normalize_split_ratio(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
-            return None
-        s = str(v).strip().lower()
-        if s in ("nan", ""):
-            return None
-        try:
-            return float(s)
-        except ValueError:
-            return None
-
-    @field_validator("prev_shares", "post_shares", mode="before")
-    @classmethod
-    def normalize_shares(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
-            return None
-        s = str(v).strip().lower()
-        if s in ("nan", ""):
-            return None
-        try:
-            return int(float(s))
-        except ValueError:
-            return None
-
-    @field_validator("receipt_no", "original_receipt_no", mode="before")
-    @classmethod
-    def normalize_receipt_no(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
-            return None
-        s = str(v).strip().lower()
-        if s in ("nan", ""):
-            return None
-        try:
-            # e+13 같은 float 표현식 방지
-            if "." in s:
-                return str(int(float(s)))
-            return s
-        except ValueError:
-            return s
 
 
 class StockSplitManifest(BaseModel):

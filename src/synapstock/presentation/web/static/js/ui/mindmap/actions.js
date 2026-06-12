@@ -67,7 +67,7 @@ export async function initGlobalSearch(jumpToStock) {
                 div.innerHTML = `
                     <span class="search-result-name">${item.name} (${item.ticker})</span>
                     <div class="search-result-meta">
-                        <span class="search-result-board">${item.board.replace('theme_', '').replace('.json', '')}</span>
+                        <span class="search-result-board">${item.board_name || item.board.replace('theme_', '').replace('virtual_', '').replace('.json', '')}</span>
                         <span class="search-result-path">${item.path.join(' > ')}</span>
                     </div>
                 `;

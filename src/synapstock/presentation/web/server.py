@@ -141,12 +141,14 @@ async def startup_event():
     logger.info("[Startup] 인덱스 동기화 프로세스 시작 (Google Drive)")
     from synapstock.presentation.web.core.dependencies import (
         sync_news_archive,
+        sync_all_new_listings_if_needed,
     )
 
     async def run_sync_sequentially():
         try:
             await sync_indices_if_needed(force=True)
             await sync_news_archive()
+            await sync_all_new_listings_if_needed()
         except Exception as e:
             logger.error(f"[Startup] 동기화 중 오류 발생: {e}")
 

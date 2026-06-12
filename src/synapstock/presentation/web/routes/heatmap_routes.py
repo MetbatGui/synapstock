@@ -17,6 +17,7 @@ async def get_heatmap_plotly_data(
     try:
         # 1. 서비스 로드
         service = HeatmapService()
+        await service.sync_from_drive()
         themes = service.get_themes(force_refresh=force_refresh)
         
         if not themes:

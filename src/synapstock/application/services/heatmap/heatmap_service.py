@@ -36,11 +36,22 @@ class HeatmapService:
             self.file_repo = loader
         else:
             from synapstock.infrastructure.adapters.heatmap.file_repository import JsonThemeDataLoader
-            self.file_repo = JsonThemeDataLoader()
+            # 전역 컨테이너 설정으로부터 드라이브 어댑터 및 히트맵 폴더 ID를 획득하여 주입
+            from synapstock.infrastructure.container import container
+            self.file_repo = JsonThemeDataLoader(
+                json_dir=str(container.config.heatmap_dir),
+                drive_adapter=container.drive_adapter,
+                folder_id=container.config.heatmap_folder_id
+            )
             
         self.theme_stats_service = ThemeStatisticsService()
         self.stock_validator = stock_validator if stock_validator else StockValidator()
         self._last_validation_report = pd.DataFrame()
+
+    async def sync_from_drive(self) -> None:
+        """구글 드라이브로부터 히트맵 테마 JSON 데이터들을 로컬로 동기화합니다."""
+        if hasattr(self.file_repo, "sync_with_drive"):
+            await self.file_repo.sync_with_drive()
 
     def get_heatmap_data(self) -> pd.DataFrame:
         """히트맵 생성을 위한 최종 데이터를 반환합니다.

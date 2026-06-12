@@ -80,6 +80,7 @@ class Container:
         self.config.weekly_change_dir.mkdir(parents=True, exist_ok=True)
         self.config.stock_split_dir.mkdir(parents=True, exist_ok=True)
         self.config.news_dir.mkdir(parents=True, exist_ok=True)
+        self.config.heatmap_dir.mkdir(parents=True, exist_ok=True)
 
 
         # 3. 인프라 어댑터 싱글톤
@@ -162,6 +163,7 @@ class Container:
             bw_repository=self._bw_repo,
             manifest_path=self.config.board_dir / "board_sync_manifest.json",
             virtual_board_path=self.config.board_dir / "virtual_신규상장주.json",
+            board_file_sync_service=self._board_file_sync_service,
         )
 
         self._financial_service = FinancialService(repository=self._financial_repo)
@@ -184,6 +186,7 @@ class Container:
         self.sync_financial_statements_from_drive()
         self.sync_boards_from_drive_in_background()
         self.sync_stock_splits_from_drive_in_background()
+        self.sync_heatmap_from_drive_in_background()
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
@@ -207,6 +210,7 @@ class Container:
                 "news": self.config.news_folder_id,
                 "weekly_change": self.config.weekly_change_folder_id,
                 "stock_split": self.config.stock_split_folder_id,
+                "heatmap": self.config.heatmap_folder_id,
             }
 
             # None이 아닌 폴더 ID만 포함하여 dict[str, str] 보장
@@ -303,6 +307,32 @@ class Container:
         t = threading.Thread(target=run_sync_in_background, name="StockSplitSyncThread", daemon=True)
         t.start()
         logger.info("[Container] 백그라운드 주식 분할 동기화 스레드를 성공적으로 시작했습니다.")
+
+    def sync_heatmap_from_drive_in_background(self):
+        """Google Drive로부터 히트맵 테마 JSON 파일들을 백그라운드 스레드에서 동기화합니다."""
+        if not self._drive_adapter:
+            logger.info("[Container] 어댑터가 활성화되지 않아 히트맵 동기화를 건너뜁니다.")
+            return
+
+        import threading
+
+        def run_sync_in_background():
+            import asyncio
+            from synapstock.application.services.heatmap.heatmap_service import HeatmapService
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                svc = HeatmapService()
+                new_loop.run_until_complete(svc.sync_from_drive())
+            except Exception as e:
+                logger.error(f"[Container] 백그라운드 히트맵 동기화 실패: {e}")
+            finally:
+                new_loop.close()
+
+        # 완전한 논블로킹(Non-blocking) 백그라운드 데몬 스레드로 실행
+        t = threading.Thread(target=run_sync_in_background, name="HeatmapSyncThread", daemon=True)
+        t.start()
+        logger.info("[Container] 백그라운드 히트맵 동기화 스레드를 성공적으로 시작했습니다.")
 
 
     async def _sync_financial_statements_async(self):
