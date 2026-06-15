@@ -163,11 +163,13 @@ def run_server(port: int = 8090):
     """Uvicorn 서버를 실행합니다.
 
     보안을 위해 기본적으로 로컬호스트(``127.0.0.1``)에 바인딩하며 언급된 포트로 서버를 구동합니다.
+    환경 변수 ``SYNAPSTOCK_HOST``가 지정되면 해당 호스트에 바인딩합니다.
 
     Args:
         port (int): 리스닝할 TCP 포트 번호. 기본값은 ``8090``.
     """
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    host = os.environ.get("SYNAPSTOCK_HOST", "127.0.0.1")
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 def start_web_server_background(port: int = 8090):
