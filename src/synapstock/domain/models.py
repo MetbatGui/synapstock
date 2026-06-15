@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from synapstock.domain.statistics.models import NewListing
 
 
@@ -60,40 +60,19 @@ class Stock(BaseModel):
 class Node(BaseModel):
     """마인드맵 노드 모델.
 
-    재귀적 트리 구조를 가지며, depth는 부모 노드에서 계산 후 주입된다.
+    경로 기반 플랫 모델을 지니며, 자식들을 중첩하여 가지지 않습니다.
 
     Attributes:
         name: 노드 이름.
         depth: root 노드와의 거리 (root=0).
-        nodes: 자식 노드 목록.
+        parent_path: 부모 노드의 절대 경로.
         stocks: 이 노드에 속한 종목 목록.
     """
 
     name: str
     depth: int
-    nodes: list[Node] = []
+    parent_path: str | None = None
     stocks: list[Stock] = []
-
-    def find_node(self, name: str) -> Node | None:
-        """이름으로 하위 노드를 재귀적으로 검색한다."""
-        if self.name == name:
-            return self
-        for child in self.nodes:
-            found = child.find_node(name)
-            if found:
-                return found
-        return None
-
-    def find_stock(self, ticker: str) -> Stock | None:
-        """티커로 하위 종목을 재귀적으로 검색한다."""
-        for stock in self.stocks:
-            if stock.ticker == ticker:
-                return stock
-        for child in self.nodes:
-            found = child.find_stock(ticker)
-            if found:
-                return found
-        return None
 
     def add_stock(self, stock: Stock) -> bool:
         """중복 체크 후 종목을 추가한다. 이미 존재하면 True(성공)를 반환한다."""
@@ -108,112 +87,32 @@ class Node(BaseModel):
         self.stocks = [s for s in self.stocks if s.ticker != ticker]
         return len(self.stocks) < orig_len
 
-    def find_and_remove_stock(self, ticker: str) -> bool:
-        """재귀적으로 종목을 찾아 삭제한다."""
-        if self.remove_stock(ticker):
-            return True
-        for child in self.nodes:
-            if child.find_and_remove_stock(ticker):
-                return True
-        return False
-
-
-
-    def find_and_add_report(self, ticker: str, report_path: str) -> bool:
-        """재귀적으로 종목을 찾아 리포트 경로를 추가한다."""
-        for s in self.stocks:
-            if s.ticker == ticker:
-                if report_path not in s.reports:
-                    s.reports.append(report_path)
-                return True
-        for child in self.nodes:
-            if child.find_and_add_report(ticker, report_path):
-                return True
-        return False
-
-    def find_and_remove_report(self, ticker: str, report_path: str) -> bool:
-        """재귀적으로 종목을 찾아 리포트 경로를 삭제한다."""
-        for s in self.stocks:
-            if s.ticker == ticker:
-                if report_path in s.reports:
-                    s.reports.remove(report_path)
-                    return True
-                return False
-        for child in self.nodes:
-            if child.find_and_remove_report(ticker, report_path):
-                return True
-        return False
-
-    def add_child(self, name: str) -> Node:
-        """자식 노드를 생성하여 추가하고 반환한다.
-
-        Args:
-            name: 자식 노드의 이름.
-
-        Returns:
-            생성된 자식 Node 인스턴스.
-        """
-        child = Node(name=name, depth=self.depth + 1)
-        self.nodes.append(child)
-        return child
-
-    def remove_child(self, name: str, absorb: bool = True) -> None:
-        """자식 노드를 삭제한다.
-
-        Args:
-            name: 삭제할 자식 노드의 이름.
-            absorb: True일 경우 삭제되는 노드의 자식들을 현재 노드(부모)로 흡수한다.
-        """
-        target = next((n for n in self.nodes if n.name == name), None)
-        if not target:
-            return
-
-        if absorb:
-            # 1. 자식 노드들을 현재 노드로 이동 및 depth 갱신
-            for child_node in target.nodes:
-                child_node._update_depth_recursive(self.depth + 1)
-                self.nodes.append(child_node)
-            # 2. 종목들을 현재 노드(부모)로 이동
-            self.stocks.extend(target.stocks)
-
-        self.nodes.remove(target)
-
-    def _update_depth_recursive(self, new_depth: int) -> None:
-        """노드와 그 하위 트리 전체의 depth를 재귀적으로 갱신한다."""
-        self.depth = new_depth
-        for child in self.nodes:
-            child._update_depth_recursive(new_depth + 1)
-
-    def _format(self, indent: int = 0) -> str:
-        """재귀적으로 트리 문자열을 구성한다."""
-        prefix = "  " * indent
-        lines = [f"{prefix}[D{self.depth}] {self.name}"]
-        for stock in self.stocks:
-            lines.append(f"{prefix}  {stock!r}")
-        for child in self.nodes:
-            lines.append(child._format(indent + 1))
-        return "\n".join(lines)
-
-    def __repr__(self) -> str:
-        return self._format()
-
-    def __str__(self) -> str:
-        return self._format()
-
 
 class Board(BaseModel):
     """마인드맵 보드 모델.
 
-    Board 생성 시 루트 노드(depth=0)가 자동으로 생성된다.
+    Board 생성 시 루트 노드(depth=0, Key는 보드명)가 자동으로 생성된다.
+    모든 하위 노드는 absolute path 키값을 가진 평탄화된 nodes 딕셔너리로 일원화 관리된다.
 
     Attributes:
         name: 보드 이름.
-        root: 자동 생성된 루트 노드 (depth=0, name=보드명).
+        nodes: 경로(Key)별 Node(Value) 매핑 딕셔너리.
     """
 
     id: str | None = None  # 파일명 및 고유 식별자
     name: str  # 표시 이름
-    root: Node
+    nodes: dict[str, Node] = Field(default_factory=dict)
+
+    @property
+    def root(self) -> Node:
+        """재귀 트리 호환을 위해 루트 노드 객체를 탐색하여 반환합니다."""
+        # parent_path가 None인 노드가 루트 노드입니다.
+        root_node = next((n for n in self.nodes.values() if n.parent_path is None), None)
+        if not root_node:
+            # 폴백용 자동 복구
+            root_node = Node(name=self.name, depth=0, parent_path=None)
+            self.nodes[self.name] = root_node
+        return root_node
 
     @property
     def is_virtual(self) -> bool:
@@ -221,31 +120,44 @@ class Board(BaseModel):
         target = self.id or self.name
         return target is not None and target.startswith("virtual_")
 
-
     @model_validator(mode="before")
     @classmethod
     def create_root_node(cls, data: Any) -> Any:
-        """root가 없을 경우 Board name으로 루트 노드를 자동 생성한다."""
-        if isinstance(data, dict) and "root" not in data and "name" in data:
-            data["root"] = Node(name=data["name"], depth=0)
+        """nodes가 없을 경우 Board name으로 루트 노드를 자동 생성한다."""
+        if isinstance(data, dict) and "nodes" not in data and "name" in data:
+            root_name = data["name"]
+            data["nodes"] = {
+                root_name: Node(name=root_name, depth=0, parent_path=None)
+            }
         return data
 
     def find_node(self, name: str) -> Node | None:
-        """보드 내에서 이름으로 노드를 검색한다."""
-        return self.root.find_node(name)
+        """보드 내에서 절대 경로(name)로 노드를 검색한다."""
+        return self.nodes.get(name)
 
     def find_stock(self, ticker: str) -> Stock | None:
         """보드 내에서 티커로 종목을 검색한다."""
-        return self.root.find_stock(ticker)
+        for node in self.nodes.values():
+            for stock in node.stocks:
+                if stock.ticker == ticker:
+                    return stock
+        return None
 
     def add_node(self, parent_name: str, node_name: str) -> bool:
-        """특정 노드 하위에 새 노드를 추가한다."""
+        """특정 부모 노드 하위에 새 노드를 추가한다."""
         parent = self.find_node(parent_name)
         if not parent:
             return False
-        if any(n.name == node_name for n in parent.nodes):
+        
+        new_path = f"{parent_name}/{node_name}"
+        if new_path in self.nodes:
             return True
-        parent.add_child(node_name)
+        
+        self.nodes[new_path] = Node(
+            name=node_name,
+            depth=parent.depth + 1,
+            parent_path=parent_name
+        )
         return True
 
     def add_stock_to_node(self, parent_name: str, stock: Stock) -> bool:
@@ -257,41 +169,100 @@ class Board(BaseModel):
 
     def delete_node(self, node_name: str) -> bool:
         """노드를 삭제하고 하위 요소를 부모로 흡수한다. (루트 제외)"""
-        if self.root.name == node_name:
+        node = self.find_node(node_name)
+        if not node or node.parent_path is None:
             return False
 
-        def find_and_remove(parent: Node, target_name: str) -> bool:
-            for i, child in enumerate(parent.nodes):
-                if child.name == target_name:
-                    parent.remove_child(target_name, absorb=True)
-                    return True
-                if find_and_remove(child, target_name):
-                    return True
+        parent_path = node.parent_path
+        parent_node = self.find_node(parent_path)
+        if not parent_node:
             return False
 
-        return find_and_remove(self.root, node_name)
+        # 1. 삭제 대상 노드의 종목들을 부모 노드로 이동
+        for stock in node.stocks:
+            parent_node.add_stock(stock)
+
+        # 2. 하위 자식 노드들의 경로 및 부모 경로 갱신
+        child_paths = [p for p in self.nodes.keys() if p.startswith(node_name + "/")]
+        child_paths.sort()  # 상위 계층부터 안전하게 재배치하기 위해 정렬
+
+        depth_delta = node.depth - parent_node.depth
+
+        for old_path in child_paths:
+            child = self.nodes.pop(old_path)
+            
+            # 경로 갱신
+            relative_part = old_path[len(node_name):]
+            new_path = parent_path + relative_part
+            
+            # 부모 경로 갱신
+            if child.parent_path == node_name:
+                child.parent_path = parent_path
+            else:
+                child_rel_parent = child.parent_path[len(node_name):]
+                child.parent_path = parent_path + child_rel_parent
+            
+            # depth 갱신
+            child.depth -= depth_delta
+            
+            self.nodes[new_path] = child
+
+        # 3. 본 노드 제거
+        self.nodes.pop(node_name, None)
+        return True
 
     def delete_stock(self, ticker: str) -> bool:
-        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 삭제합니다."""
-        return self.root.find_and_remove_stock(ticker)
+        """보드 내에서 특정 종목(티커 기준)을 찾아 삭제합니다."""
+        deleted = False
+        for node in self.nodes.values():
+            if node.remove_stock(ticker):
+                deleted = True
+        return deleted
 
     def add_report_to_stock(self, ticker: str, report_path: str) -> bool:
-        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 리포트 경로를 추가합니다."""
-        return self.root.find_and_add_report(ticker, report_path)
+        """보드 내에서 특정 종목(티커 기준)을 찾아 리포트 경로를 추가합니다."""
+        stock = self.find_stock(ticker)
+        if not stock:
+            return False
+        if report_path not in stock.reports:
+            stock.reports.append(report_path)
+        return True
 
     def remove_report_from_stock(self, ticker: str, report_path: str) -> bool:
-        """보드 내에서 특정 종목(티커 기준)을 재귀적으로 찾아 리포트 경로를 삭제합니다."""
-        return self.root.find_and_remove_report(ticker, report_path)
+        """보드 내에서 특정 종목(티커 기준)을 찾아 리포트 경로를 삭제합니다."""
+        stock = self.find_stock(ticker)
+        if not stock:
+            return False
+        if report_path in stock.reports:
+            stock.reports.remove(report_path)
+            return True
+        return False
 
     def __repr__(self) -> str:
-        return f"Board({self.name!r})\n{self.root!r}"
+        # 기존 트리 형태로 덤프하여 가독성 및 호환을 유지한다.
+        root_path = next((path for path, n in self.nodes.items() if n.parent_path is None), None)
+        if not root_path:
+            return f"Board({self.name!r})\n  (Empty)"
+
+        lines = []
+        def _render_tree(path: str, indent: int = 0):
+            node = self.nodes[path]
+            prefix = "  " * indent
+            lines.append(f"{prefix}[D{node.depth}] {node.name}")
+            for stock in node.stocks:
+                lines.append(f"{prefix}  {stock!r}")
+            
+            # 직계 자식 노드 탐색 및 정렬
+            children = [p for p, n in self.nodes.items() if n.parent_path == path]
+            children.sort()
+            for child_path in children:
+                _render_tree(child_path, indent + 1)
+
+        _render_tree(root_path, 0)
+        return f"Board({self.name!r})\n" + "\n".join(lines)
 
     def __str__(self) -> str:
         return self.__repr__()
-
-
-# 재귀 참조 해소 (Node.nodes: list[Node])
-Node.model_rebuild()
 
 
 @dataclass
@@ -389,4 +360,3 @@ class BoardSyncManifest(BaseModel):
             deleted=deleted
         )
         self.last_updated = datetime.now(UTC).isoformat()
-
