@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from synapstock.domain.models import Board, Node, Stock
+from synapstock.domain.models import Board, Stock
 from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 
 
@@ -27,11 +27,13 @@ def mock_session():
     session.delete.return_value = mock_res
     return session
 
+
 @pytest.fixture
 def adapter(mock_session):
     adapter = MiroMindmapAdapter(api_token="fake_token")
     adapter.session = mock_session
     return adapter
+
 
 def test_list_boards(adapter, mock_session):
     # Arrange
@@ -45,6 +47,7 @@ def test_list_boards(adapter, mock_session):
     # Assert
     assert names == ["Board 1", "Board 2"]
     mock_session.get.assert_called_with("https://api.miro.com/v2/boards")
+
 
 def test_load_board(adapter, mock_session):
     board_name = "Test Board"
@@ -75,21 +78,19 @@ def test_load_board(adapter, mock_session):
 
     assert board.name == board_name
     assert board.root.name == board_name
-    assert len(board.root.nodes) == 1
-    assert board.root.nodes[0].stocks[0].ticker == "005930"
+    assert len(board.nodes) == 2  # Test Board (Root), Test Board/Sub Node
+    assert "Test Board/Sub Node" in board.nodes
+    assert board.nodes["Test Board/Sub Node"].stocks[0].ticker == "005930"
+
 
 def test_save_board_logic(adapter, mock_session):
     """save 호출 시 내부적으로 초기화(delete) 및 생성(post)이 일어나는지 검증."""
     board_name = "Test Board"
     board_id = "b123"
-    board = Board(
-        name=board_name,
-        root=Node(
-            name=board_name, depth=0,
-            nodes=[Node(name="NodeA", depth=1)],
-            stocks=[Stock(name="Stock1", ticker="000001")]
-        )
-    )
+    
+    board = Board(name=board_name)
+    board.add_node(board_name, "NodeA")
+    board.add_stock_to_node(f"{board_name}/NodeA", Stock(name="Stock1", ticker="000001"))
 
     # 1. GET /boards 응답
     # 2. GET /items (삭제용) 응답
