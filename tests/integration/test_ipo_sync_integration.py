@@ -62,7 +62,7 @@ def test_ipo_sync_provisions_manifest_and_virtual_board(temp_board_dir):
     virtual_board_data = json.loads(virtual_board_path.read_text(encoding="utf-8"))
     
     assert virtual_board_data["name"] == "신규상장주"
-    stocks = virtual_board_data["root"]["stocks"]
+    stocks = virtual_board_data["nodes"]["신규상장주"]["stocks"]
     assert len(stocks) == 2 # 사이냅소프트, 뱅크웨어글로벌 2건
     
     assert any(s["name"] == "사이냅소프트" and s["ticker"] == "466410" for s in stocks)
@@ -73,7 +73,7 @@ def test_ipo_sync_provisions_manifest_and_virtual_board(temp_board_dir):
     
     # 다시 로드하여 갯수가 여전히 2개로 유지되는지 검사
     virtual_board_data_2 = json.loads(virtual_board_path.read_text(encoding="utf-8"))
-    assert len(virtual_board_data_2["root"]["stocks"]) == 2, "동일 데이터 재동기화 시 가상보드 하위에 중복 적재가 차단되어야 합니다."
+    assert len(virtual_board_data_2["nodes"]["신규상장주"]["stocks"]) == 2, "동일 데이터 재동기화 시 가상보드 하위에 중복 적재가 차단되어야 합니다."
 
 
 @pytest.mark.asyncio
@@ -114,12 +114,15 @@ async def test_stock_addition_automatically_assigns_pending_ipo(temp_board_dir):
     # 2. 초기 가상보드 생성 (990001 포함)
     virtual_board = {
         "name": "신규상장주",
-        "root": {
-            "name": "신규상장주",
-            "depth": 0,
-            "stocks": [
-                {"name": "더미테크", "ticker": "990001"}
-            ]
+        "nodes": {
+            "신규상장주": {
+                "name": "신규상장주",
+                "depth": 0,
+                "parent_path": None,
+                "stocks": [
+                    {"name": "더미테크", "ticker": "990001", "aliases": [], "reports": [], "news": []}
+                ]
+            }
         }
     }
     virtual_board_path.write_text(json.dumps(virtual_board, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -128,12 +131,19 @@ async def test_stock_addition_automatically_assigns_pending_ipo(temp_board_dir):
     theme_it_path = temp_board_dir / "theme_IT.json"
     theme_it = {
         "name": "IT",
-        "root": {
-            "name": "IT",
-            "depth": 0,
-            "nodes": [
-                {"name": "인터넷", "depth": 1, "stocks": []}
-            ]
+        "nodes": {
+            "IT": {
+                "name": "IT",
+                "depth": 0,
+                "parent_path": None,
+                "stocks": []
+            },
+            "IT/인터넷": {
+                "name": "인터넷",
+                "depth": 1,
+                "parent_path": "IT",
+                "stocks": []
+            }
         }
     }
     theme_it_path.write_text(json.dumps(theme_it, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -179,11 +189,11 @@ async def test_stock_addition_automatically_assigns_pending_ipo(temp_board_dir):
     item = manifest_data["new_listings"]["990001"]
     assert item["status"] == "ASSIGNED"
     assert item["current_board"] == "theme_IT"
-    assert item["current_path"] == ["인터넷"]
+    assert item["current_path"] == ["IT", "인터넷"]
     
     # --- 가상보드에서 해당 종목 자동 제거 검증 ---
     virtual_board_data = json.loads(virtual_board_path.read_text(encoding="utf-8"))
-    stocks = virtual_board_data["root"].get("stocks", [])
+    stocks = virtual_board_data["nodes"]["신규상장주"].get("stocks", [])
     assert len(stocks) == 0, "가상보드 대기목록에서 자동 삭제되어야 합니다."
     
     # --- 구글 드라이브 sync_with_drive 트리거 검증 ---
@@ -223,12 +233,15 @@ async def test_stock_deletion_from_ipo_board_turns_status_ignored(temp_board_dir
     # 2. 초기 가상보드 생성 (990003 포함)
     virtual_board = {
         "name": "신규상장주",
-        "root": {
-            "name": "신규상장주",
-            "depth": 0,
-            "stocks": [
-                {"name": "더미에너지", "ticker": "990003"}
-            ]
+        "nodes": {
+            "신규상장주": {
+                "name": "신규상장주",
+                "depth": 0,
+                "parent_path": None,
+                "stocks": [
+                    {"name": "더미에너지", "ticker": "990003", "aliases": [], "reports": [], "news": []}
+                ]
+            }
         }
     }
     virtual_board_path.write_text(json.dumps(virtual_board, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -302,18 +315,21 @@ async def test_stock_deletion_from_sector_board_does_not_rollback_to_pending(tem
     theme_it_path = temp_board_dir / "theme_IT.json"
     theme_it = {
         "name": "IT",
-        "root": {
-            "name": "IT",
-            "depth": 0,
-            "nodes": [
-                {
-                    "name": "화학섹터",
-                    "depth": 1,
-                    "stocks": [
-                        {"name": "더미케미칼", "ticker": "990004"}
-                    ]
-                }
-            ]
+        "nodes": {
+            "IT": {
+                "name": "IT",
+                "depth": 0,
+                "parent_path": None,
+                "stocks": []
+            },
+            "IT/화학섹터": {
+                "name": "화학섹터",
+                "depth": 1,
+                "parent_path": "IT",
+                "stocks": [
+                    {"name": "더미케미칼", "ticker": "990004", "aliases": [], "reports": [], "news": []}
+                ]
+            }
         }
     }
     theme_it_path.write_text(json.dumps(theme_it, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -392,12 +408,15 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     # 2. 초기 가상보드 생성 (990002 포함)
     virtual_board = {
         "name": "신규상장주",
-        "root": {
-            "name": "신규상장주",
-            "depth": 0,
-            "stocks": [
-                {"name": "더미바이오", "ticker": "990002"}
-            ]
+        "nodes": {
+            "신규상장주": {
+                "name": "신규상장주",
+                "depth": 0,
+                "parent_path": None,
+                "stocks": [
+                    {"name": "더미바이오", "ticker": "990002", "aliases": [], "reports": [], "news": []}
+                ]
+            }
         }
     }
     virtual_board_path.write_text(json.dumps(virtual_board, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -406,12 +425,19 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     theme_it_path = temp_board_dir / "theme_IT.json"
     theme_it = {
         "name": "IT",
-        "root": {
-            "name": "IT",
-            "depth": 0,
-            "nodes": [
-                {"name": "인터넷", "depth": 1, "stocks": []}
-            ]
+        "nodes": {
+            "IT": {
+                "name": "IT",
+                "depth": 0,
+                "parent_path": None,
+                "stocks": []
+            },
+            "IT/인터넷": {
+                "name": "인터넷",
+                "depth": 1,
+                "parent_path": "IT",
+                "stocks": []
+            }
         }
     }
     theme_it_path.write_text(json.dumps(theme_it, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -453,7 +479,7 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     
     # 가상보드 파일 상에서도 제거 확인
     virtual_board_data_1 = json.loads(virtual_board_path.read_text(encoding="utf-8"))
-    stocks_1 = virtual_board_data_1["root"].get("stocks", [])
+    stocks_1 = virtual_board_data_1["nodes"]["신규상장주"].get("stocks", [])
     assert len(stocks_1) == 0
     
     # 5-2) 타겟 보드에 추가
@@ -470,7 +496,7 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     item = manifest_data_2["new_listings"]["990002"]
     assert item["status"] == "ASSIGNED"
     assert item["current_board"] == "theme_IT"
-    assert item["current_path"] == ["인터넷"]
+    assert item["current_path"] == ["IT", "인터넷"]
     
     # --- 드라이브 싱크 호출 확인 ---
     assert drive_adapter.put_file.call_count >= 1

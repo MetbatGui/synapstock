@@ -41,10 +41,9 @@ def test_get_board_data_normal(mock_dependencies):
     """GET /api/board (일반 보드) 엔드포인트 검증."""
     mock_query = mock_dependencies["query"]
     
-    root_node = Node(name="테스트보드", depth=0)
-    root_node.add_child("하위노드")
-    root_node.stocks.append(Stock(name="삼성전자", ticker="005930"))
-    board = Board(id="theme_test", name="테스트보드", root=root_node)
+    board = Board(id="theme_test", name="테스트보드")
+    board.add_node("테스트보드", "하위노드")
+    board.add_stock_to_node("테스트보드", Stock(name="삼성전자", ticker="005930"))
     
     mock_query.load_board.return_value = board
 
@@ -64,10 +63,9 @@ def test_get_board_data_virtual(mock_dependencies):
     """GET /api/board (가상보드 - 신규상장주) 엔드포인트 검증."""
     mock_query = mock_dependencies["query"]
     
-    root_node = Node(name="신규상장주", depth=0)
-    root_node.stocks.append(Stock(name="종목A", ticker="990011"))
-    root_node.stocks.append(Stock(name="종목B", ticker="990016"))
-    board = Board(id="virtual_신규상장주", name="신규상장주", root=root_node)
+    board = Board(id="virtual_신규상장주", name="신규상장주")
+    board.root.stocks.append(Stock(name="종목A", ticker="990011"))
+    board.root.stocks.append(Stock(name="종목B", ticker="990016"))
     
     mock_query.load_board.return_value = board
 

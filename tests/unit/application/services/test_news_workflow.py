@@ -40,16 +40,15 @@ class MockMindmapAdapter(MindmapPort):
 
 @pytest.fixture
 def mock_board():
-    root = Node(name="Root", depth=0)
-
-    # 반도체 > IDM > 삼성전자
-    semi_node = root.add_child("반도체")
-    idm_node = semi_node.add_child("IDM")
+    board = Board(name="theme_data")
+    board.add_node("theme_data", "반도체")
+    board.add_node("theme_data/반도체", "IDM")
 
     samsung = Stock(name="삼성전자", ticker="005930", news=[])
-    idm_node.stocks.append(samsung)
+    board.add_stock_to_node("theme_data/반도체/IDM", samsung)
 
-    return Board(name="theme_data", root=root)
+    return board
+
 
 @pytest.mark.asyncio
 async def test_search_path_and_add_news(mock_board):
@@ -72,19 +71,17 @@ async def test_search_path_and_add_news(mock_board):
     # 1. 경로 검색 기능 검증 (단순 탐색 알고리즘 또는 BoardService 내의 함수 모방)
     # 현재 BoardService에 경로(Path)를 리스트로 반환하는 기능이 없다면,
     # 어댑터/포트 레이어나 라우터에서 다음과 같은 탐색 로직을 사용할 것임을 검증합니다.
-    def find_node_path(node: Node, target_name: str, current_path: list[str]) -> list[str]:
-        for s in node.stocks:
-            if s.name == target_name:
-                return current_path + [target_name]
-        for child in node.nodes:
-            res = find_node_path(child, target_name, current_path + [child.name])
-            if res:
-                return res
+    def find_node_path(board: Board, target_name: str) -> list[str]:
+        for path_key, node in board.nodes.items():
+            for s in node.stocks:
+                if s.name == target_name:
+                    parts = path_key.split("/")
+                    return parts[1:] + [target_name]
         return []
 
     # 검색 API가 반환할 경로
     board = query_service.load_board("theme_data")
-    path = find_node_path(board.root, "삼성전자", [])
+    path = find_node_path(board, "삼성전자")
 
     assert path == ["반도체", "IDM", "삼성전자"]
 
