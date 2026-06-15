@@ -9,6 +9,7 @@ services:
       - "8090:8090"
     environment:
       - SYNAPSTOCK_HOST=0.0.0.0
+      - TZ=Asia/Seoul
     env_file:
       - .env
     volumes:
@@ -22,6 +23,8 @@ services:
       dockerfile: Dockerfile
     container_name: synapstock-bot
     command: synapstock-bot
+    environment:
+      - TZ=Asia/Seoul
     env_file:
       - .env
     volumes:

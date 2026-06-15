@@ -60,12 +60,16 @@ class HeatmapVisualizer:
         fig.write_html(output_file)
         print(f"\n히트맵 생성 완료: {output_file}")
         
-        # 브라우저 자동 실행
-        try:
-            os.startfile(output_file)
-        except AttributeError:
-            import webbrowser
-            webbrowser.open(output_file)
+        # 브라우저 자동 실행 (도커/서버 환경 등 Headless 환경에서는 건너뜀)
+        if "SYNAPSTOCK_HOST" not in os.environ:
+            try:
+                os.startfile(output_file)
+            except AttributeError:
+                try:
+                    import webbrowser
+                    webbrowser.open(output_file)
+                except Exception:
+                    pass
     
     def create_treemap(self, df_final: pd.DataFrame, group_stats: dict, output_file: str = 'theme_heatmap.html'):
         """데이터프레임을 기반으로 Plotly Treemap을 생성하고 저장합니다. (기존 API - 하위 호환)
@@ -191,9 +195,13 @@ class HeatmapVisualizer:
         fig.write_html(output_file)
         print(f"\n히트맵 생성 완료: {output_file}")
         
-        # 브라우저 자동 실행
-        try:
-            os.startfile(output_file)
-        except AttributeError:
-            import webbrowser
-            webbrowser.open(output_file)
+        # 브라우저 자동 실행 (도커/서버 환경 등 Headless 환경에서는 건너뜀)
+        if "SYNAPSTOCK_HOST" not in os.environ:
+            try:
+                os.startfile(output_file)
+            except AttributeError:
+                try:
+                    import webbrowser
+                    webbrowser.open(output_file)
+                except Exception:
+                    pass
