@@ -1,0 +1,30 @@
+services:
+  synapstock-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synapstock-web
+    command: synapstock
+    ports:
+      - "8090:8090"
+    environment:
+      - SYNAPSTOCK_HOST=0.0.0.0
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/app/secrets
+    restart: unless-stopped
+
+  synapstock-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synapstock-bot
+    command: synapstock-bot
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/app/secrets
+    restart: unless-stopped

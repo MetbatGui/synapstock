@@ -1,0 +1,34 @@
+# Virtual environments and dependencies
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Version Control
+.git/
+.gitignore
+
+# Cache and temporary directories
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data and secrets (mounted via volumes)
+data/
+secrets/
+.env
+
+# Tests and documentation (not needed in production image)
+tests/
+README.md
+CLAUDE.md
+
+# Windows scripts and Docker configurations
+setup.bat
+run_services.bat
+Dockerfile
+docker-compose.yml
+.dockerignore
