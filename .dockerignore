@@ -23,7 +23,6 @@ secrets/
 
 # Tests and documentation (not needed in production image)
 tests/
-README.md
 CLAUDE.md
 
 # Windows scripts and Docker configurations
