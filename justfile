@@ -10,8 +10,7 @@ docker-build:
     docker compose build
 
 # Docker 컨테이너 백그라운드 기동
-docker-up:
-    docker-build
+docker-up: docker-build
     docker compose up -d
 
 # Docker 컨테이너 중지 및 리소스 정리
