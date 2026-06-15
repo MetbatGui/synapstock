@@ -42,33 +42,72 @@ class LocalBoardRepository(BoardRepositoryPort):
         raw = json.loads(path.read_text(encoding="utf-8"))
 
         # 1. 정석 JSON 형식 (Board 모델 구조) 확인
-        if "root" in raw:
+        if "nodes" in raw:
             board = Board.model_validate(raw)
             board.id = name  # 파일명을 ID로 고정
             return board
 
+        # 1-2. 구형 트리 JSON 형식 (Board 내에 "root" 노드가 존재하는 경우)
+        if "root" in raw:
+            board_name = raw.get("name", name)
+            root_raw = raw["root"]
+            nodes_dict = {}
+
+            def _migrate_node(node_raw: dict, parent_path: str | None = None):
+                node_name = node_raw["name"]
+                depth = node_raw["depth"]
+                current_path = f"{parent_path}/{node_name}" if parent_path else node_name
+
+                stocks = []
+                for s in node_raw.get("stocks", []):
+                    stocks.append(Stock(
+                        name=s["name"],
+                        ticker=s["ticker"],
+                        aliases=s.get("aliases", []),
+                        reports=s.get("reports", []),
+                        news=s.get("news", [])
+                    ))
+
+                nodes_dict[current_path] = Node(
+                    name=node_name,
+                    depth=depth,
+                    parent_path=parent_path,
+                    stocks=stocks
+                )
+
+                for child_raw in node_raw.get("nodes", []):
+                    _migrate_node(child_raw, current_path)
+
+            _migrate_node(root_raw, None)
+            return Board(id=name, name=board_name, nodes=nodes_dict)
+
         # 2. 레거시 형식 (theme_*.json) 처리
         b_name = raw.get("theme", name)
-        root = Node(name=b_name, depth=0)
+        nodes_dict = {}
+        nodes_dict[b_name] = Node(name=b_name, depth=0, parent_path=None)
 
-        def _walk(items, parent):
+        def _walk(items, parent_path: str, parent_depth: int):
             for item in items:
                 n_name = item.get("sector_name") or item.get("sub_category_1") or item.get("name")
                 if not n_name:
                     continue
 
-                child = parent.add_child(n_name)
+                current_path = f"{parent_path}/{n_name}"
+                child = Node(name=n_name, depth=parent_depth + 1, parent_path=parent_path, stocks=[])
+                
                 for co in item.get("companies", []):
                     child.stocks.append(Stock(name=co, ticker=""))
 
+                nodes_dict[current_path] = child
+
                 sub = item.get("sectors") or item.get("categories") or item.get("sub_categories_2")
                 if sub:
-                    _walk(sub, child)
+                    _walk(sub, current_path, parent_depth + 1)
 
         if "sectors" in raw:
-            _walk(raw["sectors"], root)
+            _walk(raw["sectors"], b_name, 0)
 
-        return Board(id=name, name=b_name, root=root)
+        return Board(id=name, name=b_name, nodes=nodes_dict)
 
     def save(self, board: Board) -> None:
         """Board를 id.json 파일로 저장한다. id가 없으면 name을 시도한다."""
