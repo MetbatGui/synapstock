@@ -1,13 +1,12 @@
-import json
 import logging
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, cast
 
 from synapstock.application.services.ceiling_analysis_service import CeilingAnalysisService
 from synapstock.application.services.disclosure_analysis_service import DisclosureAnalysisService
 from synapstock.application.services.new_listing_service import NewListingService
 from synapstock.application.services.ranking_service import RankingService
+from synapstock.domain.ports import BoardSyncManifestRepositoryPort
 from synapstock.domain.statistics.domain_service import NewListingSyncDomainService
 from synapstock.domain.statistics.models import (
     CeilingAnalysisReport,
@@ -15,8 +14,6 @@ from synapstock.domain.statistics.models import (
     DailyMarketRankingAnalysis,
     NewListing,
 )
-from synapstock.domain.ports import BoardSyncManifestRepositoryPort
-
 
 logger = logging.getLogger(__name__)
 
@@ -105,27 +102,43 @@ class StatisticsService:
             if hasattr(item, "ticker") and not item.ticker:
                 if item.name in ticker_map:
                     item.ticker = ticker_map[item.name]
-                elif self._query_service and not skip_search:
-                    # 로컬 보드에 등록되지 않은 신규 종목은 네이버 API를 통해 티커 검색을 수행
-                    try:
-                        search_results = self._query_service.search_ticker(item.name)
-                        found = False
-                        if search_results:
-                            import unicodedata
-                            clean_item_name = unicodedata.normalize("NFC", item.name).strip().lower()
-                            for res in search_results:
-                                res_name = unicodedata.normalize("NFC", res.get("name", "")).strip().lower()
-                                if res_name == clean_item_name or clean_item_name in res_name:
-                                    ticker = res.get("ticker")
-                                    if ticker and ticker.isalnum() and len(ticker) == 6:
-                                        item.ticker = ticker
-                                        logger.info(f"[StatisticsService] 신규 종목 티커 검색 성공: {item.name} -> {ticker}")
-                                        found = True
-                                        break
-                        if not found:
-                            item.ticker = "none"
-                    except Exception as e:
-                        logger.error(f"[StatisticsService] 신규 종목({item.name}) 티커 검색 실패: {e}")
+                else:
+                    # 매니페스트의 new_listings 캐시에서 이름 대조하여 티커 매핑 시도
+                    found_in_manifest = False
+                    for ticker, meta in new_listings_meta.items():
+                        meta_name = (
+                            getattr(meta, "name", "")
+                            or (meta.get("name", "") if isinstance(meta, dict) else "")
+                        )
+                        if meta_name == item.name:
+                            item.ticker = ticker
+                            found_in_manifest = True
+                            break
+
+                    if not found_in_manifest and self._query_service and not skip_search:
+                        # 로컬 보드에 등록되지 않은 신규 종목은 네이버 API를 통해 티커 검색을 수행
+                        try:
+                            search_results = self._query_service.search_ticker(item.name)
+                            found = False
+                            if search_results:
+                                import unicodedata
+                                clean_item_name = unicodedata.normalize("NFC", item.name).strip().lower()
+                                for res in search_results:
+                                    res_name = unicodedata.normalize("NFC", res.get("name", "")).strip().lower()
+                                    if res_name == clean_item_name or clean_item_name in res_name:
+                                        ticker = res.get("ticker")
+                                        if ticker and ticker.isalnum() and len(ticker) == 6:
+                                            item.ticker = ticker
+                                            logger.info(
+                                                f"[StatisticsService] 신규 종목 티커 검색 성공: "
+                                                f"{item.name} -> {ticker}"
+                                            )
+                                            found = True
+                                            break
+                            if not found:
+                                item.ticker = "none"
+                        except Exception as e:
+                            logger.error(f"[StatisticsService] 신규 종목({item.name}) 티커 검색 실패: {e}")
 
             # 매니페스트 내 상태 데이터 맵핑
             # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
@@ -207,7 +220,7 @@ class StatisticsService:
     # --- 신규 상장 (IPO) ---
     async def get_new_listing_data(self, force_sync: bool = False, year: str = "2026") -> list[NewListing]:
         if year == "all":
-            years = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+            years = ["2024", "2025", "2026"]
             all_items = []
             for y in years:
                 try:
@@ -250,10 +263,10 @@ class StatisticsService:
         return enriched_items
 
     async def sync_all_new_listings(self, force_sync: bool = False) -> list[NewListing]:
-        """2020년부터 2026년까지의 모든 신규상장주 데이터를 루프 돌며 일괄 동기화 및 가상보드에 병합 적재합니다."""
-        years = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+        """2024년부터 2026년까지의 모든 신규상장주 데이터를 루프 돌며 일괄 동기화 및 가상보드에 병합 적재합니다."""
+        years = ["2024", "2025", "2026"]
         all_enriched_items = []
-        
+
         for year in years:
             try:
                 # get_data 내부적으로 force_sync=True 이면 sync_data를 호출하고,
@@ -267,7 +280,7 @@ class StatisticsService:
                 all_enriched_items.extend(enriched)
             except Exception as e:
                 logger.error(f"[StatisticsService] {year}년 신규상장 동기화 중 오류 발생: {e}")
-                
+
         # 병합된 전체 연도의 PENDING 항목들을 가상보드 및 매니페스트에 일괄 반영
         changed = self.sync_new_listings_to_virtual_board(all_enriched_items)
         if changed and self._board_file_sync_service:
