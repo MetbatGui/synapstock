@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, AsyncMock
 import pytest
 
 from synapstock.application.services.command_service import BoardCommandService
-from synapstock.domain.models import Board, Node
+from synapstock.domain.models import Board, Stock
 
 
 class TestBoardCommandServiceSyncHook:
@@ -22,8 +22,7 @@ class TestBoardCommandServiceSyncHook:
         # 기본 테스트 보드 모형
         self.test_board = Board(
             id="theme_test",
-            name="test",
-            root=Node(name="test", depth=0)
+            name="test"
         )
         self.mock_repo.load.return_value = self.test_board
 
@@ -52,7 +51,7 @@ class TestBoardCommandServiceSyncHook:
     def test_delete_node_sync_hook(self):
         """노드 삭제 성공 시 동기화 매니페스트 갱신 훅이 격발되는지 검증."""
         # 삭제 대상 자식 노드 추가
-        self.test_board.root.add_child("delete_me")
+        self.test_board.add_node("test", "delete_me")
 
         success = self.service.delete_node("theme_test", "delete_me")
 
@@ -66,8 +65,7 @@ class TestBoardCommandServiceSyncHook:
     async def test_delete_stock_sync_hook(self):
         """종목 삭제 성공 시 동기화 매니페스트 갱신 훅이 격발되는지 검증."""
         # 삭제 대상 종목 추가
-        from synapstock.domain.models import Stock
-        self.test_board.root.add_stock(Stock(name="삼성전자", ticker="005930"))
+        self.test_board.add_stock_to_node("test", Stock(name="삼성전자", ticker="005930"))
 
         success = await self.service.delete_stock("theme_test", "005930")
 
@@ -103,12 +101,10 @@ class TestBoardCommandServiceSyncHook:
 
         test_board = Board(
             id="theme_test",
-            name="test",
-            root=Node(name="test", depth=0)
+            name="test"
         )
         mock_repo.load.return_value = test_board
 
         success = service.add_node("theme_test", "test", "fallback_node")
         assert success is True
         mock_repo.save.assert_called_once_with(test_board)
-        # 동기화 서비스가 없어도 오류 없이 저장이 완료되어야 함

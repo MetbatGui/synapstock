@@ -95,7 +95,15 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
         # 최신화된 보드 데이터를 디스크에서 로드
         board = query_service.load_board(name)
 
-        def to_dict(node):
+        # 루트 노드 경로 탐색
+        root_path = next((p for p, n in board.nodes.items() if n.parent_path is None), name)
+
+        def to_dict(path: str) -> dict:
+            node = board.nodes.get(path)
+            if not node:
+                # 안전 장치
+                return {"name": path.split("/")[-1], "nodes": [], "stocks": []}
+                
             stocks_list = []
             for s in node.stocks:
                 stock_dict = {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news}
@@ -106,15 +114,19 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
                     stock_dict["current_path"] = meta.get("current_path", [])
                 stocks_list.append(stock_dict)
 
+            # 직계 자식 노드 수집 및 정렬
+            children = [p for p, n in board.nodes.items() if n.parent_path == path]
+            children.sort()
+
             return {
                 "name": node.name,
-                "nodes": [to_dict(n) for n in node.nodes],
+                "nodes": [to_dict(c) for c in children],
                 "stocks": stocks_list,
             }
 
         # 신규상장주 보드인 경우 상장일 기반 가상 연도 계층 트리 노드로 동적 변환
         if name == "virtual_신규상장주":
-            root_dict = to_dict(board.root)
+            root_dict = to_dict(root_path)
             all_stocks = root_dict.get("stocks", [])
 
             # 상장일 기반 그룹화 (연도별)
@@ -150,7 +162,7 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
                 "stocks": []  # 루트 노드 바로 아래는 비워둠
             }
 
-        return cast(dict, to_dict(board.root))
+        return cast(dict, to_dict(root_path))
     except Exception as e:
         logger.error(f"Error loading board '{name}': {str(e)}")
         return JSONResponse(status_code=404, content={"message": str(e)})

@@ -3,16 +3,18 @@ from unittest.mock import MagicMock
 import pytest
 
 from synapstock.application.services.sync_service import BoardSyncService
-from synapstock.domain.models import Board, Node, Stock
+from synapstock.domain.models import Board, Stock
 
 
 @pytest.fixture
 def mock_mindmap():
     return MagicMock()
 
+
 @pytest.fixture
 def mock_ticker_search():
     return MagicMock()
+
 
 @pytest.fixture
 def service(mock_mindmap, mock_ticker_search):
@@ -21,30 +23,29 @@ def service(mock_mindmap, mock_ticker_search):
         ticker_search=mock_ticker_search
     )
 
+
 class TestBoardSyncService:
     """BoardSyncService 단위 테스트."""
 
     def test_normalize_board_tickers(self, service, mock_ticker_search):
         """티커가 부정확한 종목의 티커를 자동으로 검색하여 채워넣어야 한다."""
-        root = Node(name="Root", depth=0)
+        board = Board(name="테스트")
         # 티커가 잘못됨 (생성 시 유효성 검사를 통과한 후 수동으로 잘못된 값 대입)
         stock = Stock(name="삼성전자", ticker="000000")
         stock.ticker = "ERROR"
-        root.stocks.append(stock)
-        board = Board(name="테스트", root=root)
+        board.add_stock_to_node("테스트", stock)
 
         mock_ticker_search.search.return_value = [{"name": "삼성전자", "ticker": "005930"}]
 
         service._normalize_board_tickers(board, progress_callback=None)
 
-        assert root.stocks[0].ticker == "005930"
+        assert board.nodes["테스트"].stocks[0].ticker == "005930"
         mock_ticker_search.search.assert_called_with("삼성전자")
 
     def test_sync_with_miro_calls_normalize_and_sync(self, service, mock_mindmap, mock_ticker_search):
         """sync_with_miro는 정규화와 동기화를 모두 호출해야 한다."""
-        root = Node(name="Root", depth=0)
-        root.stocks.append(Stock(name="삼성전자", ticker="005930"))
-        board = Board(name="테스트", root=root)
+        board = Board(name="테스트")
+        board.add_stock_to_node("테스트", Stock(name="삼성전자", ticker="005930"))
 
         service.sync_with_miro(board, progress_callback=None)
 
@@ -52,11 +53,10 @@ class TestBoardSyncService:
 
     def test_name_migration_on_normalization(self, service, mock_ticker_search):
         """정규화 과정에서 사명 변경이 감지되면 새 사명으로 교체하고 구 사명을 별칭으로 이동시켜야 한다."""
-        root = Node(name="Root", depth=0)
+        board = Board(name="테스트")
         # 티커는 있지만 이름이 구 사명인 경우
         stock = Stock(name="LIG넥스원", ticker="079550")
-        root.stocks.append(stock)
-        board = Board(name="테스트", root=root)
+        board.add_stock_to_node("테스트", stock)
 
         # 네이버 API는 새 사명을 반환한다고 가정
         mock_ticker_search.search.return_value = [{"name": "LIG디펜스앤에어로스페이스", "ticker": "079550"}]

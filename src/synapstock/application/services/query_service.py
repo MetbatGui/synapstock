@@ -64,31 +64,26 @@ class BoardQueryService:
             return []
         return cast(list[dict], self._financial.get_financial_data(company_name, metric, period))
 
-    def find_node_by_name(self, root: Node, name: str) -> Node | None:
-        """노드 트리 내에서 특정 이름의 노드를 검색합니다."""
-        return root.find_node(name)
+    def find_node_by_name(self, board: Board, name: str) -> Node | None:
+        """노드 내에서 특정 이름 또는 경로의 노드를 검색합니다."""
+        if name in board.nodes:
+            return board.nodes[name]
+        for n in board.nodes.values():
+            if n.name == name:
+                return n
+        return None
 
     def get_stock_by_ticker(self, ticker: str) -> tuple[Stock, str, list[str]] | None:
         """모든 보드를 순회하여 일치하는 티커의 종목 정보를 찾습니다."""
         boards = self.list_boards()
         for b_name in boards:
             board = self.load_board(b_name)
-
-            def find_recursive(node: Node, current_path: list[str]) -> tuple[Stock, list[str]] | None:
+            for path, node in board.nodes.items():
                 for s in node.stocks:
                     if s.ticker == ticker:
-                        return s, current_path
-                for n in node.nodes:
-                    res = find_recursive(n, current_path + [n.name])
-                    if res:
-                        return res
-                return None
-
-            # [보드이름]을 경로의 시작으로 설정하여 대략적인 위치 파악 용이하게 함
-            result = find_recursive(board.root, [board.name])
-            if result:
-                stock, path = result
-                return stock, b_name, path
+                        # [보드이름]을 경로의 시작으로 설정하여 대략적인 위치 파악 용이하게 함
+                        path_parts = path.split("/")
+                        return s, b_name, [board.name] + path_parts
         return None
 
     def get_all_stocks_flat(self) -> list[dict]:
@@ -97,25 +92,18 @@ class BoardQueryService:
         all_stocks = []
         for b_name in boards:
             board = self.load_board(b_name)
-
-            def flatten_recursive(node: Node, current_path: list[str]):
-                stocks = []
+            for path, node in board.nodes.items():
                 for s in node.stocks:
-                    stocks.append(
+                    all_stocks.append(
                         {
                             "ticker": s.ticker,
                             "name": s.name,
                             "aliases": s.aliases,
                             "board": b_name,
                             "board_name": board.name,
-                            "path": current_path,
+                            "path": path.split("/"),
                         }
                     )
-                for n in node.nodes:
-                    stocks.extend(flatten_recursive(n, current_path + [n.name]))
-                return stocks
-
-            all_stocks.extend(flatten_recursive(board.root, []))
         return all_stocks
 
     def find_stocks_by_name(self, query: str) -> list[dict]:
@@ -124,21 +112,17 @@ class BoardQueryService:
         results = []
         for b_name in boards:
             board = self.load_board(b_name)
-
-            def search_recursive(node: Node, current_path: list[str]):
+            for path, node in board.nodes.items():
                 for s in node.stocks:
                     if s.matches(query):
+                        path_parts = path.split("/")
                         results.append(
                             {
                                 "board": b_name,
                                 "board_name": board.name,
                                 "name": s.name,
                                 "ticker": s.ticker,
-                                "path": f"[{board.name}] " + " > ".join(current_path + [s.name]),
+                                "path": f"[{board.name}] " + " > ".join(path_parts + [s.name]),
                             }
                         )
-                for n in node.nodes:
-                    search_recursive(n, current_path + [n.name])
-
-            search_recursive(board.root, [board.root.name])
         return results

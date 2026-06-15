@@ -10,9 +10,11 @@ from synapstock.domain.models import Board, Stock
 def mock_repo():
     return MagicMock()
 
+
 @pytest.fixture
 def mock_ticker_search():
     return MagicMock()
+
 
 @pytest.fixture
 def service(mock_repo, mock_ticker_search):
@@ -20,6 +22,7 @@ def service(mock_repo, mock_ticker_search):
         repository=mock_repo,
         ticker_search=mock_ticker_search
     )
+
 
 class TestBoardQueryService:
     """BoardQueryService 단위 테스트."""
@@ -74,7 +77,7 @@ class TestBoardQueryService:
         # 보드 2: Mobile (삼성전자 있음)
         board_mobile = Board(name="Mobile")
         samsung = Stock(name="삼성전자", ticker="005930")
-        board_mobile.root.stocks.append(samsung)
+        board_mobile.add_stock_to_node("Mobile", samsung)
 
         mock_repo.load.side_effect = [board_pc, board_mobile]
 
@@ -86,6 +89,8 @@ class TestBoardQueryService:
         stock, b_name, path = result
         assert stock.name == "삼성전자"
         assert b_name == "theme_mobile"
+        # path는 [보드이름] + [노드이름...] 형태
+        assert path == ["Mobile", "Mobile"]
         assert mock_repo.load.call_count == 2
 
     def test_get_all_stocks_flat(self, service, mock_repo):
@@ -93,7 +98,8 @@ class TestBoardQueryService:
         # Arrange
         mock_repo.list_boards.return_value = ["theme_a"]
         board = Board(name="반도체")
-        board.root.add_child("메모리").stocks.append(Stock(name="SK하이닉스", ticker="000660"))
+        board.add_node("반도체", "메모리")
+        board.add_stock_to_node("반도체/메모리", Stock(name="SK하이닉스", ticker="000660"))
         mock_repo.load.return_value = board
 
         # Act
@@ -102,7 +108,7 @@ class TestBoardQueryService:
         # Assert
         assert len(flat_list) == 1
         assert flat_list[0]["name"] == "SK하이닉스"
-        assert flat_list[0]["path"] == ["메모리"]
+        assert flat_list[0]["path"] == ["반도체", "메모리"]
         assert flat_list[0]["board_name"] == "반도체"
 
     def test_find_stocks_by_name_global(self, service, mock_repo):
@@ -110,7 +116,8 @@ class TestBoardQueryService:
         # Arrange
         mock_repo.list_boards.return_value = ["theme_a"]
         board = Board(name="반도체")
-        board.root.add_child("파운드리").stocks.append(Stock(name="삼성전자", ticker="005930"))
+        board.add_node("반도체", "파운드리")
+        board.add_stock_to_node("반도체/파운드리", Stock(name="삼성전자", ticker="005930"))
         mock_repo.load.return_value = board
 
         # Act
@@ -119,7 +126,7 @@ class TestBoardQueryService:
         # Assert
         assert len(results) == 1
         assert results[0]["name"] == "삼성전자"
-        assert "파운드리" in results[0]["path"]
+        assert "[반도체] 반도체 > 파운드리 > 삼성전자" in results[0]["path"]
         assert results[0]["board"] == "theme_a"
 
     def test_find_stocks_by_alias_global(self, service, mock_repo):
@@ -127,9 +134,10 @@ class TestBoardQueryService:
         # Arrange
         mock_repo.list_boards.return_value = ["theme_a"]
         board = Board(name="방산")
+        board.add_node("방산", "미사일")
         # 사명은 교체되었고 구 사명이 별칭에 있는 상황
         stock = Stock(name="LIG디펜스앤에어로스페이스", ticker="079550", aliases=["LIG넥스원"])
-        board.root.add_child("미사일").stocks.append(stock)
+        board.add_stock_to_node("방산/미사일", stock)
         mock_repo.load.return_value = board
 
         # Act: 구 사명으로 검색
@@ -139,4 +147,4 @@ class TestBoardQueryService:
         assert len(results) == 1
         assert results[0]["name"] == "LIG디펜스앤에어로스페이스"
         assert results[0]["ticker"] == "079550"
-        assert "미사일" in results[0]["path"]
+        assert "[방산] 방산 > 미사일 > LIG디펜스앤에어로스페이스" in results[0]["path"]
