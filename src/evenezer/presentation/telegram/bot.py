@@ -31,7 +31,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user_obj = update.effective_user
     user_name = user_obj.first_name if user_obj else "사용자"
     welcome_msg = (
-        f"안녕하세요, {user_name}님! 마인드맵 뉴스 관리 봇입니다.\n"
+        f"안녕하세요, {user_name}님! Evenezer 뉴스 관리 봇입니다.\n"
         "아래 메뉴 버튼을 이용하여 주식 노드를 검색하거나 뉴스를 추가해 보세요."
     )
     if update.message:
