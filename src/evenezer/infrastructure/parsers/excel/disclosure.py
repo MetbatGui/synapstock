@@ -54,12 +54,19 @@ class DisclosureParser(BaseExcelParser):
                     if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() == "종목명":
                         continue
 
+                    date_val = self.to_str(self.get_val(row, "일자", "일 시"))
+                    is_corr = str(self.get_val(row, "기재정정여부", "정정여부") or "").strip() == "Y" or "정정" in str(self.get_val(row, "기재정정여부", "정정여부") or "")
+                    
+                    disc_date = self.to_str(self.get_val(row, "유상증자공시일", "공시일", "일자"))
+                    if is_corr:
+                        # 기재정정 공시인 경우 공시일을 원공시일이 아닌 실제 정정 공시 제출일(date)로 설정합니다.
+                        disc_date = date_val
+
                     item = PaidInCapitalIncrease(
-                        date=self.to_str(self.get_val(row, "일자", "일 시")),
+                        date=date_val,
                         name=self._clean_stock_name(self.to_str(name_raw)),
-                        is_correction=str(self.get_val(row, "기재정정여부", "정정여부") or "").strip() == "Y"
-                        or "정정" in str(self.get_val(row, "기재정정여부", "정정여부") or ""),
-                        disclosure_date=self.to_str(self.get_val(row, "유상증자공시일", "공시일", "일자")),
+                        is_correction=is_corr,
+                        disclosure_date=disc_date,
                         rcp_no=self.to_str(self.get_val(row, "접수번호", "접수 번호")),
                         parent_rcp_no=(
                             self.to_str(self.get_val(row, "상위접수번호"))
@@ -123,14 +130,19 @@ class DisclosureParser(BaseExcelParser):
                     if pd.isna(name_raw) or str(name_raw).strip() == "" or str(name_raw).strip() == "종목명":
                         continue
 
+                    date_val = self.to_str(self.get_val(row, "일자", "일 시", "공시일"))
+                    is_corr = str(self.get_val(row, "기재정정여부", "정정여부") or "").strip() == "Y" or "정정" in str(self.get_val(row, "기재정정여부", "정정여부") or "")
+                    
+                    disc_date = self.to_str(self.get_val(row, "무상증자공시일", "공시일", "일자", "최초공시일"))
+                    if is_corr:
+                        # 기재정정 공시인 경우 공시일을 원공시일이 아닌 실제 정정 공시 제출일(date)로 설정합니다.
+                        disc_date = date_val
+
                     item = BonusIssue(
-                        date=self.to_str(self.get_val(row, "일자", "일 시", "공시일")),
+                        date=date_val,
                         name=self._clean_stock_name(self.to_str(name_raw)),
-                        is_correction=str(self.get_val(row, "기재정정여부", "정정여부") or "").strip() == "Y"
-                        or "정정" in str(self.get_val(row, "기재정정여부", "정정여부") or ""),
-                        disclosure_date=self.to_str(
-                            self.get_val(row, "무상증자공시일", "공시일", "일자", "최초공시일")
-                        ),
+                        is_correction=is_corr,
+                        disclosure_date=disc_date,
                         rcp_no=self.to_str(self.get_val(row, "접수번호", "접수 번호")),
                         parent_rcp_no=(
                             self.to_str(self.get_val(row, "상위접수번호"))
