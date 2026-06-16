@@ -343,6 +343,18 @@ class BoardSyncManifest(BaseModel):
     last_updated: str = ""
     boards: dict[str, BoardManifestItem] = Field(default_factory=dict)
     new_listings: dict[str, NewListing] = Field(default_factory=dict)
+    processed_event_ids: list[str] = Field(default_factory=list)
+
+    def is_event_processed(self, event_id: str) -> bool:
+        """이벤트 ID가 이미 처리 완료되었는지 확인합니다."""
+        return event_id in self.processed_event_ids
+
+    def mark_event_processed(self, event_id: str, limit: int = 200) -> None:
+        """처리 완료된 이벤트 ID를 기록하고 제한 크기를 초과하면 오래된 항목부터 제거합니다."""
+        if event_id not in self.processed_event_ids:
+            self.processed_event_ids.append(event_id)
+            if len(self.processed_event_ids) > limit:
+                self.processed_event_ids = self.processed_event_ids[-limit:]
 
     def merge_with(self, remote: BoardSyncManifest) -> BoardSyncManifest:
         """로컬과 원격의 수정 시간(Timestamp) 및 IPO 병합 비즈니스 규칙에 근거하여 두 매니페스트를 통합합니다."""
@@ -363,11 +375,16 @@ class BoardSyncManifest(BaseModel):
                 r_item = merged_listings[ticker]
                 merged_listings[ticker] = l_item.merge_with(r_item)
 
+        # 처리 완료된 이벤트 ID 목록 병합 (합집합 연산 후 최신 200개 유지)
+        merged_event_ids = list(set(self.processed_event_ids) | set(remote.processed_event_ids))
+        merged_event_ids = merged_event_ids[-200:]
+
         from datetime import datetime, UTC
         return BoardSyncManifest(
             last_updated=datetime.now(UTC).isoformat(),
             boards=merged_boards,
             new_listings=merged_listings,
+            processed_event_ids=merged_event_ids,
         )
 
     def update_board(self, board_id: str, name: str, deleted: bool = False) -> None:

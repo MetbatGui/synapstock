@@ -636,3 +636,126 @@ async def test_stock_addition_outbox_flow(temp_board_dir):
     
     # 아웃박스 상태 조회: 처리되었으므로 PENDING이 없어야 함
     assert len(outbox.load_pending()) == 0
+
+
+@pytest.mark.asyncio
+async def test_idempotent_event_consumption(temp_board_dir):
+    """동일한 이벤트 ID를 가진 이벤트가 중복 유입되어도 멱등성이 보장되는지 검증."""
+    # 0. 파일 경로 세팅
+    manifest_path = temp_board_dir / "board_sync_manifest.json"
+    
+    # 1. 초기 매니페스트 생성 (processed_event_ids 필드가 복원 가능하도록 준비)
+    initial_manifest = {
+        "last_updated": datetime.now().isoformat(),
+        "boards": {
+            "theme_IT": {"name": "IT", "last_modified": 1234567.0, "deleted": False}
+        },
+        "new_listings": {},
+        "processed_event_ids": []
+    }
+    manifest_path.write_text(json.dumps(initial_manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    
+    # 2. 타겟 섹터 보드 생성
+    theme_it_path = temp_board_dir / "theme_IT.json"
+    theme_it = {
+        "name": "IT",
+        "nodes": {
+            "IT": {"name": "IT", "depth": 0, "parent_path": None, "stocks": []},
+            "IT/인터넷": {"name": "인터넷", "depth": 1, "parent_path": "IT", "stocks": []}
+        }
+    }
+    theme_it_path.write_text(json.dumps(theme_it, indent=2, ensure_ascii=False), encoding="utf-8")
+    
+    # 3. 의존성 셋업
+    from unittest.mock import AsyncMock, MagicMock
+    from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+    from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+    from synapstock.application.events.worker import OutboxWorker
+    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
+    from synapstock.application.services.command_service import BoardCommandService
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
+    from synapstock.domain.events import StockAddedToBoard
+    
+    repo = LocalBoardRepository(root_dir=temp_board_dir)
+    drive_adapter = MagicMock()
+    drive_adapter.put_file = AsyncMock(return_value=True)
+    drive_adapter.get_file = AsyncMock(return_value=None)
+    
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
+    sync_service = BoardFileSyncService(
+        repository=repo,
+        drive_adapter=drive_adapter,
+        theme_folder_id="dummy_folder",
+        manifest_repository=manifest_repository
+    )
+    
+    outbox_dir = temp_board_dir / "outbox"
+    outbox_dir.mkdir(exist_ok=True)
+    outbox = LocalFileEventOutboxAdapter(outbox_dir)
+    
+    # 멱등성 검증이 탑재된 이벤트 핸들러 정의
+    async def handle_stock_added(ev: StockAddedToBoard):
+        manifest = sync_service.load_local_manifest()
+        if hasattr(manifest, "is_event_processed") and manifest.is_event_processed(ev.event_id):
+            return  # 중복 스킵
+            
+        sync_service.update_local_manifest(ev.board_id, deleted=False)
+        await sync_service.handle_stock_addition_trigger(
+            ev.ticker, ev.board_id, ev.parent_path.split("/")
+        )
+        await sync_service.sync_with_drive()
+        
+        # 다시 불러와서 마킹하고 저장
+        manifest = sync_service.load_local_manifest()
+        if hasattr(manifest, "mark_event_processed"):
+            manifest.mark_event_processed(ev.event_id)
+            sync_service.save_local_manifest(manifest)
+            
+    worker_handlers = {
+        "StockAddedToBoard": handle_stock_added,
+    }
+    worker = OutboxWorker(outbox=outbox, handlers=worker_handlers, base_delay=0.0)
+    
+    # 4. 첫 번째 이벤트 발생 및 처리
+    event1 = StockAddedToBoard(
+        board_id="theme_IT",
+        parent_path="theme_IT/인터넷",
+        ticker="035420",
+        stock_name="NAVER"
+    )
+    
+    # 아웃박스에 저장
+    outbox_id1 = outbox.save(event1)
+    
+    # 1차 워커 소모 실행
+    await worker.process_pending_events()
+    
+    # 1차 동기화 호출 확인
+    first_put_count = drive_adapter.put_file.call_count
+    assert first_put_count >= 1
+    
+    # 매니페스트에 이벤트 ID가 등록되었는지 검증
+    manifest = sync_service.load_local_manifest()
+    assert hasattr(manifest, "processed_event_ids")
+    assert event1.event_id in manifest.processed_event_ids
+    
+    # 5. 동일한 이벤트를 아웃박스에 PENDING 상태로 강제 재적재 (중복 유입 가정)
+    # event_id가 동일한 복제본
+    event2 = StockAddedToBoard(
+        board_id="theme_IT",
+        parent_path="theme_IT/인터넷",
+        ticker="035420",
+        stock_name="NAVER"
+    )
+    # UUID 덮어쓰기
+    object.__setattr__(event2, "event_id", event1.event_id)
+    
+    outbox_id2 = outbox.save(event2)
+    assert outbox_id2 == event1.event_id # 아웃박스 파일명도 동일해짐
+    
+    # 2차 워커 소모 실행
+    await worker.process_pending_events()
+    
+    # 6. 최종 검증: 2차 실행 시에는 멱등 필터링에 걸려 구글 드라이브 동기화 API가 중복 실행되지 않아야 함
+    # (put_file 호출 횟수가 늘어나지 않고 1차 때와 동일하게 유지되어야 함)
+    assert drive_adapter.put_file.call_count == first_put_count

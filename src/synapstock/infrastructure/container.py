@@ -180,21 +180,51 @@ class Container:
 
         # OutboxWorker 전선 조립
         async def handle_stock_added(ev: StockAddedToBoard):
+            manifest = self._board_file_sync_service.load_local_manifest()
+            if manifest.is_event_processed(ev.event_id):
+                logger.info(f"[Container] 이미 처리된 StockAddedToBoard 이벤트이므로 스킵합니다: {ev.event_id}")
+                return
+
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_stock_addition_trigger(
                 ev.ticker, ev.board_id, ev.parent_path.split("/")
             )
             await self._board_file_sync_service.sync_with_drive()
+            
+            # 처리 완료 상태 기록
+            manifest = self._board_file_sync_service.load_local_manifest()
+            manifest.mark_event_processed(ev.event_id)
+            self._board_file_sync_service.save_local_manifest(manifest)
 
         async def handle_stock_deleted(ev: StockDeletedFromBoard):
+            manifest = self._board_file_sync_service.load_local_manifest()
+            if manifest.is_event_processed(ev.event_id):
+                logger.info(f"[Container] 이미 처리된 StockDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}")
+                return
+
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
+            
+            # 처리 완료 상태 기록
+            manifest = self._board_file_sync_service.load_local_manifest()
+            manifest.mark_event_processed(ev.event_id)
+            self._board_file_sync_service.save_local_manifest(manifest)
 
         async def handle_batch_stocks_deleted(ev: BatchStocksDeletedFromBoard):
+            manifest = self._board_file_sync_service.load_local_manifest()
+            if manifest.is_event_processed(ev.event_id):
+                logger.info(f"[Container] 이미 처리된 BatchStocksDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}")
+                return
+
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
+            
+            # 처리 완료 상태 기록
+            manifest = self._board_file_sync_service.load_local_manifest()
+            manifest.mark_event_processed(ev.event_id)
+            self._board_file_sync_service.save_local_manifest(manifest)
 
         worker_handlers = {
             "StockAddedToBoard": handle_stock_added,
