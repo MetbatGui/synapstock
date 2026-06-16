@@ -2,6 +2,7 @@ import asyncio
 import os
 
 import pytest
+import pytest_asyncio
 
 from evenezer.application.services.board_file_sync_service import BoardFileSyncService
 from evenezer.domain.models import Board, Node
@@ -19,8 +20,8 @@ token_exists = os.path.exists(TOKEN_PATH)
 class TestBoardFileSyncServiceIntegration:
     """실제 구글 드라이브 샌드박스 환경을 활용한 파일 동기화 통합 테스트."""
 
-    @pytest.fixture(autouse=True)
-    def setup_sandbox(self):
+    @pytest_asyncio.fixture(autouse=True)
+    async def setup_sandbox(self):
         """테스트 시작 전에 로컬 저장소와 구글 드라이브에 테스트용 임시 환경을 조성하고, 완료 후 복구합니다."""
         # 1. 설정 로드 및 인프라 조립
         self.config = AppConfig.load()
@@ -75,7 +76,7 @@ class TestBoardFileSyncServiceIntegration:
         )
 
         # 기존 드라이브 잔재 청소를 위한 사전 안전 제거 집행
-        asyncio.run(self._cleanup_drive())
+        await self._cleanup_drive()
 
         yield  # 🌟 테스트 실행부 진행
 
@@ -92,7 +93,7 @@ class TestBoardFileSyncServiceIntegration:
             pass
 
         # 구글 드라이브 임시 파일 삭제 (1단계에서 추가한 delete_file 활용!)
-        asyncio.run(self._cleanup_drive())
+        await self._cleanup_drive()
 
     async def _cleanup_drive(self):
         """구글 드라이브 내 임시 테스트 파일들을 영구 삭제합니다."""
