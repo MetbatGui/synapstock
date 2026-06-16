@@ -180,21 +180,21 @@ class StatisticsService:
     async def get_capital_increase_data(self, force_sync: bool = False, year: str = "2026") -> list:
         """[DEPRECATED] 유상증자 데이터를 가져옵니다."""
         items = await self.disclosure_svc.get_data("capital_increase", year, force_sync=force_sync)
-        return self._enrich_tickers(items)
+        return items
 
     async def get_bonus_issue_data(self, force_sync: bool = False, year: str = "2026") -> list:
         items = await self.disclosure_svc.get_data("bonus_issue", year, force_sync=force_sync)
-        return self._enrich_tickers(items)
+        return items
 
     async def get_convertible_bond_data(self, force_sync: bool = False, year: str = "2026") -> list:
         """[DEPRECATED] 전환사채 데이터를 가져옵니다."""
         items = await self.disclosure_svc.get_data("cb", year, force_sync=force_sync)
-        return self._enrich_tickers(items)
+        return items
 
     async def get_bw_data(self, force_sync: bool = False, year: str = "2026") -> list:
         """[DEPRECATED] BW 데이터를 가져옵니다."""
         items = await self.disclosure_svc.get_data("bw", year, force_sync=force_sync)
-        return self._enrich_tickers(items)
+        return items
 
     # --- 신규 상장 (IPO) ---
     async def get_new_listing_data(self, force_sync: bool = False, year: str = "2026") -> list[NewListing]:
@@ -351,7 +351,7 @@ class StatisticsService:
 
     async def sync_capital_increase_data(self, year: str = "2026") -> list:
         items = await self.disclosure_svc.sync_data("capital_increase", year)
-        return self._enrich_tickers(items)
+        return items
 
     async def sync_recent_data(self, limit: int = 5) -> int:
         """최근 랭킹 데이터를 동기화합니다."""
