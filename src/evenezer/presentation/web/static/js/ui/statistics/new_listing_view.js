@@ -438,7 +438,7 @@ export const newListingView = {
                 if (window._jumpToBoard) {
                     window._jumpToBoard(board);
                 } else {
-                    alert(`에벤에셀 탭으로 이동하여 보드 '${board}'를 직접 선택하세요.`);
+                    alert(`마인드맵 탭으로 이동하여 보드 '${board}'를 직접 선택하세요.`);
                 }
             };
         }
@@ -459,7 +459,7 @@ export const newListingView = {
             <div class="ipo-modal">
                 <h3><i class="fas fa-th-large" style="color:#3b82f6;"></i> 신규상장주 보드 배치</h3>
                 <p style="font-size:0.85rem; color:#94a3b8; margin-bottom:15px;">
-                    종목 <strong>[${name} (${ticker})]</strong>을(를) 에벤에셀 보드에 할당합니다.
+                    종목 <strong>[${name} (${ticker})]</strong>을(를) 마인드맵 보드에 할당합니다.
                 </p>
                 
                 <div class="ipo-modal-field">
