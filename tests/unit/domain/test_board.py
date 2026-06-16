@@ -13,68 +13,64 @@ def it_board() -> Board:
     board = Board(name="IT")
 
     # 인터넷
-    internet = board.root.add_child("인터넷")
-    internet.stocks = [
-        Stock(name="NAVER", ticker="035420"),
-        Stock(name="카카오", ticker="035720"),
-        Stock(name="이스트에이드", ticker="389240"),
-    ]
+    board.add_node("IT", "인터넷")
+    board.add_stock_to_node("IT/인터넷", Stock(name="NAVER", ticker="035420"))
+    board.add_stock_to_node("IT/인터넷", Stock(name="카카오", ticker="035720"))
+    board.add_stock_to_node("IT/인터넷", Stock(name="이스트에이드", ticker="389240"))
 
     # 보안 / 정보보안
-    security = board.root.add_child("보안")
-    info_sec = security.add_child("정보보안")
+    board.add_node("IT", "보안")
+    board.add_node("IT/보안", "정보보안")
 
-    enc = info_sec.add_child("암호인증")
-    enc.stocks = [Stock(name="라온시큐어", ticker="042510"), Stock(name="아톤", ticker="158430")]
+    board.add_node("IT/보안/정보보안", "암호인증")
+    board.add_stock_to_node("IT/보안/정보보안/암호인증", Stock(name="라온시큐어", ticker="042510"))
+    board.add_stock_to_node("IT/보안/정보보안/암호인증", Stock(name="아톤", ticker="158430"))
 
-    net_sec = info_sec.add_child("네트워크")
-    net_sec.stocks = [
-        Stock(name="안랩", ticker="053800"),
-        Stock(name="윈스", ticker="136240"),
-        Stock(name="지니언스", ticker="263860"),
-    ]
+    board.add_node("IT/보안/정보보안", "네트워크")
+    board.add_stock_to_node("IT/보안/정보보안/네트워크", Stock(name="안랩", ticker="053800"))
+    board.add_stock_to_node("IT/보안/정보보안/네트워크", Stock(name="윈스", ticker="136240"))
+    board.add_stock_to_node("IT/보안/정보보안/네트워크", Stock(name="지니언스", ticker="263860"))
 
-    mgmt = info_sec.add_child("보안관리")
-    mgmt.stocks = [
-        Stock(name="이스트소프트", ticker="047560"),
-        Stock(name="샌즈랩", ticker="411080"),
-        Stock(name="모니터랩", ticker="323580"),
-    ]
+    board.add_node("IT/보안/정보보안", "보안관리")
+    board.add_stock_to_node("IT/보안/정보보안/보안관리", Stock(name="이스트소프트", ticker="047560"))
+    board.add_stock_to_node("IT/보안/정보보안/보안관리", Stock(name="샌즈랩", ticker="411080"))
+    board.add_stock_to_node("IT/보안/정보보안/보안관리", Stock(name="모니터랩", ticker="323580"))
 
-    dlp = info_sec.add_child("정보 유출 방지")
-    dlp.stocks = [
-        Stock(name="지란지교시큐리티", ticker="208140"),
-        Stock(name="케이사인", ticker="192250"),
-        Stock(name="파수", ticker="150900"),
-    ]
+    board.add_node("IT/보안/정보보안", "정보 유출 방지")
+    board.add_stock_to_node("IT/보안/정보보안/정보 유출 방지", Stock(name="지란지교시큐리티", ticker="208140"))
+    board.add_stock_to_node("IT/보안/정보보안/정보 유출 방지", Stock(name="케이사인", ticker="192250"))
+    board.add_stock_to_node("IT/보안/정보보안/정보 유출 방지", Stock(name="파수", ticker="150900"))
 
     # 보안 / 보안 서비스
-    sec_svc = security.add_child("보안 서비스")
+    board.add_node("IT/보안", "보안 서비스")
 
-    ctrl = sec_svc.add_child("관제")
-    ctrl.stocks = [Stock(name="에스원", ticker="012750"), Stock(name="이노뎁", ticker="303530")]
+    board.add_node("IT/보안/보안 서비스", "관제")
+    board.add_stock_to_node("IT/보안/보안 서비스/관제", Stock(name="에스원", ticker="012750"))
+    board.add_stock_to_node("IT/보안/보안 서비스/관제", Stock(name="이노뎁", ticker="303530"))
 
-    equip = sec_svc.add_child("장비")
-    equip.stocks = [Stock(name="아이디스", ticker="054800"), Stock(name="포커스에이치엔에스", ticker="388050")]
+    board.add_node("IT/보안/보안 서비스", "장비")
+    board.add_stock_to_node("IT/보안/보안 서비스/장비", Stock(name="아이디스", ticker="054800"))
+    board.add_stock_to_node("IT/보안/보안 서비스/장비", Stock(name="포커스에이치엔에스", ticker="388050"))
 
-    auth_node = sec_svc.add_child("인증서")
-    auth_node.stocks = [Stock(name="슈프리마", ticker="094840"), Stock(name="알체라", ticker="347860")]
+    board.add_node("IT/보안/보안 서비스", "인증서")
+    board.add_stock_to_node("IT/보안/보안 서비스/인증서", Stock(name="슈프리마", ticker="094840"))
+    board.add_stock_to_node("IT/보안/보안 서비스/인증서", Stock(name="알체라", ticker="347860"))
 
     # 소프트웨어
-    software = board.root.add_child("소프트웨어")
+    board.add_node("IT", "소프트웨어")
 
-    fin = software.add_child("금융")
-    fin.stocks = [Stock(name="더존비즈온", ticker="012510"), Stock(name="웹캐시", ticker="053580")]
+    board.add_node("IT/소프트웨어", "금융")
+    board.add_stock_to_node("IT/소프트웨어/금융", Stock(name="더존비즈온", ticker="012510"))
+    board.add_stock_to_node("IT/소프트웨어/금융", Stock(name="웹캐시", ticker="053580"))
 
-    biz = software.add_child("업무")
-    biz.stocks = [
-        Stock(name="엠로", ticker="058970"),
-        Stock(name="한글과컴퓨터", ticker="030520"),
-        Stock(name="폴라리스오피스", ticker="041020"),
-    ]
+    board.add_node("IT/소프트웨어", "업무")
+    board.add_stock_to_node("IT/소프트웨어/업무", Stock(name="엠로", ticker="058970"))
+    board.add_stock_to_node("IT/소프트웨어/업무", Stock(name="한글과컴퓨터", ticker="030520"))
+    board.add_stock_to_node("IT/소프트웨어/업무", Stock(name="폴라리스오피스", ticker="041020"))
 
-    auto = software.add_child("자동화")
-    auto.stocks = [Stock(name="링크제네시스", ticker="219480"), Stock(name="비츠로시스", ticker="054220")]
+    board.add_node("IT/소프트웨어", "자동화")
+    board.add_stock_to_node("IT/소프트웨어/자동화", Stock(name="링크제네시스", ticker="219480"))
+    board.add_stock_to_node("IT/소프트웨어/자동화", Stock(name="비츠로시스", ticker="054220"))
 
     return board
 
@@ -93,104 +89,68 @@ class TestBoard:
     def test_root_starts_empty(self):
         """root 노드는 초기에 자식 노드와 종목을 가지지 않아야 한다."""
         board = Board(name="테마보드")
-        assert board.root.nodes == []
-        assert board.root.stocks == []
+        assert "테마보드" in board.nodes
+        assert len(board.nodes) == 1
+        assert board.nodes["테마보드"].stocks == []
 
     def test_name_is_required(self):
         """name이 없으면 ValidationError가 발생해야 한다."""
         with pytest.raises(ValidationError):
             Board()  # type: ignore
 
-
     def test_board_find_node(self):
-        """보드 내에서 이름으로 노드를 검색한다.
-
-        Arrange:
-            "테마보드" 내부에 "섹터A" 노드를 생성한다.
-        Act:
-            board.find_node("섹터A")를 호출한다.
-        Assert:
-            검색 결과가 실제 섹터A 객체와 동일한지 확인한다.
-        """
+        """보드 내에서 절대 경로 또는 이름으로 노드를 검색한다."""
         board = Board(name="테마보드")
-        sector = board.root.add_child("섹터A")
+        board.add_node("테마보드", "섹터A")
 
-        found = board.find_node("섹터A")
-
-        assert found is sector
+        found = board.find_node("테마보드/섹터A")
+        assert found is not None
+        assert found.name == "섹터A"
 
     def test_board_add_node(self):
-        """특정 노드 하위에 새 노드를 안전하게 추가한다.
-
-        Arrange:
-            "인터넷" 노드를 가진 보드를 준비한다.
-        Act:
-            1. "인터넷" 아래에 "포털" 노드를 추가한다.
-            2. 동일한 "포털" 노드를 다시 추가해본다.
-        Assert:
-            노드가 정상 추가되었으며, 중복 추가 시에도 갯수가 유지되는지 확인한다.
-        """
+        """특정 노드 하위에 새 노드를 안전하게 추가한다."""
         board = Board(name="IT")
-        board.root.add_child("인터넷")
+        board.add_node("IT", "인터넷")
 
         # 1. New node
-        success = board.add_node("인터넷", "포털")
-        internet = board.find_node("인터넷")
+        success = board.add_node("IT/인터넷", "포털")
+        internet = board.find_node("IT/인터넷")
         assert success is True
-        assert len(internet.nodes) == 1
-        assert internet.nodes[0].name == "포털"
+        assert "IT/인터넷/포털" in board.nodes
 
         # 2. Duplicate
-        success_dup = board.add_node("인터넷", "포털")
+        success_dup = board.add_node("IT/인터넷", "포털")
         assert success_dup is True
-        assert len(internet.nodes) == 1
 
     def test_board_delete_node_absorption(self):
-        """노드 삭제 시 하위 요소들을 부모 노드로 흡수한다.
-
-        Arrange:
-            Root -> SectorA -> SubSector1 구조이며, SubSector1에 종목 "S1"이 있다.
-        Act:
-            SubSector1 노드를 삭제한다.
-        Assert:
-            SubSector1의 종목 "S1"이 SectorA로 이동했는지 확인한다.
-        """
+        """노드 삭제 시 하위 요소들을 부모 노드로 흡수한다."""
         board = Board(name="Root")
-        sector = board.root.add_child("SectorA")
-        sub = sector.add_child("SubSector1")
-        sub.add_stock(Stock(name="Stock1", ticker="000001"))
+        board.add_node("Root", "SectorA")
+        board.add_node("Root/SectorA", "SubSector1")
+        board.add_stock_to_node("Root/SectorA/SubSector1", Stock(name="Stock1", ticker="000001"))
 
         # Act
-        success = board.delete_node("SubSector1")
+        success = board.delete_node("Root/SectorA/SubSector1")
 
         # Assert
         assert success is True
-        assert board.find_node("SubSector1") is None
+        assert board.find_node("Root/SectorA/SubSector1") is None
+        sector = board.find_node("Root/SectorA")
         assert any(s.ticker == "000001" for s in sector.stocks)
 
     def test_board_delete_root_fails(self):
-        """루트 노드는 삭제할 수 없어야 한다.
-
-        Arrange:
-            "IT" 보드를 생성한다.
-        Act:
-            board.delete_node("IT")를 호출한다.
-        Assert:
-            삭제 결과가 False이며 루트 노드가 여전히 존재하는지 확인한다.
-        """
+        """루트 노드는 삭제할 수 없어야 한다."""
         board = Board(name="IT")
-
         success = board.delete_node("IT")
-
         assert success is False
         assert board.root is not None
         assert board.root.name == "IT"
 
     def test_board_delete_stock(self):
-        """Board 애그리게이트 루트를 통해 재귀적으로 종목을 삭제할 수 있어야 한다."""
+        """Board 애그리게이트 루트를 통해 종목을 삭제할 수 있어야 한다."""
         board = Board(name="IT")
-        internet = board.root.add_child("인터넷")
-        internet.add_stock(Stock(name="카카오", ticker="035720"))
+        board.add_node("IT", "인터넷")
+        board.add_stock_to_node("IT/인터넷", Stock(name="카카오", ticker="035720"))
 
         assert board.find_stock("035720") is not None
         
@@ -200,23 +160,24 @@ class TestBoard:
         assert board.find_stock("035720") is None
 
     def test_board_report_management(self):
-        """Board 애그리게이트 루트를 통해 재귀적으로 종목에 리포트 링크를 추가하고 삭제할 수 있어야 한다."""
+        """Board 애그리게이트 루트를 통해 종목에 리포트 링크를 추가하고 삭제할 수 있어야 한다."""
         board = Board(name="IT")
-        internet = board.root.add_child("인터넷")
+        board.add_node("IT", "인터넷")
         stock = Stock(name="카카오", ticker="035720")
-        internet.add_stock(stock)
+        board.add_stock_to_node("IT/인터넷", stock)
 
         report_path = "data/pdf/kakao_report.pdf"
 
         # 리포트 추가
         success_add = board.add_report_to_stock("035720", report_path)
         assert success_add is True
-        assert report_path in stock.reports
+        target_stock = board.find_stock("035720")
+        assert report_path in target_stock.reports
 
         # 리포트 삭제
         success_remove = board.remove_report_from_stock("035720", report_path)
         assert success_remove is True
-        assert report_path not in stock.reports
+        assert report_path not in target_stock.reports
 
 
 # ── IT 보드 트리 테스트 ───────────────────────────────────────────────────────
@@ -231,12 +192,12 @@ class TestITBoardTree:
 
     def test_top_level_nodes(self, it_board: Board):
         """root 하위에 인터넷, 보안, 소프트웨어 3개 노드가 있어야 한다."""
-        names = [n.name for n in it_board.root.nodes]
-        assert names == ["인터넷", "보안", "소프트웨어"]
+        names = sorted([n.name for n in it_board.nodes.values() if n.parent_path == "IT"])
+        assert names == sorted(["인터넷", "보안", "소프트웨어"])
 
     def test_internet_stocks(self, it_board: Board):
         """인터넷 노드에 NAVER, 카카오, 이스트에이드가 있어야 한다."""
-        internet = it_board.root.nodes[0]
+        internet = it_board.nodes["IT/인터넷"]
         tickers = [s.ticker for s in internet.stocks]
         assert "035420" in tickers  # NAVER
         assert "035720" in tickers  # 카카오
@@ -244,17 +205,16 @@ class TestITBoardTree:
 
     def test_security_subtree_depth(self, it_board: Board):
         """보안 > 정보보안 > 암호인증의 depth가 각각 1, 2, 3이어야 한다."""
-        security = it_board.root.nodes[1]
-        info_sec = security.nodes[0]          # 정보보안
-        enc = info_sec.nodes[0]               # 암호인증
+        security = it_board.nodes["IT/보안"]
+        info_sec = it_board.nodes["IT/보안/정보보안"]
+        enc = it_board.nodes["IT/보안/정보보안/암호인증"]
         assert security.depth == 1
         assert info_sec.depth == 2
         assert enc.depth == 3
 
     def test_network_security_stocks(self, it_board: Board):
         """네트워크 보안 노드에 안랩, 윈스, 지니언스가 있어야 한다."""
-        info_sec = it_board.root.nodes[1].nodes[0]   # 보안 > 정보보안
-        net_sec = info_sec.nodes[1]                   # 네트워크
+        net_sec = it_board.nodes["IT/보안/정보보안/네트워크"]
         tickers = [s.ticker for s in net_sec.stocks]
         assert "053800" in tickers  # 안랩
         assert "136240" in tickers  # 윈스
@@ -262,27 +222,17 @@ class TestITBoardTree:
 
     def test_software_subtree(self, it_board: Board):
         """소프트웨어 노드에 금융, 업무, 자동화 3개 서브 노드가 있어야 한다."""
-        software = it_board.root.nodes[2]
-        names = [n.name for n in software.nodes]
-        assert names == ["금융", "업무", "자동화"]
+        names = sorted([n.name for n in it_board.nodes.values() if n.parent_path == "IT/소프트웨어"])
+        assert names == sorted(["금융", "업무", "자동화"])
 
     def test_software_finance_stocks(self, it_board: Board):
         """소프트웨어 > 금융에 더존비즈온, 웹캐시가 있어야 한다."""
-        fin = it_board.root.nodes[2].nodes[0]
+        fin = it_board.nodes["IT/소프트웨어/금융"]
         tickers = [s.ticker for s in fin.stocks]
         assert "012510" in tickers  # 더존비즈온
         assert "053580" in tickers  # 웹캐시
 
     def test_print_full_tree(self, it_board: Board):
         """IT 보드 전체 트리를 출력한다 (pytest -s 시 확인 가능)."""
-
-        def print_tree(node: Node, indent: int = 0) -> None:
-            prefix = "  " * indent
-            print(f"{prefix}[D{node.depth}] {node.name}")
-            for stock in node.stocks:
-                print(f"{prefix}  - {stock.name} ({stock.ticker})")
-            for child in node.nodes:
-                print_tree(child, indent + 1)
-
-        print()  # 줄바꿈으로 테스트 헤더와 분리
-        print_tree(it_board.root)
+        print()
+        print(it_board)

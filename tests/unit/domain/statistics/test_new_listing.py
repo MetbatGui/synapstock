@@ -62,11 +62,10 @@ def test_new_listing_sync_domain_service():
     from synapstock.domain.statistics.domain_service import NewListingSyncDomainService
 
     # 1. 초기 상태 설정
-    root_node = Node(name="신규상장주", depth=0)
-    # 가상 보드에 구형 종목(2023년 상장)과 기존 대기 종목(2025년 상장) 적재
+    virtual_board = Board(id="virtual_신규상장주", name="신규상장주")
+    root_node = virtual_board.root
     root_node.stocks.append(Stock(name="구형종목", ticker="111111"))
     root_node.stocks.append(Stock(name="대기종목", ticker="222222"))
-    virtual_board = Board(id="virtual_신규상장주", name="신규상장주", root=root_node)
 
     # 매니페스트 설정 (구형종목 2023년 상장, 대기종목 2025년 상장)
     new_listings_meta = {

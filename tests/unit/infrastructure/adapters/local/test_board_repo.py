@@ -26,8 +26,8 @@ def fixture_repo():
 def simple_board() -> Board:
     """단순 보드 픽스처."""
     board = Board(name="테스트보드")
-    sector = board.root.add_child("섹터A")
-    sector.stocks.append(Stock(name="삼성전자", ticker="005930"))
+    board.add_node("테스트보드", "섹터A")
+    board.add_stock_to_node("테스트보드/섹터A", Stock(name="삼성전자", ticker="005930"))
     return board
 
 
@@ -47,9 +47,8 @@ class TestLocalBoardRepository:
         assert loaded.name == simple_board.name
         assert loaded.root.name == simple_board.root.name
         assert loaded.root.depth == 0
-        assert len(loaded.root.nodes) == 1
-        assert loaded.root.nodes[0].name == "섹터A"
-        assert loaded.root.nodes[0].stocks[0].ticker == "005930"
+        assert "테스트보드/섹터A" in loaded.nodes
+        assert loaded.nodes["테스트보드/섹터A"].stocks[0].ticker == "005930"
 
     def test_load_not_found(self, repo):
         """존재하지 않는 Board 로드 시 FileNotFoundError가 발생해야 한다."""
@@ -72,24 +71,23 @@ class TestLocalBoardRepository:
         board = Board(name="보드")
         repo.save(board)
 
-        board.root.add_child("새섹터")
+        board.add_node("보드", "새섹터")
         repo.save(board)
 
         loaded = repo.load("보드")
-        assert len(loaded.root.nodes) == 1
-        assert loaded.root.nodes[0].name == "새섹터"
+        assert "보드/새섹터" in loaded.nodes
 
     def test_load_deep_tree(self, repo):
         """다층 트리 구조도 정확하게 복원되어야 한다."""
         board = Board(name="딥트리")
-        child = board.root.add_child("D1")
-        grandchild = child.add_child("D2")
-        grandchild.stocks.append(Stock(name="테스트주", ticker="999999"))
+        board.add_node("딥트리", "D1")
+        board.add_node("딥트리/D1", "D2")
+        board.add_stock_to_node("딥트리/D1/D2", Stock(name="테스트주", ticker="999999"))
         repo.save(board)
 
         loaded = repo.load("딥트리")
-        assert loaded.root.nodes[0].nodes[0].depth == 2
-        assert loaded.root.nodes[0].nodes[0].stocks[0].ticker == "999999"
+        assert loaded.nodes["딥트리/D1/D2"].depth == 2
+        assert loaded.nodes["딥트리/D1/D2"].stocks[0].ticker == "999999"
 
     def test_path_traversal_protection(self, repo, simple_board):
         """허용되지 않는 외부 경로 접근 시 ValueError를 발생시켜야 한다."""
@@ -118,13 +116,13 @@ class TestFixtureBoardRepository:
     def test_it_board_top_level_nodes(self, fixture_repo):
         """IT 보드의 1depth 노드는 인터넷, 보안, 소프트웨어여야 한다."""
         board = fixture_repo.load("IT")
-        names = [n.name for n in board.root.nodes]
-        assert names == ["인터넷", "보안", "소프트웨어"]
+        names = sorted([n.name for n in board.nodes.values() if n.parent_path == "IT"])
+        assert names == sorted(["인터넷", "보안", "소프트웨어"])
 
     def test_it_board_internet_stocks(self, fixture_repo):
         """인터넷 노드에 NAVER(035420)가 포함되어 있어야 한다."""
         board = fixture_repo.load("IT")
-        internet = board.root.nodes[0]
+        internet = board.nodes["IT/인터넷"]
         tickers = [s.ticker for s in internet.stocks]
         assert "035420" in tickers
 

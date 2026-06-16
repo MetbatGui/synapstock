@@ -60,16 +60,17 @@ class TestBoardServiceIntegration:
     def test_save_and_load_roundtrip(self, query_service, command_service):
         """save 후 load하면 동일한 Board 구조가 복원되어야 한다."""
         board = Board(name="테스트보드")
-        sector = board.root.add_child("섹터A")
-        sector.stocks.append(Stock(name="삼성전자", ticker="005930"))
+        board.add_node("테스트보드", "섹터A")
+        board.add_stock_to_node("테스트보드/섹터A", Stock(name="삼성전자", ticker="005930"))
 
         # command_service를 통해 간접적으로 repo에 저장 (실제로는 repo.save() 호출)
         command_service._repository.save(board)
         loaded = query_service.load_board("테스트보드")
 
         assert loaded.name == "테스트보드"
-        assert loaded.root.nodes[0].name == "섹터A"
-        assert loaded.root.nodes[0].stocks[0].ticker == "005930"
+        sector_node = loaded.find_node("테스트보드/섹터A")
+        assert sector_node is not None
+        assert sector_node.stocks[0].ticker == "005930"
 
     def test_list_boards_after_save(self, query_service, command_service):
         """save한 Board 이름이 list_boards()에 포함되어야 한다."""
@@ -92,16 +93,15 @@ class TestBoardServiceIntegration:
 
         assert board.name == "IT"
         assert board.root.depth == 0
-        names = {n.name for n in board.root.nodes}
+        names = {n.name for n in board.nodes.values() if n.parent_path == "IT"}
         assert names == {"인터넷", "보안", "소프트웨어"}
 
     def test_load_it_deep_structure(self, fixture_query_service):
         """IT 픽스처의 depth 3 노드(네트워크)를 서비스를 통해 올바르게 복원해야 한다."""
         board = fixture_query_service.load_board("IT")
-        security = next(n for n in board.root.nodes if n.name == "보안")
-        jeongbo = next(n for n in security.nodes if n.name == "정보보안")
-        network = next(n for n in jeongbo.nodes if n.name == "네트워크")
+        network = board.find_node("IT/보안/정보보안/네트워크")
 
+        assert network is not None
         assert network.depth == 3
         tickers = {s.ticker for s in network.stocks}
         assert tickers == {"053800", "136240", "263860"}
@@ -112,12 +112,14 @@ class TestBoardServiceIntegration:
         board = query.load_board("IT")
 
         # 직접 도메인 모델 조작 후 command_service로 저장
-        internet = next(n for n in board.root.nodes if n.name == "인터넷")
+        internet = board.find_node("IT/인터넷")
+        assert internet is not None
         internet.stocks.append(Stock(name="카카오뱅크", ticker="323410"))
         command._repository.save(board)
 
         reloaded = query.load_board("IT")
-        internet_r = next(n for n in reloaded.root.nodes if n.name == "인터넷")
+        internet_r = reloaded.find_node("IT/인터넷")
+        assert internet_r is not None
         tickers = {s.ticker for s in internet_r.stocks}
         assert "323410" in tickers
         assert len(tickers) == 4
@@ -126,12 +128,14 @@ class TestBoardServiceIntegration:
         """save로 보드를 덮어쓸 때 이전 데이터(삭제된 종목)가 남아있으면 안 된다."""
         query, command = mutable_services
         board = query.load_board("IT")
-        internet = next(n for n in board.root.nodes if n.name == "인터넷")
+        internet = board.find_node("IT/인터넷")
+        assert internet is not None
         internet.stocks = [s for s in internet.stocks if s.ticker != "035420"]
         command._repository.save(board)
 
         reloaded = query.load_board("IT")
-        internet_r = next(n for n in reloaded.root.nodes if n.name == "인터넷")
+        internet_r = reloaded.find_node("IT/인터넷")
+        assert internet_r is not None
         tickers = {s.ticker for s in internet_r.stocks}
         assert "035420" not in tickers
         assert len(tickers) == 2
@@ -139,10 +143,12 @@ class TestBoardServiceIntegration:
     def test_boards_are_isolated(self, query_service, command_service):
         """서로 다른 보드는 독립적으로 저장/로드되어야 한다."""
         board_a = Board(name="보드A")
-        board_a.root.add_child("섹터X").stocks.append(Stock(name="삼성전자", ticker="005930"))
+        board_a.add_node("보드A", "섹터X")
+        board_a.add_stock_to_node("보드A/섹터X", Stock(name="삼성전자", ticker="005930"))
 
         board_b = Board(name="보드B")
-        board_b.root.add_child("섹터Y").stocks.append(Stock(name="LG전자", ticker="066570"))
+        board_b.add_node("보드B", "섹터Y")
+        board_b.add_stock_to_node("보드B/섹터Y", Stock(name="LG전자", ticker="066570"))
 
         command_service._repository.save(board_a)
         command_service._repository.save(board_b)
@@ -150,9 +156,8 @@ class TestBoardServiceIntegration:
         loaded_a = query_service.load_board("보드A")
         loaded_b = query_service.load_board("보드B")
 
-        tickers_a = {s.ticker for n in loaded_a.root.nodes for s in n.stocks}
-        tickers_b = {s.ticker for n in loaded_b.root.nodes for s in n.stocks}
+        tickers_a = {s.ticker for n in loaded_a.nodes.values() for s in n.stocks}
+        tickers_b = {s.ticker for n in loaded_b.nodes.values() for s in n.stocks}
         assert tickers_a == {"005930"}
         assert tickers_b == {"066570"}
         assert tickers_a.isdisjoint(tickers_b)
-

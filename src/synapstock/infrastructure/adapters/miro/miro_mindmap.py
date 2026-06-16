@@ -98,8 +98,6 @@ class MiroMindmapAdapter(MindmapPort):
         Raises:
             FileNotFoundError: 주어진 이름의 보드를 찾을 수 없는 경우.
         """
-        # _get_or_create_board_id와 중복을 피하기 위해 내부적으로만 사용하거나 삭제 고려
-        # 일단 기존 코드 호환을 위해 유지
         res = self.session.get(f"{self.base_url}/boards")
         res.raise_for_status()
         data = res.json()
@@ -201,15 +199,17 @@ class MiroMindmapAdapter(MindmapPort):
 
         root_id = root_candidates[0]
 
-        # 4. 도메인 객체로 파싱
+        # 4. 도메인 객체로 파싱 (플랫 맵 빌드)
         update_progress("도메인 모델로 변환 중...", 0.8)
+        nodes_dict = {}
 
-        def build_domain_node(item_id, depth) -> Node:
+        def build_domain_node(item_id: str, depth: int, parent_path: str | None = None) -> None:
             item = item_dict[item_id]
             html_content = item.get("data", {}).get("content", "")
             node_name = self._extract_text_from_html(html_content)
 
-            node = Node(name=node_name, depth=depth)
+            current_path = f"{parent_path}/{node_name}" if parent_path else node_name
+            node = Node(name=node_name, depth=depth, parent_path=parent_path, stocks=[])
 
             for child_id in adjacency.get(item_id, []):
                 child_item = item_dict[child_id]
@@ -223,11 +223,11 @@ class MiroMindmapAdapter(MindmapPort):
                     ticker = comment_match.group(1).strip()
                 else:
                     # 2. 새로운 로컬 스톡 URL 패턴 확인 (/stock/TICKER)
-                    local_match = re.search(r"/stock/([0-9]{6,k})", c_html)
+                    local_match = re.search(r"/stock/([0-9]{6,8})", c_html)
                     if local_match:
                         ticker = local_match.group(1)
                     else:
-                        # 3. Naver Finance URL 패턴에서 티커 추출 (&#61; 또는 = 대응)
+                        # 3. Naver Finance URL 패턴에서 티커 추출
                         url_match = re.search(r"code(?:&#61;|=)([0-9]{6})", c_html)
                         if url_match:
                             ticker = url_match.group(1)
@@ -235,11 +235,13 @@ class MiroMindmapAdapter(MindmapPort):
                 if ticker:
                     node.stocks.append(Stock(name=c_name, ticker=ticker))
                 else:
-                    node.nodes.append(build_domain_node(child_id, depth + 1))
-            return node
+                    build_domain_node(child_id, depth + 1, current_path)
 
-        board = Board(name=board_name)
-        board.root = build_domain_node(root_id, 0)
+            nodes_dict[current_path] = node
+
+        build_domain_node(root_id, 0, None)
+        
+        board = Board(id=board_name, name=board_name, nodes=nodes_dict)
         update_progress("로드 완료!", 1.0)
         return board
 
@@ -271,7 +273,7 @@ class MiroMindmapAdapter(MindmapPort):
             for item in items:
                 self.session.delete(f"{self.base_url}/boards/{board_id}/items/{item['id']}")
 
-        if not board.root:
+        if not board.nodes:
             update_progress("보드가 비어 있어 초기화만 수행하고 종료합니다.", 1.0)
             return
 
@@ -297,7 +299,7 @@ class MiroMindmapAdapter(MindmapPort):
 
         # 1. 가상 레이아웃 계산
         update_progress("새로운 레이아웃 계산 중...", 0.1)
-        target_layout = self._calculate_balanced_layout(board.root)
+        target_layout = self._calculate_balanced_layout(board)
 
         # 2. 현재 Miro 아이템 조회
         update_progress("현재 Miro 보드 아이템 정보 조회 중...", 0.2)
@@ -420,13 +422,13 @@ class MiroMindmapAdapter(MindmapPort):
             self.session.delete(f"{self.base_url}/boards/{board_id}/items/{m_id}")
 
         with ThreadPoolExecutor(max_workers=8) as executor:
-            list(executor.map(delete_item, to_delete))
+            executor.map(delete_item, to_delete)
 
         update_progress("연결선(Connector) 정보 갱신 중...", 0.9)
-        self._refresh_connectors(board_id, item_ids, board.root)
+        self._refresh_connectors(board_id, item_ids, board)
         update_progress("동기화 완료!", 1.0)
 
-    def _refresh_connectors(self, board_id: str, item_ids: dict, root_node: Node) -> None:
+    def _refresh_connectors(self, board_id: str, item_ids: dict, board: Board) -> None:
         """커넥터 상태를 파악하여 변경된 부분만 동기화 (차분 업데이트)."""
         # 1. 현재 커넥터 목록 조회
         current_connectors = []
@@ -456,23 +458,45 @@ class MiroMindmapAdapter(MindmapPort):
         target_conn_data = []  # list of dict for POST
         target_conns_set = set()  # for tracking
 
-        def collect_targets(p):
-            p_info = item_ids.get(id(p))
+        for path, node in board.nodes.items():
+            p_info = item_ids.get(id(node))
             if not p_info:
-                return
+                continue
             p_id = p_info["id"]
             p_x = p_info["x"]
 
-            for child in p.nodes + p.stocks:
-                c_info = item_ids.get(id(child))
+            # 2-1. 자식 노드들과의 연결선 수집
+            for c_path, child in board.nodes.items():
+                if child.parent_path == path:
+                    c_info = item_ids.get(id(child))
+                    if c_info:
+                        c_id = c_info["id"]
+                        c_x = c_info["x"]
+
+                        start_snap = "right" if c_x > p_x else "left"
+                        end_snap = "left" if c_x > p_x else "right"
+
+                        pair = (p_id, c_id)
+                        target_conns_set.add(pair)
+
+                        if pair not in conn_map:
+                            target_conn_data.append(
+                                {
+                                    "startItem": {"id": p_id, "snapTo": start_snap},
+                                    "endItem": {"id": c_id, "snapTo": end_snap},
+                                    "style": {"strokeColor": "#000000", "strokeWidth": "1.5"},
+                                }
+                            )
+
+            # 2-2. 자식 주식들과의 연결선 수집
+            for stock in node.stocks:
+                c_info = item_ids.get(id(stock))
                 if c_info:
                     c_id = c_info["id"]
                     c_x = c_info["x"]
 
-                    if c_x > p_x:
-                        start_snap, end_snap = "right", "left"
-                    else:
-                        start_snap, end_snap = "left", "right"
+                    start_snap = "right" if c_x > p_x else "left"
+                    end_snap = "left" if c_x > p_x else "right"
 
                     pair = (p_id, c_id)
                     target_conns_set.add(pair)
@@ -480,16 +504,11 @@ class MiroMindmapAdapter(MindmapPort):
                     if pair not in conn_map:
                         target_conn_data.append(
                             {
-                                "startItem": {"id": p_id, "snapTo": start_snap},
-                                "endItem": {"id": c_id, "snapTo": end_snap},
-                                "style": {"strokeColor": "#000000", "strokeWidth": "1.5"},
+                                    "startItem": {"id": p_id, "snapTo": start_snap},
+                                    "endItem": {"id": c_id, "snapTo": end_snap},
+                                    "style": {"strokeColor": "#000000", "strokeWidth": "1.5"},
                             }
                         )
-
-                if isinstance(child, Node):
-                    collect_targets(child)
-
-        collect_targets(root_node)
 
         # 3. 병렬 작업 수행 (생성 및 삭제)
         def post_conn(payload):
@@ -501,54 +520,75 @@ class MiroMindmapAdapter(MindmapPort):
         to_delete_conns = [c_id for pair, c_id in conn_map.items() if pair not in target_conns_set]
 
         with ThreadPoolExecutor(max_workers=8) as executor:
-            # 커넥터는 가볍고 개수가 많을 수 있으므로 worker 수를 조금 더 늘림
             executor.map(post_conn, target_conn_data)
             executor.map(delete_conn, to_delete_conns)
 
-    def _calculate_balanced_layout(self, root_node: Node) -> list:
+    def _calculate_balanced_layout(self, board: Board) -> list:
         """루트 노드의 자식들을 좌우로 균등 배치하고 x, y 좌표가 계산된 정보를 반환.
         Returns:
             list[tuple]: [(obj, depth, x, y, is_stock), ...]
         """
+        root_path = next((p for p, n in board.nodes.items() if n.parent_path is None), None)
+        if not root_path:
+            return []
 
-        def get_leaf_count(n):
-            if isinstance(n, Stock):
+        root_node = board.nodes[root_path]
+
+        def get_leaf_count(path: str) -> int:
+            node = board.nodes[path]
+            children = [p for p, n in board.nodes.items() if n.parent_path == path]
+            if not children and not node.stocks:
                 return 1
-            if not n.nodes and not n.stocks:
-                return 1
-            count = sum(get_leaf_count(c) for c in n.nodes)
-            count += len(n.stocks)
+            count = sum(get_leaf_count(c) for c in children)
+            count += len(node.stocks)
             return count
 
-        top_children = root_node.nodes + root_node.stocks
-        top_children.sort(key=get_leaf_count, reverse=True)
+        # 루트의 직계 자식 노드 경로들 + 루트의 직계 주식들
+        top_children_paths = [p for p, n in board.nodes.items() if n.parent_path == root_path]
+        top_children = []
+        for p in top_children_paths:
+            top_children.append((board.nodes[p], False, p))
+        for s in root_node.stocks:
+            top_children.append((s, True, s))
+
+        def get_item_leaf_count(item_tuple) -> int:
+            obj, is_stock, path_or_obj = item_tuple
+            if is_stock:
+                return 1
+            return get_leaf_count(path_or_obj)
+
+        top_children.sort(key=get_item_leaf_count, reverse=True)
         left_kids, right_kids = [], []
         left_leaves, right_leaves = 0, 0
 
-        for c in top_children:
+        for item in top_children:
+            count = get_item_leaf_count(item)
             if left_leaves <= right_leaves:
-                left_kids.append(c)
-                left_leaves += get_leaf_count(c)
+                left_kids.append(item)
+                left_leaves += count
             else:
-                right_kids.append(c)
-                right_leaves += get_leaf_count(c)
+                right_kids.append(item)
+                right_leaves += count
 
-        def layout_subtree(nodes, direction_x):
-
-            # 1. 먼저 Y 좌표와 계층 구조를 계산 (traverse)
-            # 여기서는 X 좌표를 depth 기반의 '기본 X'로 임시 저장
-            node_data_list: list[dict[str, Any]] = []  # (node, depth, children_count, temp_y, temp_x, parent_idx)
-
+        def layout_subtree(top_items, direction_x):
+            node_data_list: list[dict[str, Any]] = []
             global_y = 0
 
-            def calculate_y(node_obj, depth, parent_idx=-1):
+            def calculate_y(item_tuple, depth, parent_idx=-1):
                 nonlocal global_y
-                is_stk = isinstance(node_obj, Stock)
-                children = [] if is_stk else (node_obj.nodes + node_obj.stocks)
-
+                obj, is_stock, path_or_obj = item_tuple
+                
                 my_idx = len(node_data_list)
+                children = []
+                if not is_stock:
+                    child_paths = [p for p, n in board.nodes.items() if n.parent_path == path_or_obj]
+                    for c_path in child_paths:
+                        children.append((board.nodes[c_path], False, c_path))
+                    for s in obj.stocks:
+                        children.append((s, True, s))
+
                 node_data_list.append(
-                    {"obj": node_obj, "depth": depth, "is_stk": is_stk, "parent_idx": parent_idx, "children": children}
+                    {"obj": obj, "depth": depth, "is_stk": is_stock, "parent_idx": parent_idx, "children": children}
                 )
 
                 if not children:
@@ -557,31 +597,29 @@ class MiroMindmapAdapter(MindmapPort):
                 else:
                     child_ys = []
                     for child in children:
-                        cy = calculate_y(child, depth + 1, my_idx)
-                        child_ys.append(cy)
+                         cy = calculate_y(child, depth + 1, my_idx)
+                         child_ys.append(cy)
                     my_y = sum(child_ys) / len(child_ys)
-                    # 하위 뭉치가 끝날 때 그룹 간 구분을 위해 추가 여백 부여
-                    global_y += 40
+                    global_y += 40  # 하위 뭉치 간 간격
 
                 node_data_list[my_idx]["y"] = my_y
                 return my_y
 
-            for n in nodes:
-                calculate_y(n, 1, -1)
-                global_y += 100  # 루트 직계 자식 간의 간격 확대
+            for item in top_items:
+                calculate_y(item, 1, -1)
+                global_y += 100
 
             if not node_data_list:
                 return []
 
-            # 2. Y축 중앙 정렬
+            # Y축 정렬
             min_y = min(nd["y"] for nd in node_data_list)
             max_y = max(nd["y"] for nd in node_data_list)
             center_y = (min_y + max_y) / 2
             for nd in node_data_list:
                 nd["y"] -= center_y
 
-            # 3. 재귀적으로 X 좌표 계산 (Branching/Fan-out)
-            # |child_x| > |parent_x| 보장 및 '강력한 역부채꼴(Aggressive Concave)' 적용
+            # X축 볼록 정렬
             def calculate_x_convex(parent_idx, px):
                 siblings_indices = [i for i, nd in enumerate(node_data_list) if nd["parent_idx"] == parent_idx]
                 if not siblings_indices:
@@ -597,25 +635,19 @@ class MiroMindmapAdapter(MindmapPort):
                     nd = node_data_list[idx]
                     cur_y = nd["y"]
 
-                    # 다시 중앙이 돌출되는 볼록한 부채꼴(Convex)로 수정 (간격 넓히고 곡률 완화)
                     base_dx = 250 * direction_x
-
                     protrusion_dx = 0
                     if y_range > 0:
-                        norm_dist = abs(cur_y - y_center) / (y_range / 2 if y_range > 0 else 1)
-                        # 아이템이 많아질수록(y_range가 커질수록) 곡률 가중치를 동적으로 높여 평평해지는 현상 방지
-                        # 기본 200px에서 시작하여 y_range의 15%를 가산 (최대 600px까지 확장)
+                        norm_dist = abs(cur_y - y_center) / (y_range / 2)
                         curve_weight = 200 + min(400, y_range * 0.15)
                         protrusion_dx = (1 - (norm_dist**2)) * curve_weight * direction_x
 
                     my_x = px + base_dx + protrusion_dx
                     nd["x"] = my_x
-
                     calculate_x_convex(idx, my_x)
 
             calculate_x_convex(-1, 0)
 
-            # 최종 레이아웃 결과로 변환
             return [(nd["obj"], nd["depth"], nd["x"], nd["y"], nd["is_stk"]) for nd in node_data_list]
 
         left_layout = layout_subtree(left_kids, -1)
@@ -624,6 +656,6 @@ class MiroMindmapAdapter(MindmapPort):
         all_layout: list[Any] = []
         all_layout.extend(left_layout)
         all_layout.extend(right_layout)
-        all_layout.append((root_node, 0, 0, 0, False))  # Root 노드
+        all_layout.append((root_node, 0, 0, 0, False))
 
         return all_layout
