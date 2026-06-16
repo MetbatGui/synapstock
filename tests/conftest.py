@@ -104,10 +104,13 @@ def integration_test_env():
     # 백그라운드 스레드 기동을 패치하여 테스트 프로세스에서의 리소스 충돌(RuntimeError)을 방지합니다.
     from unittest.mock import patch
     from synapstock.infrastructure.container import Container
+    from synapstock.application.events.worker import OutboxWorker
     
     with patch.object(Container, "sync_financial_statements_from_drive", return_value=None), \
          patch.object(Container, "sync_boards_from_drive_in_background", return_value=None), \
-         patch.object(Container, "sync_stock_splits_from_drive_in_background", return_value=None):
+         patch.object(Container, "sync_stock_splits_from_drive_in_background", return_value=None), \
+         patch.object(Container, "sync_heatmap_from_drive_in_background", return_value=None), \
+         patch.object(OutboxWorker, "start", return_value=None):
         container.__init__()
 
     # 4-2. dependencies 및 각 라우터 모듈 내의 전역 싱글톤 변수들을 새로운 컨테이너 인스턴스로 교체
@@ -172,9 +175,12 @@ def integration_test_env():
     shutil.rmtree(temp_dir, ignore_errors=True)
     
     # 7. 컨테이너 원상 복구 (백그라운드 스레드는 패치하여 초기화)
+    from synapstock.application.events.worker import OutboxWorker
     with patch.object(Container, "sync_financial_statements_from_drive", return_value=None), \
          patch.object(Container, "sync_boards_from_drive_in_background", return_value=None), \
-         patch.object(Container, "sync_stock_splits_from_drive_in_background", return_value=None):
+         patch.object(Container, "sync_stock_splits_from_drive_in_background", return_value=None), \
+         patch.object(Container, "sync_heatmap_from_drive_in_background", return_value=None), \
+         patch.object(OutboxWorker, "start", return_value=None):
         container.__init__()
 
     # 7-2. 컨테이너 원상 복구 후 모듈 레퍼런스 복구

@@ -28,9 +28,16 @@ class OutboxWorker:
     def start(self) -> None:
         """백그라운드 이벤트 처리 데몬 루프를 시작합니다."""
         if not self._running:
-            self._running = True
-            self._task = asyncio.create_task(self._run_loop())
-            logger.info("[OutboxWorker] 백그라운드 폴링 데몬이 시작되었습니다.")
+            try:
+                loop = asyncio.get_running_loop()
+                self._running = True
+                self._task = loop.create_task(self._run_loop())
+                logger.info("[OutboxWorker] 백그라운드 폴링 데몬이 시작되었습니다.")
+            except RuntimeError:
+                logger.warning(
+                    "[OutboxWorker] 실행 중인 asyncio 이벤트 루프가 없어 백그라운드 데몬을 시작하지 못했습니다. "
+                    "테스트 또는 동기식 레거시 동작 중일 수 있습니다."
+                )
 
     def stop(self) -> None:
         """백그라운드 이벤트 처리 데몬 루프를 종료합니다."""

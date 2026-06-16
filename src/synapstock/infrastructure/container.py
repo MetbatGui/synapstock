@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+logger = logging.getLogger(__name__)
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -36,6 +37,8 @@ from synapstock.infrastructure.adapters.google.google_drive_adapter import (
 from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
 from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+from synapstock.application.events.worker import OutboxWorker
 from synapstock.domain.events import (
     BoardCreated,
     BoardDeleted,
@@ -64,10 +67,8 @@ from synapstock.infrastructure.adapters.scraper.httpx_scraper import (
 from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
-from synapstock.infrastructure.config import AppConfig
 from synapstock.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
-
-logger = logging.getLogger(__name__)
+from synapstock.infrastructure.config import AppConfig
 
 
 class Container:
@@ -92,10 +93,12 @@ class Container:
         self.config.stock_split_dir.mkdir(parents=True, exist_ok=True)
         self.config.news_dir.mkdir(parents=True, exist_ok=True)
         self.config.heatmap_dir.mkdir(parents=True, exist_ok=True)
+        self.config.outbox_dir.mkdir(parents=True, exist_ok=True)
 
 
         # 3. 인프라 어댑터 싱글톤
         self._event_bus = InMemoryEventBusAdapter()
+        self._outbox = LocalFileEventOutboxAdapter(self.config.outbox_dir)
         self._repo = LocalBoardRepository(self.config.board_dir)
         self._board_sync_manifest_repo = LocalBoardSyncManifestRepository(
             self.config.board_dir / "board_sync_manifest.json"
@@ -152,7 +155,7 @@ class Container:
             event_bus=self._event_bus
         )
 
-        # 도메인 이벤트 핸들러 바인딩
+        # 도메인 이벤트 핸들러 바인딩 (동기 매니페스트 업데이트 즉시 실행)
         self._event_bus.subscribe(
             BoardCreated,
             lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
@@ -170,6 +173,12 @@ class Container:
             lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
         )
 
+        # 무거운 비동기 동기화 이벤트는 아웃박스에 PENDING 상태로 적재
+        self._event_bus.subscribe(StockAddedToBoard, lambda ev: self._outbox.save(ev))
+        self._event_bus.subscribe(StockDeletedFromBoard, lambda ev: self._outbox.save(ev))
+        self._event_bus.subscribe(BatchStocksDeletedFromBoard, lambda ev: self._outbox.save(ev))
+
+        # OutboxWorker 전선 조립
         async def handle_stock_added(ev: StockAddedToBoard):
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_stock_addition_trigger(
@@ -177,21 +186,22 @@ class Container:
             )
             await self._board_file_sync_service.sync_with_drive()
 
-        self._event_bus.subscribe(StockAddedToBoard, handle_stock_added)
-
         async def handle_stock_deleted(ev: StockDeletedFromBoard):
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
-
-        self._event_bus.subscribe(StockDeletedFromBoard, handle_stock_deleted)
 
         async def handle_batch_stocks_deleted(ev: BatchStocksDeletedFromBoard):
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
 
-        self._event_bus.subscribe(BatchStocksDeletedFromBoard, handle_batch_stocks_deleted)
+        worker_handlers = {
+            "StockAddedToBoard": handle_stock_added,
+            "StockDeletedFromBoard": handle_stock_deleted,
+            "BatchStocksDeletedFromBoard": handle_batch_stocks_deleted,
+        }
+        self._outbox_worker = OutboxWorker(outbox=self._outbox, handlers=worker_handlers)
 
         from synapstock.application.services.news_service import NewsService
 
@@ -246,6 +256,7 @@ class Container:
         self.sync_boards_from_drive_in_background()
         self.sync_stock_splits_from_drive_in_background()
         self.sync_heatmap_from_drive_in_background()
+        self._outbox_worker.start()
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
@@ -553,6 +564,10 @@ class Container:
     @property
     def board_file_sync_service(self) -> BoardFileSyncService:
         return self._board_file_sync_service
+
+    @property
+    def outbox_worker(self) -> OutboxWorker:
+        return self._outbox_worker
 
 
 # 전역 컨테이너 인스턴스 생성
