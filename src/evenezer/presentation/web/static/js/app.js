@@ -1,5 +1,5 @@
 /**
- * @fileoverview SynapStock 프론트엔드 진입점.
+ * @fileoverview Evenezer 프론트엔드 진입점.
  * @module app
  */
 import { addLogEntry, initTabs, switchTab, initHistoryState } from './ui/tabs.js';
