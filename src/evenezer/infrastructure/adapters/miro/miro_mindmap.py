@@ -428,9 +428,8 @@ class MiroMindmapAdapter(MindmapPort):
         self._refresh_connectors(board_id, item_ids, board)
         update_progress("동기화 완료!", 1.0)
 
-    def _refresh_connectors(self, board_id: str, item_ids: dict, board: Board) -> None:
-        """커넥터 상태를 파악하여 변경된 부분만 동기화 (차분 업데이트)."""
-        # 1. 현재 커넥터 목록 조회
+    def _get_current_connectors(self, board_id: str) -> list[dict]:
+        """현재 Miro 보드에 생성된 모든 커넥션 정보를 조회합니다."""
         current_connectors = []
         cursor = ""
         while True:
@@ -445,18 +444,20 @@ class MiroMindmapAdapter(MindmapPort):
             cursor = data.get("cursor")
             if not cursor:
                 break
+        return current_connectors
 
-        # (startItem_id, endItem_id) -> connector_id 맵 구성
-        conn_map = {}
-        for c in current_connectors:
-            s_id = c.get("startItem", {}).get("id")
-            e_id = c.get("endItem", {}).get("id")
-            if s_id and e_id:
-                conn_map[(s_id, e_id)] = c["id"]
+    def _determine_connector_snap(self, start_x: float, end_x: float) -> tuple[str, str]:
+        """부모와 자식 간의 x좌표 위치 관계에 따라 커넥션 스냅 지점을 결정합니다."""
+        start_snap = "right" if end_x > start_x else "left"
+        end_snap = "left" if end_x > start_x else "right"
+        return start_snap, end_snap
 
-        # 2. 목표 커넥터 계산
-        target_conn_data = []  # list of dict for POST
-        target_conns_set = set()  # for tracking
+    def _build_target_connectors(
+        self, board: Board, item_ids: dict, conn_map: dict
+    ) -> tuple[list[dict], set[tuple[str, str]]]:
+        """도메인 데이터 구조를 분석하여 Miro에 추가해야 할 신규 커넥터 정보와 현재 유효한 커넥터 쌍 세트를 계산합니다."""
+        target_conn_data = []
+        target_conns_set = set()
 
         for path, node in board.nodes.items():
             p_info = item_ids.get(id(node))
@@ -465,7 +466,7 @@ class MiroMindmapAdapter(MindmapPort):
             p_id = p_info["id"]
             p_x = p_info["x"]
 
-            # 2-1. 자식 노드들과의 연결선 수집
+            # 1. 자식 노드들과의 연결 계산
             for c_path, child in board.nodes.items():
                 if child.parent_path == path:
                     c_info = item_ids.get(id(child))
@@ -473,9 +474,7 @@ class MiroMindmapAdapter(MindmapPort):
                         c_id = c_info["id"]
                         c_x = c_info["x"]
 
-                        start_snap = "right" if c_x > p_x else "left"
-                        end_snap = "left" if c_x > p_x else "right"
-
+                        start_snap, end_snap = self._determine_connector_snap(p_x, c_x)
                         pair = (p_id, c_id)
                         target_conns_set.add(pair)
 
@@ -488,40 +487,60 @@ class MiroMindmapAdapter(MindmapPort):
                                 }
                             )
 
-            # 2-2. 자식 주식들과의 연결선 수집
+            # 2. 자식 주식들과의 연결 계산
             for stock in node.stocks:
                 c_info = item_ids.get(id(stock))
                 if c_info:
                     c_id = c_info["id"]
                     c_x = c_info["x"]
 
-                    start_snap = "right" if c_x > p_x else "left"
-                    end_snap = "left" if c_x > p_x else "right"
-
+                    start_snap, end_snap = self._determine_connector_snap(p_x, c_x)
                     pair = (p_id, c_id)
                     target_conns_set.add(pair)
 
                     if pair not in conn_map:
                         target_conn_data.append(
                             {
-                                    "startItem": {"id": p_id, "snapTo": start_snap},
-                                    "endItem": {"id": c_id, "snapTo": end_snap},
-                                    "style": {"strokeColor": "#000000", "strokeWidth": "1.5"},
+                                "startItem": {"id": p_id, "snapTo": start_snap},
+                                "endItem": {"id": c_id, "snapTo": end_snap},
+                                "style": {"strokeColor": "#000000", "strokeWidth": "1.5"},
                             }
                         )
 
-        # 3. 병렬 작업 수행 (생성 및 삭제)
+        return target_conn_data, target_conns_set
+
+    def _execute_connector_sync(self, board_id: str, create_targets: list[dict], delete_targets: list[str]) -> None:
+        """병렬 스레드풀을 활용해 커넥터의 대량 추가 및 삭제를 처리합니다."""
         def post_conn(payload):
             self.session.post(f"{self.base_url}/boards/{board_id}/connectors", json=payload)
 
         def delete_conn(c_id):
             self.session.delete(f"{self.base_url}/boards/{board_id}/connectors/{c_id}")
 
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            executor.map(post_conn, create_targets)
+            executor.map(delete_conn, delete_targets)
+
+    def _refresh_connectors(self, board_id: str, item_ids: dict, board: Board) -> None:
+        """커넥터 상태를 파악하여 변경된 부분만 동기화 (차분 업데이트)."""
+        current_connectors = self._get_current_connectors(board_id)
+
+        # (startItem_id, endItem_id) -> connector_id 맵 구성
+        conn_map = {}
+        for c in current_connectors:
+            s_id = c.get("startItem", {}).get("id")
+            e_id = c.get("endItem", {}).get("id")
+            if s_id and e_id:
+                conn_map[(s_id, e_id)] = c["id"]
+
+        # 목표 커넥터 및 유효 커넥션 연산
+        target_conn_data, target_conns_set = self._build_target_connectors(board, item_ids, conn_map)
+
+        # 삭제 대상 커넥션 ID 목록 계산
         to_delete_conns = [c_id for pair, c_id in conn_map.items() if pair not in target_conns_set]
 
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(post_conn, target_conn_data)
-            executor.map(delete_conn, to_delete_conns)
+        # 병렬 동기화 실행
+        self._execute_connector_sync(board_id, target_conn_data, to_delete_conns)
 
     def _calculate_balanced_layout(self, board: Board) -> list:
         """루트 노드의 자식들을 좌우로 균등 배치하고 x, y 좌표가 계산된 정보를 반환.
