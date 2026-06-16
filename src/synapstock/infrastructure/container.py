@@ -35,6 +35,16 @@ from synapstock.infrastructure.adapters.google.google_drive_adapter import (
 )
 from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
+from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+from synapstock.domain.events import (
+    BoardCreated,
+    BoardDeleted,
+    NodeAdded,
+    NodeDeleted,
+    StockAddedToBoard,
+    StockDeletedFromBoard,
+    BatchStocksDeletedFromBoard,
+)
 
 from synapstock.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
@@ -85,6 +95,7 @@ class Container:
 
 
         # 3. 인프라 어댑터 싱글톤
+        self._event_bus = InMemoryEventBusAdapter()
         self._repo = LocalBoardRepository(self.config.board_dir)
         self._board_sync_manifest_repo = LocalBoardSyncManifestRepository(
             self.config.board_dir / "board_sync_manifest.json"
@@ -138,8 +149,49 @@ class Container:
         )
         self._command_service = BoardCommandService(
             repository=self._repo,
-            sync_service=self._board_file_sync_service
+            event_bus=self._event_bus
         )
+
+        # 도메인 이벤트 핸들러 바인딩
+        self._event_bus.subscribe(
+            BoardCreated,
+            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+        )
+        self._event_bus.subscribe(
+            BoardDeleted,
+            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=True)
+        )
+        self._event_bus.subscribe(
+            NodeAdded,
+            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+        )
+        self._event_bus.subscribe(
+            NodeDeleted,
+            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+        )
+
+        async def handle_stock_added(ev: StockAddedToBoard):
+            self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+            await self._board_file_sync_service.handle_stock_addition_trigger(
+                ev.ticker, ev.board_id, ev.parent_path.split("/")
+            )
+            await self._board_file_sync_service.sync_with_drive()
+
+        self._event_bus.subscribe(StockAddedToBoard, handle_stock_added)
+
+        async def handle_stock_deleted(ev: StockDeletedFromBoard):
+            self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+            await self._board_file_sync_service.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
+            await self._board_file_sync_service.sync_with_drive()
+
+        self._event_bus.subscribe(StockDeletedFromBoard, handle_stock_deleted)
+
+        async def handle_batch_stocks_deleted(ev: BatchStocksDeletedFromBoard):
+            self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+            await self._board_file_sync_service.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
+            await self._board_file_sync_service.sync_with_drive()
+
+        self._event_bus.subscribe(BatchStocksDeletedFromBoard, handle_batch_stocks_deleted)
 
         from synapstock.application.services.news_service import NewsService
 
@@ -441,6 +493,10 @@ class Container:
             logger.info("[Container] 로컬 재무제표 파일이 최신 상태입니다. 동기화를 건너뜁니다.")
 
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
+
+    @property
+    def event_bus(self) -> InMemoryEventBusAdapter:
+        return self._event_bus
 
     @property
     def query_service(self) -> BoardQueryService:

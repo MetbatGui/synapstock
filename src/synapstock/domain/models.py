@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from synapstock.domain.statistics.models import NewListing
-
+from synapstock.domain.events import DomainEvent, NodeAdded, NodeDeleted, StockAddedToBoard, StockDeletedFromBoard
 
 
 class Stock(BaseModel):
@@ -102,6 +102,13 @@ class Board(BaseModel):
     id: str | None = None  # 파일명 및 고유 식별자
     name: str  # 표시 이름
     nodes: dict[str, Node] = Field(default_factory=dict)
+    _events: list[DomainEvent] = PrivateAttr(default_factory=list)
+
+    def pull_events(self) -> list[DomainEvent]:
+        """수집된 도메인 이벤트를 반환하고 버퍼를 비웁니다."""
+        events = list(self._events)
+        self._events.clear()
+        return events
 
     @property
     def root(self) -> Node:
@@ -158,6 +165,7 @@ class Board(BaseModel):
             depth=parent.depth + 1,
             parent_path=parent_name
         )
+        self._events.append(NodeAdded(board_id=self.id or self.name, parent_path=parent_name, node_name=node_name))
         return True
 
     def add_stock_to_node(self, parent_name: str, stock: Stock) -> bool:
@@ -165,7 +173,15 @@ class Board(BaseModel):
         parent = self.find_node(parent_name)
         if not parent:
             return False
-        return parent.add_stock(stock)
+        if parent.add_stock(stock):
+            self._events.append(StockAddedToBoard(
+                board_id=self.id or self.name,
+                parent_path=parent_name,
+                ticker=stock.ticker,
+                stock_name=stock.name
+            ))
+            return True
+        return False
 
     def delete_node(self, node_name: str) -> bool:
         """노드를 삭제하고 하위 요소를 부모로 흡수한다. (루트 제외)"""
@@ -209,6 +225,7 @@ class Board(BaseModel):
 
         # 3. 본 노드 제거
         self.nodes.pop(node_name, None)
+        self._events.append(NodeDeleted(board_id=self.id or self.name, node_path=node_name))
         return True
 
     def delete_stock(self, ticker: str) -> bool:
@@ -217,6 +234,8 @@ class Board(BaseModel):
         for node in self.nodes.values():
             if node.remove_stock(ticker):
                 deleted = True
+        if deleted:
+            self._events.append(StockDeletedFromBoard(board_id=self.id or self.name, ticker=ticker))
         return deleted
 
     def add_report_to_stock(self, ticker: str, report_path: str) -> bool:
