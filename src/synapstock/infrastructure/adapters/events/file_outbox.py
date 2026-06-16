@@ -19,7 +19,9 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
 
     def _serialize_event(self, event: Any) -> dict:
         """이벤트를 JSON 직렬화 가능한 딕셔너리로 변환합니다."""
-        if hasattr(event, "model_dump"):
+        if hasattr(event, "to_dict"):
+            return event.to_dict()
+        elif hasattr(event, "model_dump"):
             return {
                 "event_class": type(event).__name__,
                 "data": event.model_dump()
@@ -35,8 +37,13 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
             raise TypeError(f"직렬화할 수 없는 이벤트 타입입니다: {type(event)}")
 
     def save(self, event: Any) -> str:
-        outbox_id = f"{int(time.time())}_{uuid.uuid4().hex}"
         event_dict = self._serialize_event(event)
+        
+        # DomainEvent 인스턴스에 event_id가 있으면 이를 outbox_id로 사용하고, 
+        # 없을 경우 하위 호환성을 위해 새로 생성합니다.
+        outbox_id = getattr(event, "event_id", None) or event_dict.get("event_id")
+        if not outbox_id:
+            outbox_id = f"{int(time.time())}_{uuid.uuid4().hex}"
         
         payload = {
             "id": outbox_id,
@@ -63,8 +70,8 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
                 except Exception:
                     # 손상된 파일 등의 경우 건너뜀
                     pass
-        # 생성 시간순으로 정렬 (id 접두사 타임스탬프 기준으로 정렬 가능)
-        pending_list.sort(key=lambda x: x.get("id", ""))
+        # 생성 시간순으로 정렬
+        pending_list.sort(key=lambda x: x.get("created_at", ""))
         return pending_list
 
     def complete(self, outbox_id: str) -> None:
