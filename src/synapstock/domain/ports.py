@@ -312,4 +312,9 @@ class EventBusPort(ABC):
         """이벤트를 발행하여 등록된 핸들러들을 실행합니다."""
         pass
 
+    @abstractmethod
+    async def publish_async(self, event: Any) -> None:
+        """이벤트를 비동기적으로 발행하고 모든 핸들러의 실행 완료를 대기합니다."""
+        pass
+
 
