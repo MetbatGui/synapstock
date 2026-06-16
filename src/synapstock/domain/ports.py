@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from typing import Any, Type
 
 from synapstock.domain.models import Board, ScrapedNews, BoardSyncManifest
 from synapstock.domain.news.models import NewsBatch
@@ -296,5 +297,19 @@ class BoardSyncManifestRepositoryPort(ABC):
     @abstractmethod
     def save(self, manifest: BoardSyncManifest) -> None:
         """매니페스트 정보를 영속성 저장소에 저장합니다."""
+
+
+class EventBusPort(ABC):
+    """이벤트 발행 및 구독을 담당하는 추상 포트."""
+
+    @abstractmethod
+    def subscribe(self, event_type: Type[Any], handler: Callable[..., Any]) -> None:
+        """이벤트 타입에 해당하는 핸들러를 등록합니다."""
+        pass
+
+    @abstractmethod
+    def publish(self, event: Any) -> None:
+        """이벤트를 발행하여 등록된 핸들러들을 실행합니다."""
+        pass
 
 
