@@ -77,19 +77,12 @@ class OutboxWorker:
             return True
 
     def _restore_event(self, event_dict: dict) -> Any:
-        event_class_name = event_dict.get("event_class")
-        event_data = event_dict.get("data", {})
-        if not event_class_name:
-            return event_dict
-
         try:
-            from synapstock.domain import events
-            event_class = getattr(events, event_class_name, None)
-            if event_class:
-                return event_class(**event_data)
-        except Exception:
-            pass
-        return event_dict
+            from synapstock.domain.events import DomainEvent
+            return DomainEvent.from_dict(event_dict)
+        except Exception as e:
+            logger.warning(f"[OutboxWorker] 이벤트 복원 실패 (from_dict): {e}. 원본 딕셔너리를 사용합니다.")
+            return event_dict
 
     async def process_pending_events(self) -> None:
         """PENDING 상태의 이벤트를 순차 로드하여 각각에 연결된 핸들러로 라우팅합니다."""

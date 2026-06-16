@@ -1,12 +1,14 @@
 import pytest
 import json
 from pathlib import Path
+from dataclasses import dataclass
 from synapstock.domain.ports import EventOutboxPort
 from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+from synapstock.domain.events import DomainEvent
 
-class DummyEvent:
-    def __init__(self, value: str):
-        self.value = value
+@dataclass(frozen=True)
+class DummyEvent(DomainEvent):
+    value: str
 
 @pytest.fixture
 def temp_outbox_dir(tmp_path):
@@ -25,9 +27,9 @@ def test_save_and_load_pending(temp_outbox_dir):
     """이벤트 저장 후 PENDING 목록 조회가 정상적인지 검증."""
     adapter = LocalFileEventOutboxAdapter(temp_outbox_dir)
     
-    event_data = {"event_type": "DummyEvent", "data": {"value": "hello_outbox"}}
+    event = DummyEvent(value="hello_outbox")
     
-    outbox_id = adapter.save(event_data)
+    outbox_id = adapter.save(event)
     assert outbox_id is not None
     assert (temp_outbox_dir / f"{outbox_id}.json").exists()
     
@@ -36,6 +38,7 @@ def test_save_and_load_pending(temp_outbox_dir):
     assert len(pending) == 1
     assert pending[0]["id"] == outbox_id
     assert pending[0]["event"]["data"]["value"] == "hello_outbox"
+    assert pending[0]["event"]["event_class"] == "DummyEvent"
     assert pending[0]["status"] == "PENDING"
     assert pending[0]["retry_count"] == 0
 
@@ -43,9 +46,9 @@ def test_save_and_load_pending(temp_outbox_dir):
 def test_complete_moves_to_archive(temp_outbox_dir):
     """완료 처리 시 이벤트 파일이 archive 폴더로 성공적으로 이동하는지 검증."""
     adapter = LocalFileEventOutboxAdapter(temp_outbox_dir)
-    event_data = {"event_type": "DummyEvent", "data": {"value": "complete_test"}}
+    event = DummyEvent(value="complete_test")
     
-    outbox_id = adapter.save(event_data)
+    outbox_id = adapter.save(event)
     adapter.complete(outbox_id)
     
     # 원래 PENDING 파일은 지워지고
@@ -65,9 +68,9 @@ def test_complete_moves_to_archive(temp_outbox_dir):
 def test_fail_updates_retry_info(temp_outbox_dir):
     """실패 처리 시 재시도 횟수 및 에러 로그가 파일에 갱신되는지 검증."""
     adapter = LocalFileEventOutboxAdapter(temp_outbox_dir)
-    event_data = {"event_type": "DummyEvent", "data": {"value": "fail_test"}}
+    event = DummyEvent(value="fail_test")
     
-    outbox_id = adapter.save(event_data)
+    outbox_id = adapter.save(event)
     
     # 1차 실패
     adapter.fail(outbox_id, "Connection Timeout")
