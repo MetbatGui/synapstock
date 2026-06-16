@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from synapstock.application.services.sync_service import BoardSyncService
-from synapstock.domain.models import Board, Stock
+from evenezer.application.services.sync_service import BoardSyncService
+from evenezer.domain.models import Board, Stock
 
 
 @pytest.fixture

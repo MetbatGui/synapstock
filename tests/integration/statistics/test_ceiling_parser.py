@@ -1,8 +1,8 @@
 import pytest
 
-from synapstock.domain.statistics.models import CeilingAnalysisReport
-from synapstock.infrastructure.container import container
-from synapstock.infrastructure.parsers.excel import CeilingParser
+from evenezer.domain.statistics.models import CeilingAnalysisReport
+from evenezer.infrastructure.container import container
+from evenezer.infrastructure.parsers.excel import CeilingParser
 
 
 @pytest.mark.asyncio

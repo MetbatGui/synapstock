@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from synapstock.domain.statistics.models import MarketType, SupplySubject
-from synapstock.infrastructure.parsers.excel import SupplyDemandParser
+from evenezer.domain.statistics.models import MarketType, SupplySubject
+from evenezer.infrastructure.parsers.excel import SupplyDemandParser
 
 
 @pytest.mark.asyncio
@@ -99,9 +99,9 @@ async def test_parse_real_monthly_cumulative():
 
 async def test_statistics_service_caching(tmp_path):
     """StatisticsService의 저장소 연독 및 캐싱 기능 테스트."""
-    from synapstock.application.services.statistics_service import StatisticsService
-    from synapstock.domain.statistics.models import DailyMarketRanking, RankingItem
-    from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
+    from evenezer.application.services.statistics_service import StatisticsService
+    from evenezer.domain.statistics.models import DailyMarketRanking, RankingItem
+    from evenezer.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
 
     repo_dir = tmp_path / "stats"
     repo = LocalStatisticsRepository(data_root=str(repo_dir))

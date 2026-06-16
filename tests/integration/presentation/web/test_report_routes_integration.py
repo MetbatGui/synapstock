@@ -5,14 +5,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.fixture
 def client(integration_test_env):
     """DATA_DIR이 임시 경로로 격리된 상태에서 FastAPI 앱 클라이언트를 생성합니다."""
-    from synapstock.presentation.web.server import app
+    from evenezer.presentation.web.server import app
     app.router.on_startup = []
     return TestClient(app)
 
 
 def test_get_local_reports_service_none(client):
     """GET /api/reports/local - report_service가 None일 때 빈 리스트 반환 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     with patch.object(report_routes, "report_service", None):
         response = client.get("/api/reports/local?name=NAVER")
@@ -22,7 +22,7 @@ def test_get_local_reports_service_none(client):
 
 def test_get_local_reports_success(client):
     """GET /api/reports/local - report_service가 활성화되어 있을 때 리포트 목록 조회 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     mock_report = MagicMock()
     mock_report.filename = "naver_report.pdf"
@@ -45,7 +45,7 @@ def test_get_local_reports_success(client):
 
 def test_get_report_counts(client):
     """GET /api/reports/counts - 종목별 리포트 수량 집계 조회 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     mock_counts = {"NAVER": 5, "카카오": 3}
     mock_service = MagicMock()
@@ -59,7 +59,7 @@ def test_get_report_counts(client):
 
 def test_sync_reports_index_success(client):
     """POST /api/reports/sync - 리포트 인덱스 동기화 성공 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     mock_service = MagicMock()
     mock_service.sync_index = AsyncMock(return_value=["list.json", "reports.json"])
@@ -74,7 +74,7 @@ def test_sync_reports_index_success(client):
 
 def test_sync_reports_index_service_none(client):
     """POST /api/reports/sync - 서비스 미설정(None) 시 400 에러 반환 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     with patch.object(report_routes, "report_service", None):
         response = client.post("/api/reports/sync")
@@ -84,7 +84,7 @@ def test_sync_reports_index_service_none(client):
 
 def test_serve_report_file_found(client, tmp_path):
     """GET /report_files/{filename} - 로컬 PDF 파일 서빙 및 200 OK 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     # 임시 테스트 PDF 파일 생성
     dummy_pdf = tmp_path / "test_report.pdf"
@@ -101,7 +101,7 @@ def test_serve_report_file_found(client, tmp_path):
 
 def test_serve_report_file_not_found(client):
     """GET /report_files/{filename} - 파일이 존재하지 않을 시 404 에러 반환 검증."""
-    from synapstock.presentation.web.routes import report_routes
+    from evenezer.presentation.web.routes import report_routes
     
     mock_service = MagicMock()
     mock_service.get_file_content_path = AsyncMock(return_value=None)

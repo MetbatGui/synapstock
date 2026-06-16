@@ -3,8 +3,8 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 import pytest
-from synapstock.application.services.statistics_service import StatisticsService
-from synapstock.domain.statistics.models import NewListing
+from evenezer.application.services.statistics_service import StatisticsService
+from evenezer.domain.statistics.models import NewListing
 
 @pytest.fixture
 def temp_board_dir(tmp_path):
@@ -21,7 +21,7 @@ def test_ipo_sync_provisions_manifest_and_virtual_board(temp_board_dir):
     virtual_board_path = temp_board_dir / "virtual_신규상장주.json"
     
     # 1. 의존성 없이 StatisticsService 인스턴스 기동 (테스트 경로 명시적 주입)
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository, LocalBoardRepository
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository, LocalBoardRepository
     manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     board_repository = LocalBoardRepository(temp_board_dir)
     service = StatisticsService(
@@ -150,16 +150,16 @@ async def test_stock_addition_automatically_assigns_pending_ipo(temp_board_dir):
     
     # 4. 의존성 셋업
     from unittest.mock import AsyncMock, MagicMock
-    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-    from synapstock.application.services.command_service import BoardCommandService
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+    from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+    from evenezer.application.services.command_service import BoardCommandService
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
     
     repo = LocalBoardRepository(root_dir=temp_board_dir)
     drive_adapter = MagicMock()
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
     manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
@@ -248,16 +248,16 @@ async def test_stock_deletion_from_ipo_board_turns_status_ignored(temp_board_dir
     
     # 3. 의존성 셋업
     from unittest.mock import AsyncMock, MagicMock
-    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-    from synapstock.application.services.command_service import BoardCommandService
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+    from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+    from evenezer.application.services.command_service import BoardCommandService
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
     
     repo = LocalBoardRepository(root_dir=temp_board_dir)
     drive_adapter = MagicMock()
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
     manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
@@ -336,16 +336,16 @@ async def test_stock_deletion_from_sector_board_does_not_rollback_to_pending(tem
     
     # 3. 의존성 셋업
     from unittest.mock import AsyncMock, MagicMock
-    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-    from synapstock.application.services.command_service import BoardCommandService
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+    from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+    from evenezer.application.services.command_service import BoardCommandService
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
     
     repo = LocalBoardRepository(root_dir=temp_board_dir)
     drive_adapter = MagicMock()
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
     manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
@@ -444,16 +444,16 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     
     # 4. 의존성 셋업
     from unittest.mock import AsyncMock, MagicMock
-    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-    from synapstock.application.services.command_service import BoardCommandService
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+    from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+    from evenezer.application.services.command_service import BoardCommandService
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
     
     repo = LocalBoardRepository(root_dir=temp_board_dir)
     drive_adapter = MagicMock()
     drive_adapter.put_file = AsyncMock(return_value=True)
     drive_adapter.get_file = AsyncMock(return_value=None)
     
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
     manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
     sync_service = BoardFileSyncService(
         repository=repo,
@@ -554,13 +554,13 @@ async def test_stock_addition_outbox_flow(temp_board_dir):
     
     # 4. 의존성 셋업 (아웃박스 및 워커 연동)
     from unittest.mock import AsyncMock, MagicMock
-    from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
-    from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
-    from synapstock.application.events.worker import OutboxWorker
-    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-    from synapstock.application.services.command_service import BoardCommandService
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
-    from synapstock.domain.events import StockAddedToBoard
+    from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+    from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+    from evenezer.application.events.worker import OutboxWorker
+    from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+    from evenezer.application.services.command_service import BoardCommandService
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
+    from evenezer.domain.events import StockAddedToBoard
     
     repo = LocalBoardRepository(root_dir=temp_board_dir)
     drive_adapter = MagicMock()
@@ -668,13 +668,13 @@ async def test_idempotent_event_consumption(temp_board_dir):
     
     # 3. 의존성 셋업
     from unittest.mock import AsyncMock, MagicMock
-    from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
-    from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
-    from synapstock.application.events.worker import OutboxWorker
-    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-    from synapstock.application.services.command_service import BoardCommandService
-    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
-    from synapstock.domain.events import StockAddedToBoard
+    from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+    from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+    from evenezer.application.events.worker import OutboxWorker
+    from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+    from evenezer.application.services.command_service import BoardCommandService
+    from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
+    from evenezer.domain.events import StockAddedToBoard
     
     repo = LocalBoardRepository(root_dir=temp_board_dir)
     drive_adapter = MagicMock()

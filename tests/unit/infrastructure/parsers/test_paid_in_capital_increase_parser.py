@@ -3,7 +3,7 @@ import io
 import pandas as pd
 import pytest
 
-from synapstock.infrastructure.parsers.excel import DisclosureParser
+from evenezer.infrastructure.parsers.excel import DisclosureParser
 
 
 def test_parse_paid_in_capital_increase_with_real_example():

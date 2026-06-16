@@ -1,6 +1,6 @@
 import pytest
 
-from synapstock.infrastructure.adapters.local.file_storage import LocalFileStorageAdapter
+from evenezer.infrastructure.adapters.local.file_storage import LocalFileStorageAdapter
 
 
 @pytest.fixture

@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # 테스트 대상 라우터가 속한 FastAPI 앱 또는 APIRouter 임포트
 # presentation/web/server.py 가 존재하므로 이를 참조하거나, APIRouter를 직접 테스트하기 위해 임시 앱을 생성해 테스트함
 from fastapi import FastAPI
-from synapstock.presentation.web.routes.statistics_routes import router
-from synapstock.domain.statistics.models import StockSplit
+from evenezer.presentation.web.routes.statistics_routes import router
+from evenezer.domain.statistics.models import StockSplit
 
 app = FastAPI()
 app.include_router(router)
@@ -16,8 +16,8 @@ client = TestClient(app)
 
 @pytest.fixture
 def mock_dependencies():
-    with patch("synapstock.presentation.web.routes.statistics_routes.stock_split_repo") as mock_repo, \
-         patch("synapstock.presentation.web.routes.statistics_routes.stock_split_sync_service") as mock_sync:
+    with patch("evenezer.presentation.web.routes.statistics_routes.stock_split_repo") as mock_repo, \
+         patch("evenezer.presentation.web.routes.statistics_routes.stock_split_sync_service") as mock_sync:
         yield mock_repo, mock_sync
 
 

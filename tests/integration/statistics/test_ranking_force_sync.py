@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pandas as pd
 import pytest
 
-from synapstock.application.services.ranking_service import RankingService
-from synapstock.domain.statistics.models import MarketType, SupplySubject
-from synapstock.infrastructure.adapters.local.cache_manager import LocalCacheManager
+from evenezer.application.services.ranking_service import RankingService
+from evenezer.domain.statistics.models import MarketType, SupplySubject
+from evenezer.infrastructure.adapters.local.cache_manager import LocalCacheManager
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)

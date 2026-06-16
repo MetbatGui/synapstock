@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from synapstock.domain.models import Board, Stock
-from synapstock.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
+from evenezer.domain.models import Board, Stock
+from evenezer.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
 
 
 @pytest.fixture

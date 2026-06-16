@@ -9,7 +9,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
-from synapstock.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from evenezer.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
 
 
 # -----------------------------------------------------------------------------
@@ -115,9 +115,9 @@ def global_google_mocks(mock_drive_service):
     mock_creds.create_scoped.return_value.authorize.return_value.credentials.universe_domain = "googleapis.com"
     
     with patch("google.oauth2.credentials.Credentials.from_authorized_user_file", return_value=mock_creds), \
-         patch("synapstock.infrastructure.adapters.google.google_drive_adapter.build", return_value=mock_drive_service) as mock_build1, \
+         patch("evenezer.infrastructure.adapters.google.google_drive_adapter.build", return_value=mock_drive_service) as mock_build1, \
          patch("googleapiclient.discovery.build", return_value=mock_drive_service) as mock_build2, \
-         patch("synapstock.infrastructure.adapters.google.google_drive_adapter.MediaIoBaseDownload", new=MockMediaIoBaseDownload), \
+         patch("evenezer.infrastructure.adapters.google.google_drive_adapter.MediaIoBaseDownload", new=MockMediaIoBaseDownload), \
          patch("googleapiclient.http.MediaIoBaseDownload", new=MockMediaIoBaseDownload):
         yield mock_build1
 
@@ -165,7 +165,7 @@ def test_service_property_expired_refresh(temp_token_file, mock_drive_service):
 
     with patch("google.oauth2.credentials.Credentials.from_authorized_user_file", return_value=mock_creds), \
          patch("googleapiclient.discovery.build", return_value=mock_drive_service) as mock_build, \
-         patch("synapstock.infrastructure.adapters.google.google_drive_adapter.Request") as mock_request:
+         patch("evenezer.infrastructure.adapters.google.google_drive_adapter.Request") as mock_request:
         
         service = adapter.service
         assert service == mock_drive_service
@@ -348,7 +348,7 @@ def test_upload_file_new_and_update(temp_token_file, mock_drive_service):
     adapter = GoogleDriveAdapter(token_file=temp_token_file, folders={"root": "root_id"})
 
     with patch.object(adapter, "_ensure_path_directories", return_value="parent_id"), \
-         patch("synapstock.infrastructure.adapters.google.google_drive_adapter.MediaIoBaseUpload") as mock_upload_cls:
+         patch("evenezer.infrastructure.adapters.google.google_drive_adapter.MediaIoBaseUpload") as mock_upload_cls:
         
         # 1. 파일이 존재하는 경우 (update)
         mock_drive_service.files()._list_res.execute.return_value = {"files": [{"id": "existing_file_id"}]}
@@ -540,7 +540,7 @@ async def test_download_file_success_and_fail(temp_token_file, tmp_path, mock_dr
         def __init__(self, *args, **kwargs):
             raise Exception("Download break")
 
-    with patch("synapstock.infrastructure.adapters.google.google_drive_adapter.MediaIoBaseDownload", new=MockExceptionDownloader):
+    with patch("evenezer.infrastructure.adapters.google.google_drive_adapter.MediaIoBaseDownload", new=MockExceptionDownloader):
         dest_file.unlink(missing_ok=True)
         success_fail = await adapter.download_file("filename.pdf", dest_file, folder="root")
         assert success_fail is False
@@ -589,7 +589,7 @@ def test_download_missing_reports_all_exists(temp_token_file, tmp_path):
     report_list = [{"filename": "exists.pdf"}]
     mock_callback = MagicMock()
 
-    with patch("synapstock.infrastructure.adapters.google.google_drive_adapter.build") as mock_build:
+    with patch("evenezer.infrastructure.adapters.google.google_drive_adapter.build") as mock_build:
         adapter.download_missing_reports(str(local_dir), report_list, progress_callback=mock_callback)
         mock_build.assert_not_called()
         mock_callback.assert_called_once_with("모든 리포트가 로컬에 존재합니다. (총 1개)", 1.0)

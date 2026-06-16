@@ -7,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from synapstock.presentation.web.routes.board_routes import router
+from evenezer.presentation.web.routes.board_routes import router
 
 
 @pytest.fixture

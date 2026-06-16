@@ -1,6 +1,6 @@
 import pytest
 
-from synapstock.infrastructure.container import container
+from evenezer.infrastructure.container import container
 
 
 @pytest.mark.asyncio

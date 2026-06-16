@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock
 import pytest
 
-from synapstock.application.services.command_service import BoardCommandService
-from synapstock.domain.models import Board, Stock
-from synapstock.domain.events import (
+from evenezer.application.services.command_service import BoardCommandService
+from evenezer.domain.models import Board, Stock
+from evenezer.domain.events import (
     NodeAdded, NodeDeleted, StockAddedToBoard, StockDeletedFromBoard,
     BoardCreated, BoardDeleted, BatchStocksDeletedFromBoard
 )

@@ -1,5 +1,5 @@
-from synapstock.domain.statistics.models import ConvertibleBond
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalConvertibleBondRepository
+from evenezer.domain.statistics.models import ConvertibleBond
+from evenezer.infrastructure.adapters.local.statistics_repo import LocalConvertibleBondRepository
 
 
 def test_save_and_load_convertible_bond_data(tmp_path):

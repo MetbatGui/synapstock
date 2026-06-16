@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from synapstock.domain.models import Board, Stock
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from evenezer.domain.models import Board, Stock
+from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
 
 FIXTURES_DIR = Path(__file__).parents[4] / "fixtures" / "boards"
 

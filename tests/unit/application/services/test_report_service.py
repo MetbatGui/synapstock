@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from synapstock.application.services.report_service import ReportService
+from evenezer.application.services.report_service import ReportService
 
 
 @pytest.fixture

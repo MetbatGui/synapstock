@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from synapstock.application.services.media_service import StockMediaService
+from evenezer.application.services.media_service import StockMediaService
 
 
 @pytest.fixture

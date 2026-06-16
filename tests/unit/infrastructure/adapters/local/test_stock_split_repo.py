@@ -3,8 +3,8 @@ import pandas as pd
 import json
 from pathlib import Path
 
-from synapstock.infrastructure.adapters.local.stock_split_repo import LocalStockSplitRepository
-from synapstock.domain.statistics.models import StockSplitManifest, StockSplit
+from evenezer.infrastructure.adapters.local.stock_split_repo import LocalStockSplitRepository
+from evenezer.domain.statistics.models import StockSplitManifest, StockSplit
 
 
 def test_load_manifest_not_exists(tmp_path):

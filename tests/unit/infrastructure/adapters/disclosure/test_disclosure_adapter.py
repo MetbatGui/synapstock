@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-from synapstock.infrastructure.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
+from evenezer.infrastructure.adapters.disclosure.disclosure_adapter import DartDisclosureAdapter
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def mock_html_response():
 class TestDartDisclosureAdapterCache:
     """DartDisclosureAdapter의 캐싱 기능 단위 테스트."""
 
-    @patch("synapstock.infrastructure.adapters.disclosure.disclosure_adapter.requests.post")
+    @patch("evenezer.infrastructure.adapters.disclosure.disclosure_adapter.requests.post")
     def test_caching_behavior(self, mock_post, mock_html_response):
         """동일한 종목을 여러 번 조회할 때 캐시가 작동하여 외부 요청을 한 번만 보내야 한다."""
         # Arrange
@@ -61,7 +61,7 @@ class TestDartDisclosureAdapterCache:
         assert results2 == results1
         assert mock_post.call_count == 1
 
-    @patch("synapstock.infrastructure.adapters.disclosure.disclosure_adapter.requests.post")
+    @patch("evenezer.infrastructure.adapters.disclosure.disclosure_adapter.requests.post")
     def test_cache_expiration(self, mock_post, mock_html_response):
         """캐시 유지 시간(TTL)이 지나면 다시 외부 요청을 보내어 데이터를 갱신해야 한다."""
         # Arrange
@@ -87,7 +87,7 @@ class TestDartDisclosureAdapterCache:
         # Assert (총 2회 호출 확인)
         assert mock_post.call_count == 2
 
-    @patch("synapstock.infrastructure.adapters.disclosure.disclosure_adapter.requests.post")
+    @patch("evenezer.infrastructure.adapters.disclosure.disclosure_adapter.requests.post")
     def test_clear_cache(self, mock_post, mock_html_response):
         """clear_cache 호출 시 기존 캐시가 적절히 파괴되어야 한다."""
         # Arrange

@@ -1,5 +1,5 @@
 
-from synapstock.domain.statistics import DailyMarketRanking, MarketType, RankingItem, SupplySubject
+from evenezer.domain.statistics import DailyMarketRanking, MarketType, RankingItem, SupplySubject
 
 
 def test_create_daily_market_ranking():
@@ -33,8 +33,8 @@ def test_supply_subject_enum():
 
 def test_stock_split_model_normalization():
     """StockSplitExcelDTO의 Pydantic Validator 작동 및 데이터 정규화, 그리고 도메인 객체 변환 검증."""
-    from synapstock.infrastructure.adapters.local.stock_split_repo import StockSplitExcelDTO
-    from synapstock.domain.statistics import StockSplit
+    from evenezer.infrastructure.adapters.local.stock_split_repo import StockSplitExcelDTO
+    from evenezer.domain.statistics import StockSplit
 
     # 1. 일반적인 한글 컬럼 매핑 및 포맷 정규화 테스트
     split_data = {
@@ -107,7 +107,7 @@ def test_stock_split_model_normalization():
 
 def test_stock_split_business_rule_validation():
     """StockSplit 도메인 모델의 자율 비즈니스 룰 검증기 작동 확인."""
-    from synapstock.domain.statistics import StockSplit
+    from evenezer.domain.statistics import StockSplit
     import pytest
 
     # 정상 데이터 생성 확인
@@ -150,7 +150,7 @@ def test_stock_split_business_rule_validation():
 
 def test_stock_split_manifest_model():
     """StockSplitManifest 모델 생성 및 데이터 검증."""
-    from synapstock.domain.statistics import StockSplitManifest
+    from evenezer.domain.statistics import StockSplitManifest
 
     manifest_data = {
         "manifest_version": "1.0.0",

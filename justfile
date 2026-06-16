@@ -2,7 +2,7 @@
 set shell := ["powershell", "-Command"]
 
 # -----------------------------------------------------------------------------
-# SynapStock Justfile - Docker & Local Development Command Shortcuts
+# Evenezer Justfile - Docker & Local Development Command Shortcuts
 # -----------------------------------------------------------------------------
 
 # Docker 이미지 빌드

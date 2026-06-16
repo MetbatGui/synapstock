@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from synapstock.domain.models import Node, Stock
+from evenezer.domain.models import Node, Stock
 
 
 class TestStock:

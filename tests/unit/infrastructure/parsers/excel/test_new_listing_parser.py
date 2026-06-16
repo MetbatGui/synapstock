@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from synapstock.infrastructure.parsers.excel.new_listing import NewListingParser
+from evenezer.infrastructure.parsers.excel.new_listing import NewListingParser
 
 
 def test_new_listing_parser_with_sample_data():

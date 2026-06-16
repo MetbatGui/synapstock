@@ -2,8 +2,8 @@ from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
-from synapstock.application.services.command_service import BoardCommandService
-from synapstock.domain.models import Board, Stock
+from evenezer.application.services.command_service import BoardCommandService
+from evenezer.domain.models import Board, Stock
 
 
 class TestBoardCommandServiceSyncHook:

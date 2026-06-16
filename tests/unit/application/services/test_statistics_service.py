@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from synapstock.application.services.statistics_service import StatisticsService
+from evenezer.application.services.statistics_service import StatisticsService
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ class TestStatisticsService:
 
     def test_enrich_tickers(self, service, mock_query_service):
         """_enrich_tickers를 통해 아이템 리스트의 티커가 보강되어야 한다."""
-        from synapstock.domain.statistics.models import RankingItem
+        from evenezer.domain.statistics.models import RankingItem
 
         # Arrange
         mock_query_service.get_all_stocks_flat.return_value = [
@@ -87,7 +87,7 @@ class TestStatisticsService:
     @pytest.mark.asyncio
     async def test_get_convertible_bond_data_delegation(self, service):
         """CB 데이터 조회 시 disclosure_svc에 위임하고 티커를 보강해야 한다."""
-        from synapstock.domain.statistics.models import ConvertibleBond
+        from evenezer.domain.statistics.models import ConvertibleBond
 
         # Arrange
         mock_disclosure_svc = MagicMock()
@@ -111,7 +111,7 @@ class TestStatisticsService:
     @pytest.mark.asyncio
     async def test_get_bw_data_delegation(self, service):
         """BW 데이터 조회 시 disclosure_svc에 위임하고 티커를 보강해야 한다."""
-        from synapstock.domain.statistics.models import BondWithWarrants
+        from evenezer.domain.statistics.models import BondWithWarrants
 
         # Arrange
         mock_disclosure_svc = MagicMock()

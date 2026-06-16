@@ -1,14 +1,14 @@
 services:
-  synapstock-web:
+  evenezer-web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: synapstock-web
-    command: synapstock
+    container_name: evenezer-web
+    command: evenezer
     ports:
       - "8090:8090"
     environment:
-      - SYNAPSTOCK_HOST=0.0.0.0
+      - EVENEZER_HOST=0.0.0.0
       - TZ=Asia/Seoul
     env_file:
       - .env
@@ -17,12 +17,12 @@ services:
       - ./secrets:/app/secrets
     restart: unless-stopped
 
-  synapstock-bot:
+  evenezer-bot:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: synapstock-bot
-    command: synapstock-bot
+    container_name: evenezer-bot
+    command: evenezer-bot
     environment:
       - TZ=Asia/Seoul
     env_file:

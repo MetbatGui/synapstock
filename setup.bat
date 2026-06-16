@@ -1,6 +1,6 @@
 @echo off
 echo ==========================================
-echo   SynapStock Environment Setup Script
+echo   Evenezer Environment Setup Script
 echo ==========================================
 
 echo.

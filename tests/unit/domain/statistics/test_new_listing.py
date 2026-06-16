@@ -1,5 +1,5 @@
 from datetime import datetime
-from synapstock.domain.statistics.models import NewListing
+from evenezer.domain.statistics.models import NewListing
 
 
 def test_merge_with_assigned_priority():
@@ -57,9 +57,9 @@ def test_merge_with_same_status_timestamp_missing():
 
 def test_new_listing_sync_domain_service():
     """NewListingSyncDomainService의 비즈니스 규칙 작동을 검증합니다."""
-    from synapstock.domain.models import Board, Node, Stock
-    from synapstock.domain.statistics.models import NewListing
-    from synapstock.domain.statistics.domain_service import NewListingSyncDomainService
+    from evenezer.domain.models import Board, Node, Stock
+    from evenezer.domain.statistics.models import NewListing
+    from evenezer.domain.statistics.domain_service import NewListingSyncDomainService
 
     # 1. 초기 상태 설정
     virtual_board = Board(id="virtual_신규상장주", name="신규상장주")

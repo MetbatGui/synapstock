@@ -1,8 +1,8 @@
 
 import pytest
 
-from synapstock.domain.news.models import NewsBatch, NewsItem
-from synapstock.infrastructure.adapters.local.news_repo import LocalNewsRepository
+from evenezer.domain.news.models import NewsBatch, NewsItem
+from evenezer.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
 
 @pytest.fixture

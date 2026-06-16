@@ -3,7 +3,7 @@ import io
 import pandas as pd
 import pytest
 
-from synapstock.infrastructure.parsers.excel.disclosure import DisclosureParser
+from evenezer.infrastructure.parsers.excel.disclosure import DisclosureParser
 
 
 @pytest.fixture

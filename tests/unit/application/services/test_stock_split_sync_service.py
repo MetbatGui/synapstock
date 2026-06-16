@@ -2,8 +2,8 @@ import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from synapstock.application.services.stock_split_sync_service import StockSplitSyncService
-from synapstock.domain.statistics.models import StockSplitManifest
+from evenezer.application.services.stock_split_sync_service import StockSplitSyncService
+from evenezer.domain.statistics.models import StockSplitManifest
 
 
 @pytest.fixture

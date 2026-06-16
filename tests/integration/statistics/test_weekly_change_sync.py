@@ -1,6 +1,6 @@
 import logging
 import pytest
-from synapstock.infrastructure.container import Container
+from evenezer.infrastructure.container import Container
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

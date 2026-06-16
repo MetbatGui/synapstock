@@ -2,14 +2,14 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from synapstock.application.services.statistics_service import StatisticsService
-from synapstock.domain.statistics.models import (
+from evenezer.application.services.statistics_service import StatisticsService
+from evenezer.domain.statistics.models import (
     DailyMarketRanking,
     MarketType,
     RankingItem,
     SupplySubject,
 )
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
+from evenezer.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
 
 
 @pytest.fixture
