@@ -115,30 +115,9 @@ class StatisticsService:
                             found_in_manifest = True
                             break
 
-                    if not found_in_manifest and self._query_service and not skip_search:
-                        # 로컬 보드에 등록되지 않은 신규 종목은 네이버 API를 통해 티커 검색을 수행
-                        try:
-                            search_results = self._query_service.search_ticker(item.name)
-                            found = False
-                            if search_results:
-                                import unicodedata
-                                clean_item_name = unicodedata.normalize("NFC", item.name).strip().lower()
-                                for res in search_results:
-                                    res_name = unicodedata.normalize("NFC", res.get("name", "")).strip().lower()
-                                    if res_name == clean_item_name or clean_item_name in res_name:
-                                        ticker = res.get("ticker")
-                                        if ticker and ticker.isalnum() and len(ticker) == 6:
-                                            item.ticker = ticker
-                                            logger.info(
-                                                f"[StatisticsService] 신규 종목 티커 검색 성공: "
-                                                f"{item.name} -> {ticker}"
-                                            )
-                                            found = True
-                                            break
-                            if not found:
-                                item.ticker = "none"
-                        except Exception as e:
-                            logger.error(f"[StatisticsService] 신규 종목({item.name}) 티커 검색 실패: {e}")
+                    if not found_in_manifest:
+                        # 실시간 외부 API 티커 검색은 네트워크 병목을 유발하므로 수행하지 않고 none으로 설정합니다.
+                        item.ticker = "none"
 
             # 매니페스트 내 상태 데이터 맵핑
             # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
