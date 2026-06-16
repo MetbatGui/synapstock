@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from synapstock.presentation.web.server import app
+from evenezer.presentation.web.server import app
 
 
 class TestBoardRoutesSyncApiIntegration:
@@ -20,7 +20,7 @@ class TestBoardRoutesSyncApiIntegration:
         mock_sync_fn = AsyncMock(return_value=True)
 
         with patch(
-            "synapstock.presentation.web.routes.board_routes.board_file_sync_service.sync_with_drive",
+            "evenezer.presentation.web.routes.board_routes.board_file_sync_service.sync_with_drive",
             mock_sync_fn
         ):
             response = client.post("/api/board/virtual/sync")
@@ -41,7 +41,7 @@ class TestBoardRoutesSyncApiIntegration:
         mock_sync_fn = AsyncMock(return_value=False)
 
         with patch(
-            "synapstock.presentation.web.routes.board_routes.board_file_sync_service.sync_with_drive",
+            "evenezer.presentation.web.routes.board_routes.board_file_sync_service.sync_with_drive",
             mock_sync_fn
         ):
             response = client.post("/api/board/virtual/sync")

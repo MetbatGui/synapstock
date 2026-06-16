@@ -1,6 +1,6 @@
 import pytest
-from synapstock.application.services.heatmap.heatmap_service import HeatmapService
-from synapstock.application.services.heatmap.view_model_builder import HeatmapViewModelBuilder
+from evenezer.application.services.heatmap.heatmap_service import HeatmapService
+from evenezer.application.services.heatmap.view_model_builder import HeatmapViewModelBuilder
 
 def test_heatmap_service_initialization():
     """HeatmapService의 성공적인 인스턴스화 여부 검증"""

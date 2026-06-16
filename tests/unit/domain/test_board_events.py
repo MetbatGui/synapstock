@@ -1,6 +1,6 @@
 import pytest
-from synapstock.domain.models import Board, Stock
-from synapstock.domain.events import NodeAdded, NodeDeleted, StockAddedToBoard, StockDeletedFromBoard
+from evenezer.domain.models import Board, Stock
+from evenezer.domain.events import NodeAdded, NodeDeleted, StockAddedToBoard, StockDeletedFromBoard
 
 @pytest.mark.unit
 def test_board_events_collection():

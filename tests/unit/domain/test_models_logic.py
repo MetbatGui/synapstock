@@ -1,4 +1,4 @@
-from synapstock.domain.statistics.models import (
+from evenezer.domain.statistics.models import (
     DailyMarketRanking,
     MarketType,
     MonthlyMarketStats,

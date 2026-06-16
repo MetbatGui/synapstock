@@ -6,12 +6,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from synapstock.application.services.command_service import BoardCommandService
-from synapstock.application.services.query_service import BoardQueryService
-from synapstock.application.services.sync_service import BoardSyncService
-from synapstock.domain.models import Board, Stock
-from synapstock.domain.ports import MindmapPort, TickerSearchPort
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from evenezer.application.services.command_service import BoardCommandService
+from evenezer.application.services.query_service import BoardQueryService
+from evenezer.application.services.sync_service import BoardSyncService
+from evenezer.domain.models import Board, Stock
+from evenezer.domain.ports import MindmapPort, TickerSearchPort
+from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
 
 FIXTURES_DIR = Path(__file__).parents[3] / "fixtures" / "folder_mindmap"
 

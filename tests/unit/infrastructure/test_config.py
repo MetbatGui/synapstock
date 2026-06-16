@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from synapstock.infrastructure.config import AppConfig
+from evenezer.infrastructure.config import AppConfig
 
 
 def test_config_load_default_paths():

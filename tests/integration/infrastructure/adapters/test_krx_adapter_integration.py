@@ -4,8 +4,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import requests
 
-from synapstock.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
-from synapstock.infrastructure.adapters.heatmap.krx_repository import KrxRepository
+from evenezer.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
+from evenezer.infrastructure.adapters.heatmap.krx_repository import KrxRepository
 
 
 class MockResponse:

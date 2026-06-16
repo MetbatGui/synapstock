@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**SynapStock** — a Korean stock market mindmap orchestrator that connects news and stocks. It manages board layouts (via Miro), syncs data with Google Drive, scrapes KRX (Korean Exchange) market data, and exposes everything through a FastAPI web UI and a Telegram bot.
+**Evenezer** — a Korean stock market mindmap orchestrator that connects news and stocks. It manages board layouts (via Miro), syncs data with Google Drive, scrapes KRX (Korean Exchange) market data, and exposes everything through a FastAPI web UI and a Telegram bot.
 
 ## Commands
 
 ```bash
 # Run the web server (port 8090)
-uv run synapstock
+uv run evenezer
 
 # Run the Telegram bot
-uv run synapstock-bot
+uv run evenezer-bot
 
 # Run all tests
 uv run pytest
@@ -43,16 +43,16 @@ Line length is 120. Ruff enforces E, F, I, W, UP rule sets. Mypy runs with the P
 
 Clean/Hexagonal architecture with four layers:
 
-**Domain** (`src/synapstock/domain/`) — Core business entities (`Stock`, `Node`, `Board`) and abstract ports (`ports.py`). No external dependencies. Sub-domains for `news/`, `statistics/`, `financials/`, `heatmap/`, `analytics/`.
+**Domain** (`src/evenezer/domain/`) — Core business entities (`Stock`, `Node`, `Board`) and abstract ports (`ports.py`). No external dependencies. Sub-domains for `news/`, `statistics/`, `financials/`, `heatmap/`, `analytics/`.
 
-**Application** (`src/synapstock/application/services/`) — 18 service modules orchestrating use cases. Key services:
+**Application** (`src/evenezer/application/services/`) — 18 service modules orchestrating use cases. Key services:
 - `BoardCommandService` / `BoardQueryService` — CRUD on boards
 - `BoardFileSyncService` — syncs boards with Google Drive
 - `StatisticsService` — market stats (net-buy, ceiling, bonus issue, etc.)
 - `HeatmapService` — theme-based heatmap generation
 - `NewsService` — scrapes and archives news per stock
 
-**Infrastructure** (`src/synapstock/infrastructure/`) — Concrete adapters behind domain ports:
+**Infrastructure** (`src/evenezer/infrastructure/`) — Concrete adapters behind domain ports:
 - `adapters/google/` — Google Drive upload/download
 - `adapters/krx/` — KRX API (market data, KRX login)
 - `adapters/miro/` — Miro REST API (board manipulation)
@@ -64,7 +64,7 @@ Clean/Hexagonal architecture with four layers:
 
 All services are wired together in `infrastructure/container.py` — a single `container` singleton used for dependency injection across the app.
 
-**Presentation** (`src/synapstock/presentation/`) — Two channels:
+**Presentation** (`src/evenezer/presentation/`) — Two channels:
 - `web/` — FastAPI app (`server.py`) with Jinja2 templates; routes split by domain (`board`, `stock`, `report`, `statistics`, `financial`, `heatmap`). WebSocket endpoint `/ws/logs` streams real-time logs.
 - `telegram/` — python-telegram-bot handlers and conversation flows.
 

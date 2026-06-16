@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 import pytest
 import pandas as pd
-from synapstock.application.services.heatmap.heatmap_service import HeatmapService
-from synapstock.domain.heatmap.models import Heatmap, Theme
+from evenezer.application.services.heatmap.heatmap_service import HeatmapService
+from evenezer.domain.heatmap.models import Heatmap, Theme
 
 def test_heatmap_cache_hit_and_expiry_refresh():
     """통합 테스트: 캐시 힛 검증 및 만료 시 갱신(Refresh) 라이프사이클 검증"""

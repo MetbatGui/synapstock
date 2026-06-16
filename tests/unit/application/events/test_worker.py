@@ -2,8 +2,8 @@ import pytest
 import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import Mock, AsyncMock
-from synapstock.application.events.worker import OutboxWorker
-from synapstock.domain.events import StockAddedToBoard
+from evenezer.application.events.worker import OutboxWorker
+from evenezer.domain.events import StockAddedToBoard
 
 @pytest.fixture
 def mock_outbox():

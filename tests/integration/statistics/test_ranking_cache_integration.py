@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from synapstock.infrastructure.container import Container
+from evenezer.infrastructure.container import Container
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)

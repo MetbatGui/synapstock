@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-from synapstock.application.services.command_service import BoardCommandService
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+from evenezer.application.services.command_service import BoardCommandService
+from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
 
 
 class TestBoardCommandServiceIntegration:
@@ -22,7 +22,7 @@ class TestBoardCommandServiceIntegration:
 
         # 실물 동기화 서비스 초기화 (구글 드라이브 통신은 비워두고, 로컬 매니페스트 I/O만 실계측)
         self.manifest_path = self.test_dir / "board_sync_manifest.json"
-        from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+        from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
         self.manifest_repository = LocalBoardSyncManifestRepository(self.manifest_path)
         self.sync_service = BoardFileSyncService(
             repository=self.repository,

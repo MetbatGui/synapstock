@@ -5,8 +5,8 @@ import io
 import json
 from datetime import datetime
 
-from synapstock.application.services.weekly_change_service import WeeklyChangeService
-from synapstock.domain.statistics.models import WeeklyChangeReport, WeeklyChangeItem
+from evenezer.application.services.weekly_change_service import WeeklyChangeService
+from evenezer.domain.statistics.models import WeeklyChangeReport, WeeklyChangeItem
 
 
 @pytest.fixture

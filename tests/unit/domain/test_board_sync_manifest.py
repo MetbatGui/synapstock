@@ -1,6 +1,6 @@
 from datetime import datetime, UTC
-from synapstock.domain.models import BoardSyncManifest, BoardManifestItem
-from synapstock.domain.statistics.models import NewListing
+from evenezer.domain.models import BoardSyncManifest, BoardManifestItem
+from evenezer.domain.statistics.models import NewListing
 
 
 def test_board_manifest_item_default():

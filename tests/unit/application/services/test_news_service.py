@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch, ANY
 
 import pytest
 
-from synapstock.application.services.news_service import NewsService
-from synapstock.domain.models import ScrapedNews
-from synapstock.domain.news.models import NewsBatch, NewsItem
+from evenezer.application.services.news_service import NewsService
+from evenezer.domain.models import ScrapedNews
+from evenezer.domain.news.models import NewsBatch, NewsItem
 
 
 @pytest.fixture

@@ -2,8 +2,8 @@ import logging
 
 import pytest
 
-from synapstock.domain.statistics.models import MarketType, SupplySubject
-from synapstock.infrastructure.container import Container
+from evenezer.domain.statistics.models import MarketType, SupplySubject
+from evenezer.infrastructure.container import Container
 
 # 로깅 설정 (상세 로그 확인용)
 logging.basicConfig(level=logging.INFO)

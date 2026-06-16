@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client(integration_test_env):
     """DATA_DIR이 임시 경로로 격리된 상태에서 FastAPI 앱 클라이언트를 생성합니다."""
-    from synapstock.presentation.web.server import app
+    from evenezer.presentation.web.server import app
     app.router.on_startup = []
     return TestClient(app)
 

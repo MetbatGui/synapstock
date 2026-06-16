@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
 
-from synapstock.application.services.financial_service import FinancialService
-from synapstock.domain.statistics.models import MarketType
+from evenezer.application.services.financial_service import FinancialService
+from evenezer.domain.statistics.models import MarketType
 
 
 class MockStatement:

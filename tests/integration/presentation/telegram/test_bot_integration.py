@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from telegram import Update, User, Chat, Message, CallbackQuery, MessageEntity
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
-from synapstock.presentation.telegram.bot import start_command, unknown_message
-from synapstock.presentation.telegram.handlers.news_handler import get_news_workflow_handler
+from evenezer.presentation.telegram.bot import start_command, unknown_message
+from evenezer.presentation.telegram.handlers.news_handler import get_news_workflow_handler
 
 async def fake_get_me(self, *args, **kwargs):
     self._bot_user = User(id=9999, first_name="Bot", is_bot=True, username="test_bot")
@@ -42,7 +42,7 @@ async def telegram_app(integration_test_env):
     mock_send.return_value = fake_sent_msg
     
     # 봇 bot_data에 격리된 컨테이너의 서비스 주입
-    from synapstock.infrastructure.container import container
+    from evenezer.infrastructure.container import container
     application.bot_data["query_service"] = container.query_service
     application.bot_data["command_service"] = container.command_service
     application.bot_data["media_service"] = container.media_service
@@ -199,7 +199,7 @@ async def test_news_workflow_multiple_matches_and_select(telegram_app):
     """뉴스 추가 플로우 - 여러 종목이 검색되었을 때 인라인 키보드 렌더링 및 콜백 클릭 흐름 검증."""
     # "지니언스"는 IT.json에서 하나만 나올 수 있지만, 임시로 검색 결과가 여러 개 나오도록 유도하기 위해
     # find_stocks_by_name의 결과를 모킹합니다.
-    from synapstock.presentation.web.core.dependencies import query_service
+    from evenezer.presentation.web.core.dependencies import query_service
     
     mock_results = [
         {"board": "theme_IT", "ticker": "123451", "name": "이스트소프트", "path": "보안 > 보안관리"},
@@ -276,7 +276,7 @@ async def test_process_search_query_edge_cases(telegram_app):
     assert "다시 입력해주세요" in telegram_app.bot.send_message.call_args[1]["text"]
 
     # 2-3. 검색 도중 예외가 발생할 때
-    from synapstock.presentation.web.core.dependencies import query_service
+    from evenezer.presentation.web.core.dependencies import query_service
     telegram_app.bot.send_message.reset_mock()
     with patch.object(query_service, "find_stocks_by_name", side_effect=ValueError("검색 에러 테스트")):
         update_search_error = make_text_update(telegram_app, "오류유도")
@@ -288,7 +288,7 @@ async def test_process_search_query_edge_cases(telegram_app):
 @pytest.mark.asyncio
 async def test_process_stock_selection_edge_cases(telegram_app):
     """종목 선택 단계에서의 예외 상황(인라인 쿼리 빈 데이터, 잘못된 인덱스 등) 검증."""
-    from synapstock.presentation.web.core.dependencies import query_service
+    from evenezer.presentation.web.core.dependencies import query_service
     mock_results = [
         {"board": "theme_IT", "ticker": "123451", "name": "이스트소프트", "path": "보안 > 보안관리"},
     ]
@@ -414,8 +414,8 @@ async def test_process_news_url_edge_cases(telegram_app):
 
 def test_main_missing_token():
     """telegram_token 설정이 누락되었을 때 봇 프로그램이 sys.exit(1)로 정상 종료되는지 검증."""
-    from synapstock.presentation.telegram.bot import main
-    from synapstock.infrastructure.container import container
+    from evenezer.presentation.telegram.bot import main
+    from evenezer.infrastructure.container import container
     
     with patch.object(container.config, "telegram_token", None), \
          pytest.raises(SystemExit) as exc_info:
@@ -425,8 +425,8 @@ def test_main_missing_token():
 
 def test_main_running():
     """토큰이 주어졌을 때 봇 빌드 및 폴링이 안전하게 호출되는지 검증."""
-    from synapstock.presentation.telegram.bot import main
-    from synapstock.infrastructure.container import container
+    from evenezer.presentation.telegram.bot import main
+    from evenezer.infrastructure.container import container
     
     mock_app = MagicMock()
     mock_app.bot_data = {}
@@ -438,7 +438,7 @@ def test_main_running():
     mock_builder.build.return_value = mock_app
     
     with patch.object(container.config, "telegram_token", "fake_token_for_main"), \
-         patch("synapstock.presentation.telegram.bot.ApplicationBuilder", return_value=mock_builder):
+         patch("evenezer.presentation.telegram.bot.ApplicationBuilder", return_value=mock_builder):
         main()
         
     mock_builder.token.assert_called_once_with("fake_token_for_main")

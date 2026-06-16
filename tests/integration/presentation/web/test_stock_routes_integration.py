@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.fixture
 def client(integration_test_env):
     """DATA_DIR이 임시 경로로 격리된 상태에서 FastAPI 앱 클라이언트를 생성합니다."""
-    from synapstock.presentation.web.server import app
+    from evenezer.presentation.web.server import app
     # 테스트 시 startup 이벤트를 비활성화하여 백그라운드 동기화 스레드 실행을 방지합니다.
     app.router.on_startup = []
     return TestClient(app)
@@ -52,7 +52,7 @@ def test_search_stock(client):
     # NaverTickerSearchAdapter는 실제로 캐시 파일(stock_cache.json)이나 네이버 검색 API를 모킹 없이 타거나,
     # 여기서는 검색 결과를 통합 테스트하기 위해 mock을 걸거나 빈 결과에 대비함.
     # 안전하게 NaverTickerSearchAdapter의 search 함수만 패치하여 검증합니다.
-    from synapstock.presentation.web.core.dependencies import query_service
+    from evenezer.presentation.web.core.dependencies import query_service
     
     mock_results = [{"name": "안랩", "ticker": "053800"}]
     with patch.object(query_service._ticker_search, "search", return_value=mock_results) as mock_search:
@@ -83,7 +83,7 @@ def test_get_all_stocks_flat(client):
 def test_get_disclosures(client):
     """GET /api/disclosure/{ticker} - 공시 목록 조회 검증."""
     # 외부 DART API 호출을 대체하기 위해 query_service.get_disclosures 모킹
-    from synapstock.presentation.web.core.dependencies import query_service
+    from evenezer.presentation.web.core.dependencies import query_service
     
     mock_disclosures = [
         {"rcpNo": "202601010001", "title": "정기공시", "date": "2026-01-01"}
@@ -98,7 +98,7 @@ def test_get_disclosures(client):
 
 def test_scrape_news_success(client):
     """GET /api/news/scrape - 뉴스 URL 성공 스크랩 검증."""
-    from synapstock.presentation.web.core.dependencies import news_service
+    from evenezer.presentation.web.core.dependencies import news_service
     
     mock_scraped = MagicMock()
     mock_scraped.title = "테스트 뉴스 제목"

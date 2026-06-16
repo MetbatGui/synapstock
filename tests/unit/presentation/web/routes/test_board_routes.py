@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from synapstock.presentation.web.routes.board_routes import router
-from synapstock.domain.models import Stock
+from evenezer.presentation.web.routes.board_routes import router
+from evenezer.domain.models import Stock
 
 app = FastAPI()
 app.include_router(router)
@@ -14,8 +14,8 @@ client = TestClient(app)
 
 @pytest.fixture
 def mock_deps():
-    with patch("synapstock.presentation.web.routes.board_routes.query_service") as mock_query, \
-         patch("synapstock.presentation.web.routes.board_routes.command_service") as mock_command:
+    with patch("evenezer.presentation.web.routes.board_routes.query_service") as mock_query, \
+         patch("evenezer.presentation.web.routes.board_routes.command_service") as mock_command:
         yield mock_query, mock_command
 
 

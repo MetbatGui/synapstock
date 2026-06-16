@@ -2,10 +2,10 @@ from unittest.mock import Mock, AsyncMock
 
 import pytest
 
-from synapstock.application.services.media_service import StockMediaService
-from synapstock.application.services.query_service import BoardQueryService
-from synapstock.domain.models import Board, Node, Stock
-from synapstock.domain.ports import BoardRepositoryPort, MindmapPort, StoragePort, TickerSearchPort
+from evenezer.application.services.media_service import StockMediaService
+from evenezer.application.services.query_service import BoardQueryService
+from evenezer.domain.models import Board, Node, Stock
+from evenezer.domain.ports import BoardRepositoryPort, MindmapPort, StoragePort, TickerSearchPort
 
 
 class MockBoardRepository(BoardRepositoryPort):

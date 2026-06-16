@@ -1,8 +1,8 @@
 import asyncio
 import pytest
 from unittest.mock import Mock
-from synapstock.domain.ports import EventBusPort
-from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+from evenezer.domain.ports import EventBusPort
+from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
 
 @pytest.mark.unit
 def test_event_bus_interface():

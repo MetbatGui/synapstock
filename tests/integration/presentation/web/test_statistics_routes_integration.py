@@ -5,14 +5,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 @pytest.fixture
 def client(integration_test_env):
     """DATA_DIR이 임시 경로로 격리된 상태에서 FastAPI 앱 클라이언트를 생성합니다."""
-    from synapstock.presentation.web.server import app
+    from evenezer.presentation.web.server import app
     app.router.on_startup = []
     return TestClient(app)
 
 
 def test_get_weekly_change(client):
     """GET /api/statistics/weekly-change - 주간 등락률 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import weekly_change_service
+    from evenezer.presentation.web.core.dependencies import weekly_change_service
     
     mock_data = {"date": "2026-06-10", "items": [{"name": "삼성전자", "ratio": 1.5}]}
     with patch.object(weekly_change_service, "get_weekly_change", new_callable=AsyncMock) as mock_get:
@@ -26,7 +26,7 @@ def test_get_weekly_change(client):
 
 def test_get_weekly_change_dates(client):
     """GET /api/statistics/weekly-change/dates - 사용 가능한 주간 등락률 날짜 목록 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import weekly_change_service
+    from evenezer.presentation.web.core.dependencies import weekly_change_service
     
     mock_dates = ["2026-06-03", "2026-06-10"]
     with patch.object(weekly_change_service, "list_available_dates", new_callable=AsyncMock) as mock_list:
@@ -39,7 +39,7 @@ def test_get_weekly_change_dates(client):
 
 def test_sync_weekly_change(client):
     """POST /api/statistics/weekly-change/sync - 주간 등락률 수동 동기화 검증."""
-    from synapstock.presentation.web.core.dependencies import weekly_change_service
+    from evenezer.presentation.web.core.dependencies import weekly_change_service
     
     mock_sync_result = MagicMock()
     mock_sync_result.date = "2026-06-10"
@@ -99,7 +99,7 @@ def test_get_available_dates(client):
 
 def test_sync_statistics(client):
     """POST /api/statistics/sync - 구글 드라이브 수급 데이터 동기화 검증."""
-    from synapstock.presentation.web.core.dependencies import statistics_service
+    from evenezer.presentation.web.core.dependencies import statistics_service
     
     with patch.object(statistics_service, "sync_recent_data", new_callable=AsyncMock, return_value=3) as mock_sync:
         response = client.post("/api/statistics/sync")
@@ -112,7 +112,7 @@ def test_sync_statistics(client):
 
 def test_get_ceiling_report(client):
     """GET /api/statistics/ceiling-report - 상한가 분석 리포트 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import statistics_service
+    from evenezer.presentation.web.core.dependencies import statistics_service
     
     mock_report = {"date": "2026-06-10", "items": [{"name": "종목A", "reason": "호재"}]}
     with patch.object(statistics_service, "get_ceiling_analysis", new_callable=AsyncMock, return_value=mock_report) as mock_get:
@@ -123,7 +123,7 @@ def test_get_ceiling_report(client):
 
 def test_get_ceiling_years(client):
     """GET /api/statistics/ceiling-years - 상한가 가능 연도 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import statistics_service
+    from evenezer.presentation.web.core.dependencies import statistics_service
     
     with patch.object(statistics_service, "list_available_ceiling_years", new_callable=AsyncMock, return_value=["2025", "2026"]):
         response = client.get("/api/statistics/ceiling-years")
@@ -133,7 +133,7 @@ def test_get_ceiling_years(client):
 
 def test_get_ceiling_dates(client):
     """GET /api/statistics/ceiling-dates - 상한가 가능 날짜 목록 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import statistics_service
+    from evenezer.presentation.web.core.dependencies import statistics_service
     
     with patch.object(statistics_service, "list_available_ceiling_dates", new_callable=AsyncMock, return_value=["2026-06-09", "2026-06-10"]):
         response = client.get("/api/statistics/ceiling-dates?year=2026")
@@ -143,7 +143,7 @@ def test_get_ceiling_dates(client):
 
 def test_get_new_listing(client):
     """GET /api/statistics/new-listing - 신규상장주 분석 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import statistics_service
+    from evenezer.presentation.web.core.dependencies import statistics_service
     
     mock_ipo_data = [{"company_name": "신규A", "listing_date": "2026-06-10"}]
     with patch.object(statistics_service, "get_new_listing_data", new_callable=AsyncMock, return_value=mock_ipo_data) as mock_get:
@@ -172,7 +172,7 @@ def test_get_new_listing_default_all_years_real(client):
 
 def test_get_bonus_issue(client):
     """GET /api/statistics/bonus-issue - 무상증자 분석 조회 검증."""
-    from synapstock.presentation.web.core.dependencies import statistics_service
+    from evenezer.presentation.web.core.dependencies import statistics_service
     
     mock_bonus_data = [{"company_name": "증자A", "base_date": "2026-06-10"}]
     with patch.object(statistics_service, "get_bonus_issue_data", new_callable=AsyncMock, return_value=mock_bonus_data) as mock_get:

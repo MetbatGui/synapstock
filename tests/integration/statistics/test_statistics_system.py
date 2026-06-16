@@ -1,8 +1,8 @@
 
 import pytest
 
-from synapstock.domain.statistics.models import DailyMarketRanking, MarketType, RankingItem, SupplySubject
-from synapstock.infrastructure.container import Container
+from evenezer.domain.statistics.models import DailyMarketRanking, MarketType, RankingItem, SupplySubject
+from evenezer.infrastructure.container import Container
 
 
 @pytest.fixture
@@ -19,11 +19,11 @@ def test_container(tmp_path):
     netbuy_dir = data_dir / "statistics" / "netbuy"
     netbuy_dir.mkdir(parents=True)
 
-    from synapstock.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
+    from evenezer.infrastructure.adapters.local.statistics_repo import LocalStatisticsRepository
     container._statistics_repo = LocalStatisticsRepository(str(netbuy_dir))
 
     # StatisticsService 재초기화 (새 레포지토리 주입)
-    from synapstock.application.services.statistics_service import StatisticsService
+    from evenezer.application.services.statistics_service import StatisticsService
     container._statistics_service = StatisticsService(
         storage=container._drive_adapter,
         repository=container._statistics_repo,

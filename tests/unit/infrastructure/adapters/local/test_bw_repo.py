@@ -1,5 +1,5 @@
-from synapstock.domain.statistics.models import BondWithWarrants
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalBondWithWarrantsRepository
+from evenezer.domain.statistics.models import BondWithWarrants
+from evenezer.infrastructure.adapters.local.statistics_repo import LocalBondWithWarrantsRepository
 
 
 def test_save_and_load_bw_data(tmp_path):

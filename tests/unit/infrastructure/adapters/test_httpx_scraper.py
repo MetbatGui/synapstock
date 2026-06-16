@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from synapstock.infrastructure.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
+from evenezer.infrastructure.adapters.scraper.httpx_scraper import HttpxNewsScraperAdapter
 
 
 @pytest.fixture

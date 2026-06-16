@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from synapstock.infrastructure.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
+from evenezer.infrastructure.adapters.scraper.naver_ticker_adapter import NaverTickerSearchAdapter
 
 
 @pytest.fixture

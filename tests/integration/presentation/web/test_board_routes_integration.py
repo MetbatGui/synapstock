@@ -3,19 +3,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from synapstock.presentation.web.server import app
-from synapstock.domain.models import Board, Node, Stock
+from evenezer.presentation.web.server import app
+from evenezer.domain.models import Board, Node, Stock
 
 client = TestClient(app)
 
 
 @pytest.fixture
 def mock_dependencies():
-    with patch("synapstock.presentation.web.routes.board_routes.query_service") as mock_query, \
-         patch("synapstock.presentation.web.routes.board_routes.command_service") as mock_command, \
-         patch("synapstock.presentation.web.routes.board_routes.media_service") as mock_media, \
-         patch("synapstock.presentation.web.routes.board_routes.board_file_sync_service") as mock_file_sync, \
-         patch("synapstock.presentation.web.routes.board_routes.sync_service") as mock_miro_sync:
+    with patch("evenezer.presentation.web.routes.board_routes.query_service") as mock_query, \
+         patch("evenezer.presentation.web.routes.board_routes.command_service") as mock_command, \
+         patch("evenezer.presentation.web.routes.board_routes.media_service") as mock_media, \
+         patch("evenezer.presentation.web.routes.board_routes.board_file_sync_service") as mock_file_sync, \
+         patch("evenezer.presentation.web.routes.board_routes.sync_service") as mock_miro_sync:
         yield {
             "query": mock_query,
             "command": mock_command,
@@ -103,7 +103,7 @@ def test_trigger_sync(mock_dependencies):
     mock_query.load_board.return_value = MagicMock()
 
     # 국소적으로 board_routes 내의 Thread 클래스만 패치하여 스레드 기동을 우회합니다.
-    with patch("synapstock.presentation.web.routes.board_routes.threading.Thread") as mock_thread_cls:
+    with patch("evenezer.presentation.web.routes.board_routes.threading.Thread") as mock_thread_cls:
         mock_thread_inst = MagicMock()
         mock_thread_cls.return_value = mock_thread_inst
         response = client.post("/api/sync?name=theme_test")

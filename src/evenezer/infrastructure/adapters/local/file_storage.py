@@ -1,0 +1,106 @@
+import asyncio
+import logging
+import shutil
+from pathlib import Path
+
+from evenezer.domain.ports import StoragePort
+
+logger = logging.getLogger(__name__)
+
+
+class LocalFileStorageAdapter(StoragePort):
+    """로컬 파일 시스템을 위한 StoragePort 구현체."""
+
+    def __init__(self, base_dir: str | Path = "."):
+        self.base_dir = Path(base_dir)
+
+    def _get_abs_path(self, path: str) -> Path:
+        """상대 경로를 인스턴스 기준의 절대 경로로 변환한다.
+        경로 순회(Path Traversal) 공격 방지를 위해 base_dir 내에 위치하는지 검증한다.
+        """
+        p = Path(path)
+        base_resolved = self.base_dir.resolve()
+        
+        if p.is_absolute():
+            resolved_path = p.resolve()
+        else:
+            resolved_path = (base_resolved / p).resolve()
+            
+        if not resolved_path.is_relative_to(base_resolved):
+            raise ValueError(f"Access Denied: Path traversal detected for path '{path}'")
+            
+        return resolved_path
+
+    async def path_exists(self, path: str, **kwargs) -> bool:
+        """경로 존재 여부를 확인한다."""
+        return await asyncio.to_thread(self._get_abs_path(path).exists)
+
+    async def ensure_directory(self, path: str, **kwargs) -> bool:
+        """디렉토리가 없으면 생성한다."""
+        def _ensure():
+            try:
+                self._get_abs_path(path).mkdir(parents=True, exist_ok=True)
+                return True
+            except Exception as e:
+                logger.error(f"Failed to create directory {path}: {e}")
+                return False
+        return await asyncio.to_thread(_ensure)
+
+    async def get_file(self, path: str, **kwargs) -> bytes | None:
+        """파일 내용을 읽어온다."""
+        abs_path = self._get_abs_path(path)
+        if not await asyncio.to_thread(abs_path.is_file):
+            return None
+        try:
+            return await asyncio.to_thread(abs_path.read_bytes)
+        except Exception as e:
+            logger.error(f"Failed to read file {path}: {e}")
+            return None
+
+    async def put_file(self, path: str, data: bytes, **kwargs) -> bool:
+        """데이터를 파일로 저장한다."""
+        abs_path = self._get_abs_path(path)
+        def _put():
+            try:
+                # 부모 디렉토리가 없으면 생성
+                abs_path.parent.mkdir(parents=True, exist_ok=True)
+                abs_path.write_bytes(data)
+                return True
+            except Exception as e:
+                logger.error(f"Failed to write file {path}: {e}")
+                return False
+        return await asyncio.to_thread(_put)
+
+    async def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
+        """폴더 내 파일 목록을 반환한다."""
+        abs_path = self._get_abs_path(folder_path)
+        if not await asyncio.to_thread(abs_path.is_dir):
+            return []
+
+        def _list():
+            results = []
+            for p in abs_path.iterdir():
+                if p.is_file():
+                    results.append(
+                        {"id": str(p.relative_to(self.base_dir)) if not p.is_absolute() else str(p), "name": p.name}
+                    )
+            return results
+        return await asyncio.to_thread(_list)
+
+    async def download_file(self, filename: str, local_path: str, **kwargs) -> bool:
+        """파일을 복사한다 (로컬 어댑터에서는 copy와 유사)."""
+        src = self._get_abs_path(filename)
+        dest = Path(local_path)
+
+        if not await asyncio.to_thread(src.exists):
+            return False
+
+        def _copy():
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+                return True
+            except Exception as e:
+                logger.error(f"Failed to download(copy) file {filename} to {local_path}: {e}")
+                return False
+        return await asyncio.to_thread(_copy)

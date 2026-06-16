@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from synapstock.domain.models import Board, Node, Stock
+from evenezer.domain.models import Board, Node, Stock
 
 # ── 픽스처 ──────────────────────────────────────────────────────────────────
 

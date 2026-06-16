@@ -1,6 +1,6 @@
 import pytest
 
-from synapstock.infrastructure.parsers.excel.base import BaseExcelParser
+from evenezer.infrastructure.parsers.excel.base import BaseExcelParser
 
 
 class ConcreteParser(BaseExcelParser):

@@ -2,9 +2,9 @@ import pytest
 import json
 from pathlib import Path
 from dataclasses import dataclass
-from synapstock.domain.ports import EventOutboxPort
-from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
-from synapstock.domain.events import DomainEvent
+from evenezer.domain.ports import EventOutboxPort
+from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+from evenezer.domain.events import DomainEvent
 
 @dataclass(frozen=True)
 class DummyEvent(DomainEvent):

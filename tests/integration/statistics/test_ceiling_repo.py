@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from synapstock.domain.statistics.models import CeilingAnalysisReport, CeilingItem
-from synapstock.infrastructure.adapters.local.statistics_repo import LocalCeilingRepository
+from evenezer.domain.statistics.models import CeilingAnalysisReport, CeilingItem
+from evenezer.infrastructure.adapters.local.statistics_repo import LocalCeilingRepository
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from synapstock.infrastructure.parsers.excel import DisclosureParser
+from evenezer.infrastructure.parsers.excel import DisclosureParser
 
 
 def test_parse_bond_with_warrants_real_example():

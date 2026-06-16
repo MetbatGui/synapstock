@@ -6,7 +6,7 @@ from unittest.mock import patch
 @pytest.fixture
 def client(integration_test_env):
     """DATA_DIR이 임시 경로로 격리된 상태에서 FastAPI 앱 클라이언트를 생성합니다."""
-    from synapstock.presentation.web.server import app
+    from evenezer.presentation.web.server import app
     app.router.on_startup = []
     return TestClient(app)
 
@@ -14,7 +14,7 @@ def client(integration_test_env):
 def test_get_heatmap_plotly_data(client):
     """GET /api/heatmap/data - Plotly.js Treemap 호환용 히트맵 데이터 생성 검증."""
     # KRX 시세 조회 어댑터를 모킹하여 네트워크 의존성을 제거합니다.
-    from synapstock.infrastructure.adapters.heatmap.krx_repository import KrxRepository
+    from evenezer.infrastructure.adapters.heatmap.krx_repository import KrxRepository
     
     # 테마 JSON 파일에 정의된 대표 종목들의 시세 데이터를 모의 생성합니다.
     # 예: NAVER, 카카오, 안랩 등

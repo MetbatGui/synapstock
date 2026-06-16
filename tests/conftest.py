@@ -26,10 +26,10 @@ def integration_test_env():
     import shutil
     import tempfile
     from pathlib import Path
-    from synapstock.infrastructure.container import container
+    from evenezer.infrastructure.container import container
 
     # 1. 임시 디렉터리 생성 및 DATA_DIR 설정
-    temp_dir = Path(tempfile.mkdtemp(prefix="synapstock_integration_"))
+    temp_dir = Path(tempfile.mkdtemp(prefix="evenezer_integration_"))
     old_data_dir = os.environ.get("DATA_DIR")
     os.environ["DATA_DIR"] = str(temp_dir)
 
@@ -103,8 +103,8 @@ def integration_test_env():
     # 4. 의존성 컨테이너 재조립 (새로운 임시 DATA_DIR 반영)
     # 백그라운드 스레드 기동을 패치하여 테스트 프로세스에서의 리소스 충돌(RuntimeError)을 방지합니다.
     from unittest.mock import patch
-    from synapstock.infrastructure.container import Container
-    from synapstock.application.events.worker import OutboxWorker
+    from evenezer.infrastructure.container import Container
+    from evenezer.application.events.worker import OutboxWorker
     
     with patch.object(Container, "sync_financial_statements_from_drive", return_value=None), \
          patch.object(Container, "sync_boards_from_drive_in_background", return_value=None), \
@@ -117,13 +117,13 @@ def integration_test_env():
     # 파이썬의 'from import' 바인딩 복사 특성을 우회하기 위해 이미 로드된 모든 라우터 모듈의 레퍼런스를 갱신합니다.
     import sys
     modules_to_patch = [
-        "synapstock.presentation.web.core.dependencies",
-        "synapstock.presentation.web.routes.board_routes",
-        "synapstock.presentation.web.routes.stock_routes",
-        "synapstock.presentation.web.routes.financial_routes",
-        "synapstock.presentation.web.routes.report_routes",
-        "synapstock.presentation.web.routes.statistics_routes",
-        "synapstock.presentation.web.routes.heatmap_routes",
+        "evenezer.presentation.web.core.dependencies",
+        "evenezer.presentation.web.routes.board_routes",
+        "evenezer.presentation.web.routes.stock_routes",
+        "evenezer.presentation.web.routes.financial_routes",
+        "evenezer.presentation.web.routes.report_routes",
+        "evenezer.presentation.web.routes.statistics_routes",
+        "evenezer.presentation.web.routes.heatmap_routes",
     ]
     for mod_name in modules_to_patch:
         if mod_name in sys.modules:
@@ -175,7 +175,7 @@ def integration_test_env():
     shutil.rmtree(temp_dir, ignore_errors=True)
     
     # 7. 컨테이너 원상 복구 (백그라운드 스레드는 패치하여 초기화)
-    from synapstock.application.events.worker import OutboxWorker
+    from evenezer.application.events.worker import OutboxWorker
     with patch.object(Container, "sync_financial_statements_from_drive", return_value=None), \
          patch.object(Container, "sync_boards_from_drive_in_background", return_value=None), \
          patch.object(Container, "sync_stock_splits_from_drive_in_background", return_value=None), \

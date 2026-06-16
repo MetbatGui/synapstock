@@ -30,8 +30,8 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
-# Ensure virtual environment executables (like uvicorn, synapstock, synapstock-bot) are directly accessible
+# Ensure virtual environment executables (like uvicorn, evenezer, evenezer-bot) are directly accessible
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Default CMD (can be overridden in docker-compose.yml)
-CMD ["synapstock"]
+CMD ["evenezer"]

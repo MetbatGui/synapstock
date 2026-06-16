@@ -3,11 +3,11 @@ import os
 
 import pytest
 
-from synapstock.application.services.board_file_sync_service import BoardFileSyncService
-from synapstock.domain.models import Board, Node
-from synapstock.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
-from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository
-from synapstock.infrastructure.config import AppConfig
+from evenezer.application.services.board_file_sync_service import BoardFileSyncService
+from evenezer.domain.models import Board, Node
+from evenezer.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository
+from evenezer.infrastructure.config import AppConfig
 
 # secrets/token.json 자격 증명이 실제로 로컬에 존재하는지 조사하여 조건부 스킵 가드 설정
 TOKEN_PATH = "secrets/token.json"
@@ -63,7 +63,7 @@ class TestBoardFileSyncServiceIntegration:
         )
 
         # 임시 매니페스트 레포지토리 초기화
-        from synapstock.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
+        from evenezer.infrastructure.adapters.local.board_repo import LocalBoardSyncManifestRepository
         self.manifest_repository = LocalBoardSyncManifestRepository(self.test_manifest_path)
 
         # 2. 동기화 서비스 초기화
