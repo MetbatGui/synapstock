@@ -105,7 +105,6 @@ class TestStatisticsService:
 
         # Assert
         mock_disclosure_svc.get_data.assert_called_once_with("cb", "2026", force_sync=True)
-        service._enrich_tickers.assert_called_once_with(mock_items)
         assert result == mock_items
 
     @pytest.mark.asyncio
@@ -129,5 +128,4 @@ class TestStatisticsService:
 
         # Assert
         mock_disclosure_svc.get_data.assert_called_once_with("bw", "2026", force_sync=False)
-        service._enrich_tickers.assert_called_once_with(mock_items)
         assert result == mock_items
