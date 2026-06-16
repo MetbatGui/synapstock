@@ -52,6 +52,7 @@ class TestBoardCommandServiceSyncHook:
         """노드 삭제 성공 시 동기화 매니페스트 갱신 훅이 격발되는지 검증."""
         # 삭제 대상 자식 노드 추가
         self.test_board.add_node("test", "delete_me")
+        self.test_board.pull_events()  # 임시 노드 추가 시 누적된 도메인 이벤트 클리어 (중복 호출 방지)
 
         success = self.service.delete_node("theme_test", "delete_me")
 
@@ -66,6 +67,7 @@ class TestBoardCommandServiceSyncHook:
         """종목 삭제 성공 시 동기화 매니페스트 갱신 훅이 격발되는지 검증."""
         # 삭제 대상 종목 추가
         self.test_board.add_stock_to_node("test", Stock(name="삼성전자", ticker="005930"))
+        self.test_board.pull_events()  # 임시 종목 추가 시 누적된 도메인 이벤트 클리어 (중복 호출 방지)
 
         success = await self.service.delete_stock("theme_test", "005930")
 
