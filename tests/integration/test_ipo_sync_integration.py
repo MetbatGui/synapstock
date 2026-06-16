@@ -500,3 +500,139 @@ async def test_stock_move_from_ipo_board_to_sector_board(temp_board_dir):
     
     # --- 드라이브 싱크 호출 확인 ---
     assert drive_adapter.put_file.call_count >= 1
+
+
+@pytest.mark.asyncio
+async def test_stock_addition_outbox_flow(temp_board_dir):
+    """Outbox와 Worker를 통해 종목 추가 비동기 이벤트가 구글 드라이브 동기화까지 전달되는지 전체 흐름 검증."""
+    # 0. 파일 경로 세팅
+    manifest_path = temp_board_dir / "board_sync_manifest.json"
+    virtual_board_path = temp_board_dir / "virtual_신규상장주.json"
+    
+    # 1. 초기 매니페스트 및 가상 보드
+    initial_manifest = {
+        "last_updated": datetime.now().isoformat(),
+        "boards": {
+            "theme_IT": {"name": "IT", "last_modified": 1234567.0, "deleted": False},
+            "virtual_신규상장주": {"name": "신규상장주", "last_modified": 1234567.0, "deleted": False}
+        },
+        "new_listings": {
+            "990001": {
+                "ticker": "990001",
+                "name": "더미테크",
+                "status": "PENDING",
+                "updated_at": datetime.now().isoformat(),
+                "current_board": "virtual_신규상장주",
+                "current_path": []
+            }
+        }
+    }
+    manifest_path.write_text(json.dumps(initial_manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    
+    # 2. 초기 가상보드 생성 (990001 포함)
+    virtual_board = {
+        "name": "신규상장주",
+        "nodes": {
+            "신규상장주": {
+                "name": "신규상장주", "depth": 0, "parent_path": None,
+                "stocks": [{"name": "더미테크", "ticker": "990001", "aliases": [], "reports": [], "news": []}]
+            }
+        }
+    }
+    virtual_board_path.write_text(json.dumps(virtual_board, indent=2, ensure_ascii=False), encoding="utf-8")
+    
+    # 3. 타겟 섹터 보드 생성 (theme_IT)
+    theme_it_path = temp_board_dir / "theme_IT.json"
+    theme_it = {
+        "name": "IT",
+        "nodes": {
+            "IT": {"name": "IT", "depth": 0, "parent_path": None, "stocks": []},
+            "IT/인터넷": {"name": "인터넷", "depth": 1, "parent_path": "IT", "stocks": []}
+        }
+    }
+    theme_it_path.write_text(json.dumps(theme_it, indent=2, ensure_ascii=False), encoding="utf-8")
+    
+    # 4. 의존성 셋업 (아웃박스 및 워커 연동)
+    from unittest.mock import AsyncMock, MagicMock
+    from synapstock.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
+    from synapstock.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+    from synapstock.application.events.worker import OutboxWorker
+    from synapstock.application.services.board_file_sync_service import BoardFileSyncService
+    from synapstock.application.services.command_service import BoardCommandService
+    from synapstock.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
+    from synapstock.domain.events import StockAddedToBoard
+    
+    repo = LocalBoardRepository(root_dir=temp_board_dir)
+    drive_adapter = MagicMock()
+    drive_adapter.put_file = AsyncMock(return_value=True)
+    drive_adapter.get_file = AsyncMock(return_value=None)
+    
+    manifest_repository = LocalBoardSyncManifestRepository(manifest_path)
+    sync_service = BoardFileSyncService(
+        repository=repo,
+        drive_adapter=drive_adapter,
+        theme_folder_id="dummy_folder",
+        manifest_repository=manifest_repository
+    )
+    
+    # 아웃박스 및 이벤트 버스 연동
+    outbox_dir = temp_board_dir / "outbox"
+    outbox_dir.mkdir(exist_ok=True)
+    outbox = LocalFileEventOutboxAdapter(outbox_dir)
+    event_bus = InMemoryEventBusAdapter(sync_mode=False)
+    
+    # 이벤트 발생 시 아웃박스 적재 구독
+    event_bus.subscribe(StockAddedToBoard, lambda ev: outbox.save(ev))
+    
+    async def handle_stock_added(ev: StockAddedToBoard):
+        sync_service.update_local_manifest(ev.board_id, deleted=False)
+        await sync_service.handle_stock_addition_trigger(
+            ev.ticker, ev.board_id, ev.parent_path.split("/")
+        )
+        await sync_service.sync_with_drive()
+        
+    worker_handlers = {
+        "StockAddedToBoard": handle_stock_added,
+    }
+    worker = OutboxWorker(outbox=outbox, handlers=worker_handlers, base_delay=0.0)
+    
+    command_service = BoardCommandService(
+        repository=repo,
+        event_bus=event_bus
+    )
+    
+    # 5. 종목 추가 수행 -> 이벤트가 발행되어 아웃박스에 적재됨
+    success = await command_service.add_stock(
+        board_name="theme_IT",
+        parent_name="인터넷",
+        stock_name="더미테크",
+        ticker="990001"
+    )
+    assert success is True
+    
+    # 아웃박스 상태 조회: PENDING 상태로 1개 저장되어 있어야 함
+    pending = outbox.load_pending()
+    assert len(pending) == 1
+    assert pending[0]["event"]["event_class"] == "StockAddedToBoard"
+    
+    # 아직 동기화가 실제로 일어나지 않았어야 함 (아웃박스에서 비동기 소모 대기 중)
+    assert drive_adapter.put_file.call_count == 0
+    
+    # 6. 워커 구동 (수동으로 pending 이벤트 프로세스 1회 실행)
+    await worker.process_pending_events()
+    
+    # 7. 소모 완료 후 검증
+    # 매니페스트 ASSIGNED 전환 검증
+    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    item = manifest_data["new_listings"]["990001"]
+    assert item["status"] == "ASSIGNED"
+    
+    # 가상보드에서 제거 검증
+    virtual_board_data = json.loads(virtual_board_path.read_text(encoding="utf-8"))
+    assert len(virtual_board_data["nodes"]["신규상장주"].get("stocks", [])) == 0
+    
+    # 구글 드라이브 sync_with_drive 트리거 검증
+    assert drive_adapter.put_file.call_count >= 1
+    
+    # 아웃박스 상태 조회: 처리되었으므로 PENDING이 없어야 함
+    assert len(outbox.load_pending()) == 0

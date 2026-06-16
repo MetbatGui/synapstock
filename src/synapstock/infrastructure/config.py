@@ -34,6 +34,7 @@ class AppConfig(BaseModel):
     weekly_change_dir: Path = Path("data/statistics/weekly_change")
     stock_split_dir: Path = Path("data/statistics/stock_split")
     news_dir: Path = Path("data/news")
+    outbox_dir: Path = Path("data/outbox")
 
 
     # 외부 API 토큰 (환경 변수)
@@ -88,6 +89,7 @@ class AppConfig(BaseModel):
             weekly_change_dir=data_root / "statistics" / "weekly_change",
             stock_split_dir=data_root / "statistics" / "stock_split",
             news_dir=data_root / "news",
+            outbox_dir=data_root / "outbox",
 
             miro_token=os.getenv("MIRO_ACCESS_TOKEN", ""),
             telegram_token=os.getenv("TELEGRAM_API_TOKEN", ""),

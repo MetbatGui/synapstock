@@ -318,3 +318,27 @@ class EventBusPort(ABC):
         pass
 
 
+class EventOutboxPort(ABC):
+    """이벤트 유실 방지 및 비동기 소모를 위한 아웃박스 저장소 추상 포트."""
+
+    @abstractmethod
+    def save(self, event: Any) -> str:
+        """이벤트를 PENDING 상태로 영속 저장소에 기록하고 고유 ID를 반환합니다."""
+        pass
+
+    @abstractmethod
+    def load_pending(self) -> list[dict]:
+        """처리 대기 중인(PENDING) 이벤트 목록을 조회합니다."""
+        pass
+
+    @abstractmethod
+    def complete(self, outbox_id: str) -> None:
+        """이벤트 처리를 완료하고 아카이브 또는 제거 처리합니다."""
+        pass
+
+    @abstractmethod
+    def fail(self, outbox_id: str, error_msg: str) -> None:
+        """이벤트 처리 실패를 기록하고 재시도 카운트를 갱신합니다."""
+        pass
+
+
