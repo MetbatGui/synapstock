@@ -122,7 +122,7 @@ async def get_disclosures(ticker: str) -> list | JSONResponse:
     try:
         if not ticker or ticker == "none":
             return []
-        disclosures = query_service.get_disclosures(ticker)
+        disclosures = await query_service.get_disclosures(ticker)
         return cast(list, disclosures)
     except Exception as e:
         return JSONResponse(status_code=500, content={"message": str(e)})
