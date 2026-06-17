@@ -1,6 +1,7 @@
 import json
 import time
 import uuid
+import threading
 from pathlib import Path
 from typing import Any
 from datetime import datetime
@@ -8,14 +9,18 @@ from datetime import datetime
 from evenezer.domain.ports import EventOutboxPort
 
 class LocalFileEventOutboxAdapter(EventOutboxPort):
-    """로컬 파일 시스템 기반의 EventOutboxPort 구현체."""
+    """로컬 파일 시스템 기반의 EventOutboxPort 구현체. 스레드 락킹과 데드레터 큐를 지원합니다."""
 
     def __init__(self, outbox_dir: Path | str) -> None:
         self.outbox_dir = Path(outbox_dir)
         self.archive_dir = self.outbox_dir / "archive"
+        self.failed_dir = self.outbox_dir / "failed"
         
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
         self.archive_dir.mkdir(parents=True, exist_ok=True)
+        self.failed_dir.mkdir(parents=True, exist_ok=True)
+        
+        self._lock = threading.Lock()
 
     def _serialize_event(self, event: Any) -> dict:
         """이벤트를 JSON 직렬화 가능한 딕셔너리로 변환합니다."""
@@ -55,51 +60,75 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
         }
         
         file_path = self.outbox_dir / f"{outbox_id}.json"
-        file_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        with self._lock:
+            file_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return outbox_id
 
     def load_pending(self) -> list[dict]:
         pending_list = []
-        # outbox_dir 아래의 *.json 파일만 탐색 (하위 archive 폴더 내 파일은 제외)
-        for p in self.outbox_dir.glob("*.json"):
-            if p.is_file():
-                try:
-                    data = json.loads(p.read_text(encoding="utf-8"))
-                    if data.get("status") == "PENDING":
-                        pending_list.append(data)
-                except Exception:
-                    # 손상된 파일 등의 경우 건너뜀
-                    pass
+        with self._lock:
+            # outbox_dir 아래의 *.json 파일만 탐색 (하위 archive/failed 폴더 내 파일은 제외)
+            for p in self.outbox_dir.glob("*.json"):
+                if p.is_file():
+                    try:
+                        data = json.loads(p.read_text(encoding="utf-8"))
+                        if data.get("status") == "PENDING":
+                            pending_list.append(data)
+                    except Exception:
+                        # 손상된 파일 등의 경우 건너뜀
+                        pass
         # 생성 시간순으로 정렬
         pending_list.sort(key=lambda x: x.get("created_at", ""))
         return pending_list
 
     def complete(self, outbox_id: str) -> None:
         file_path = self.outbox_dir / f"{outbox_id}.json"
-        if file_path.exists():
-            try:
-                data = json.loads(file_path.read_text(encoding="utf-8"))
-                data["status"] = "COMPLETED"
-                data["completed_at"] = datetime.now().isoformat()
-                
-                # 아카이브 폴더로 이동
-                archive_path = self.archive_dir / f"{outbox_id}.json"
-                archive_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-                
-                # 원본 삭제
-                file_path.unlink()
-            except Exception:
-                pass
+        with self._lock:
+            if file_path.exists():
+                try:
+                    data = json.loads(file_path.read_text(encoding="utf-8"))
+                    data["status"] = "COMPLETED"
+                    data["completed_at"] = datetime.now().isoformat()
+                    
+                    # 아카이브 폴더로 이동
+                    archive_path = self.archive_dir / f"{outbox_id}.json"
+                    archive_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                    
+                    # 원본 삭제
+                    file_path.unlink()
+                except Exception:
+                    pass
 
     def fail(self, outbox_id: str, error_msg: str) -> None:
         file_path = self.outbox_dir / f"{outbox_id}.json"
-        if file_path.exists():
-            try:
-                data = json.loads(file_path.read_text(encoding="utf-8"))
-                data["retry_count"] += 1
-                data["last_error"] = error_msg
-                data["updated_at"] = datetime.now().isoformat()
-                
-                file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-            except Exception:
-                pass
+        with self._lock:
+            if file_path.exists():
+                try:
+                    data = json.loads(file_path.read_text(encoding="utf-8"))
+                    data["retry_count"] += 1
+                    data["last_error"] = error_msg
+                    data["updated_at"] = datetime.now().isoformat()
+                    
+                    file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                except Exception:
+                    pass
+
+    def fail_permanent(self, outbox_id: str, error_msg: str) -> None:
+        """이벤트를 영구 실패 상태로 failed 디렉토리에 격리합니다."""
+        file_path = self.outbox_dir / f"{outbox_id}.json"
+        with self._lock:
+            if file_path.exists():
+                try:
+                    data = json.loads(file_path.read_text(encoding="utf-8"))
+                    data["status"] = "FAILED_PERMANENT"
+                    data["last_error"] = error_msg
+                    data["failed_at"] = datetime.now().isoformat()
+                    
+                    # 실패(failed) 폴더로 이동하여 격리
+                    failed_path = self.failed_dir / f"{outbox_id}.json"
+                    failed_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                    
+                    # 원본 삭제
+                    file_path.unlink()
+                except Exception:
+                    pass

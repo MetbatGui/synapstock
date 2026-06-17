@@ -3,6 +3,7 @@ import logging
 import inspect
 from datetime import datetime
 from typing import Any, Callable
+from collections.abc import Mapping
 
 from evenezer.domain.ports import EventOutboxPort
 
@@ -14,7 +15,7 @@ class OutboxWorker:
     def __init__(
         self,
         outbox: EventOutboxPort,
-        handlers: dict[str, Callable[..., Any]],
+        handlers: Mapping[str, Callable[..., Any]],
         max_retries: int = 5,
         base_delay: float = 2.0,
     ) -> None:
@@ -65,11 +66,13 @@ class OutboxWorker:
             return True
 
         try:
+            from datetime import UTC
             updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
-            if updated_at.tzinfo is not None:
-                updated_at = updated_at.replace(tzinfo=None)
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=UTC)
 
-            elapsed = (datetime.now() - updated_at).total_seconds()
+            # 타임존 인지형(Aware) datetime 연산을 통해 로컬 타임존 간차로 인한 백오프 오작동 버그를 예방합니다.
+            elapsed = (datetime.now(UTC) - updated_at).total_seconds()
             # 지수 백오프: base_delay * (2 ** (retry_count - 1))
             delay = self._base_delay * (2 ** (retry_count - 1))
             return elapsed >= delay
@@ -98,7 +101,8 @@ class OutboxWorker:
                 logger.warning(
                     f"[OutboxWorker] 이벤트 {outbox_id}가 최대 재시도 횟수({self._max_retries}회)를 초과하여 제외(영구 실패) 처리됩니다."
                 )
-                self._outbox.complete(outbox_id)
+                # 영구 실패(Dead Letter) 아카이빙을 위해 complete 대신 fail_permanent를 호출합니다.
+                self._outbox.fail_permanent(outbox_id, item.get("last_error") or "Max retries exceeded")
                 continue
 
             # 2. 지수 백오프 확인

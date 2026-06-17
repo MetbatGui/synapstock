@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Type
 
 from evenezer.domain.models import Board, ScrapedNews, BoardSyncManifest
@@ -340,5 +341,11 @@ class EventOutboxPort(ABC):
     def fail(self, outbox_id: str, error_msg: str) -> None:
         """이벤트 처리 실패를 기록하고 재시도 카운트를 갱신합니다."""
         pass
+
+    @abstractmethod
+    def fail_permanent(self, outbox_id: str, error_msg: str) -> None:
+        """이벤트 처리가 영구적으로 실패했음을 기록하고(재시도 중단) 격리 처리합니다."""
+        pass
+
 
 
