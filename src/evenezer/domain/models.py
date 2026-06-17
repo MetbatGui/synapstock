@@ -27,14 +27,28 @@ class Stock(BaseModel):
 
     @model_validator(mode="after")
     def validate_ticker(self) -> Stock:
-        """티커 규격(예: 6자리 숫자/영문 구조)을 자율 검증합니다."""
+        """티커 규격(예: 6자리 숫자/영문 구조)을 자율 검증합니다.
+
+        Returns:
+            검증 및 공백 제거 처리가 완료된 자기 자신(Stock) 인스턴스.
+
+        Raises:
+            ValueError: 티커가 6자리 숫자가 아니거나 영문/숫자 구조가 아닐 경우.
+        """
         self.ticker = self.ticker.strip()
         if not self.ticker.isalnum() or len(self.ticker) != 6:
             raise ValueError(f"유효하지 않은 주식 티커 심볼입니다 (6자리 숫자 혹은 영문이어야 함): {self.ticker}")
         return self
 
     def matches(self, query: str) -> bool:
-        """사명 또는 별칭에 검색어가 부합하는지 도메인 내부에서 스스로 확인합니다."""
+        """사명 또는 별칭에 검색어가 부합하는지 도메인 내부에서 스스로 확인합니다.
+
+        Args:
+            query: 검색어 문자열.
+
+        Returns:
+            종목명 또는 별칭 중 하나라도 검색어를 포함하면 True, 그렇지 않으면 False.
+        """
         normalized_query = query.strip().lower()
         if normalized_query in self.name.lower():
             return True
@@ -47,7 +61,11 @@ class Stock(BaseModel):
         return bool(ticker_stripped and ticker_stripped.isalnum() and len(ticker_stripped) == 6)
 
     def rename(self, new_name: str) -> None:
-        """사명 변경 시 기존 사명을 aliases로 격하하고 새 사명을 적용합니다."""
+        """사명 변경 시 기존 사명을 aliases로 격하하고 새 사명을 적용합니다.
+
+        Args:
+            new_name: 새로 변경할 사명.
+        """
         if self.name != new_name:
             if self.name not in self.aliases:
                 self.aliases.append(self.name)
@@ -75,14 +93,28 @@ class Node(BaseModel):
     stocks: list[Stock] = []
 
     def add_stock(self, stock: Stock) -> bool:
-        """중복 체크 후 종목을 추가한다. 이미 존재하면 True(성공)를 반환한다."""
+        """중복 체크 후 종목을 추가합니다. 이미 존재하면 추가하지 않고 True를 반환합니다.
+
+        Args:
+            stock: 추가할 Stock 인스턴스.
+
+        Returns:
+            성공적으로 추가되었거나 이미 존재하면 True.
+        """
         if any(s.ticker == stock.ticker for s in self.stocks):
             return True
         self.stocks.append(stock)
         return True
 
     def remove_stock(self, ticker: str) -> bool:
-        """티커로 종목을 찾아 삭제한다."""
+        """티커로 종목을 찾아 삭제합니다.
+
+        Args:
+            ticker: 삭제할 주식 종목 코드 (6자리).
+
+        Returns:
+            종목이 존재하여 삭제 완료했으면 True, 존재하지 않았으면 False.
+        """
         orig_len = len(self.stocks)
         self.stocks = [s for s in self.stocks if s.ticker != ticker]
         return len(self.stocks) < orig_len
@@ -105,7 +137,11 @@ class Board(BaseModel):
     _events: list[DomainEvent] = PrivateAttr(default_factory=list)
 
     def pull_events(self) -> list[DomainEvent]:
-        """수집된 도메인 이벤트를 반환하고 버퍼를 비웁니다."""
+        """수집된 도메인 이벤트를 반환하고 버퍼를 비웁니다.
+
+        Returns:
+            수집되었던 도메인 이벤트 객체 리스트.
+        """
         events = list(self._events)
         self._events.clear()
         return events
@@ -139,11 +175,25 @@ class Board(BaseModel):
         return data
 
     def find_node(self, name: str) -> Node | None:
-        """보드 내에서 절대 경로(name)로 노드를 검색한다."""
+        """보드 내에서 절대 경로(name)로 노드를 검색합니다.
+
+        Args:
+            name: 검색할 노드의 절대 경로.
+
+        Returns:
+            검색된 Node 객체. 해당 노드가 없으면 None.
+        """
         return self.nodes.get(name)
 
     def find_stock(self, ticker: str) -> Stock | None:
-        """보드 내에서 티커로 종목을 검색한다."""
+        """보드 내에서 티커로 종목을 검색합니다.
+
+        Args:
+            ticker: 검색할 주식 종목 코드 (6자리).
+
+        Returns:
+            검색된 Stock 객체. 해당 종목이 없으면 None.
+        """
         for node in self.nodes.values():
             for stock in node.stocks:
                 if stock.ticker == ticker:
@@ -151,7 +201,15 @@ class Board(BaseModel):
         return None
 
     def add_node(self, parent_name: str, node_name: str) -> bool:
-        """특정 부모 노드 하위에 새 노드를 추가한다."""
+        """특정 부모 노드 하위에 새 자식 노드를 추가합니다.
+
+        Args:
+            parent_name: 부모 노드의 절대 경로.
+            node_name: 추가할 자식 노드의 단순 이름.
+
+        Returns:
+            성공적으로 추가되었거나 이미 해당 경로 노드가 존재하면 True. 부모가 존재하지 않으면 False.
+        """
         parent = self.find_node(parent_name)
         if not parent:
             return False
@@ -169,7 +227,15 @@ class Board(BaseModel):
         return True
 
     def add_stock_to_node(self, parent_name: str, stock: Stock) -> bool:
-        """특정 노드 하위에 종목을 추가한다."""
+        """특정 노드 하위에 종목을 추가합니다.
+
+        Args:
+            parent_name: 종목을 추가할 대상 노드의 절대 경로.
+            stock: 추가할 Stock 인스턴스.
+
+        Returns:
+            성공적으로 추가되었으면 True, 실패 시(부모 노드가 없는 경우 등) False.
+        """
         parent = self.find_node(parent_name)
         if not parent:
             return False
@@ -184,7 +250,15 @@ class Board(BaseModel):
         return False
 
     def delete_node(self, node_name: str) -> bool:
-        """노드를 삭제하고 하위 요소를 부모로 흡수한다. (루트 제외)"""
+        """노드를 삭제하고 하위 요소를 부모 노드로 흡수(이동)합니다. (루트 노드 제외)
+
+        Args:
+            node_name: 삭제할 대상 노드의 절대 경로.
+
+        Returns:
+            성공적으로 노드가 삭제되어 자식 및 종목이 재배치되었으면 True,
+            삭제 대상이 없거나 부모 경로가 없는 경우(루트 노드) False.
+        """
         node = self.find_node(node_name)
         if not node or node.parent_path is None:
             return False
@@ -229,7 +303,14 @@ class Board(BaseModel):
         return True
 
     def delete_stock(self, ticker: str) -> bool:
-        """보드 내에서 특정 종목(티커 기준)을 찾아 삭제합니다."""
+        """보드 내에서 특정 종목(티커 기준)을 찾아 삭제합니다.
+
+        Args:
+            ticker: 삭제할 주식 종목 코드 (6자리).
+
+        Returns:
+            종목이 존재하여 하나 이상의 노드에서 성공적으로 제거되었으면 True, 삭제된 내역이 없으면 False.
+        """
         deleted = False
         for node in self.nodes.values():
             if node.remove_stock(ticker):
@@ -239,7 +320,15 @@ class Board(BaseModel):
         return deleted
 
     def add_report_to_stock(self, ticker: str, report_path: str) -> bool:
-        """보드 내에서 특정 종목(티커 기준)을 찾아 리포트 경로를 추가합니다."""
+        """보드 내에서 특정 종목(티커 기준)을 찾아 리포트 파일 경로를 추가합니다.
+
+        Args:
+            ticker: 대상 주식 종목 코드 (6자리).
+            report_path: 추가할 리포트 파일의 경로.
+
+        Returns:
+            종목을 찾아서 리포트 경로를 추가했으면 True, 종목이 존재하지 않으면 False.
+        """
         stock = self.find_stock(ticker)
         if not stock:
             return False
@@ -248,7 +337,15 @@ class Board(BaseModel):
         return True
 
     def remove_report_from_stock(self, ticker: str, report_path: str) -> bool:
-        """보드 내에서 특정 종목(티커 기준)을 찾아 리포트 경로를 삭제합니다."""
+        """보드 내에서 특정 종목(티커 기준)을 찾아 리포트 경로를 삭제합니다.
+
+        Args:
+            ticker: 대상 주식 종목 코드 (6자리).
+            report_path: 삭제할 리포트 파일의 경로.
+
+        Returns:
+            종목을 찾아 리포트 경로를 성공적으로 제거했으면 True, 종목이 없거나 해당 리포트 경로가 없으면 False.
+        """
         stock = self.find_stock(ticker)
         if not stock:
             return False
@@ -346,18 +443,37 @@ class BoardSyncManifest(BaseModel):
     processed_event_ids: list[str] = Field(default_factory=list)
 
     def is_event_processed(self, event_id: str) -> bool:
-        """이벤트 ID가 이미 처리 완료되었는지 확인합니다."""
+        """이벤트 ID가 이미 처리 완료되었는지 확인합니다.
+
+        Args:
+            event_id: 확인할 이벤트의 고유 ID.
+
+        Returns:
+            이미 처리된 이벤트이면 True, 그렇지 않으면 False.
+        """
         return event_id in self.processed_event_ids
 
     def mark_event_processed(self, event_id: str, limit: int = 200) -> None:
-        """처리 완료된 이벤트 ID를 기록하고 제한 크기를 초과하면 오래된 항목부터 제거합니다."""
+        """처리 완료된 이벤트 ID를 기록하고 제한 크기를 초과하면 오래된 항목부터 제거합니다.
+
+        Args:
+            event_id: 처리 완료를 기록할 이벤트 고유 ID.
+            limit: 보관할 이벤트 ID의 최대 개수 한계치. 기본값은 200.
+        """
         if event_id not in self.processed_event_ids:
             self.processed_event_ids.append(event_id)
             if len(self.processed_event_ids) > limit:
                 self.processed_event_ids = self.processed_event_ids[-limit:]
 
     def merge_with(self, remote: BoardSyncManifest) -> BoardSyncManifest:
-        """로컬과 원격의 수정 시간(Timestamp) 및 IPO 병합 비즈니스 규칙에 근거하여 두 매니페스트를 통합합니다."""
+        """로컬과 원격의 수정 시간(Timestamp) 및 IPO 병합 비즈니스 규칙에 근거하여 두 매니페스트를 통합합니다.
+
+        Args:
+            remote: 병합할 대상 원격 매니페스트 객체.
+
+        Returns:
+            병합이 완료된 새로운 BoardSyncManifest 인스턴스.
+        """
         merged_boards = dict(remote.boards)
         for b_id, l_item in self.boards.items():
             if b_id not in merged_boards:
@@ -388,7 +504,13 @@ class BoardSyncManifest(BaseModel):
         )
 
     def update_board(self, board_id: str, name: str, deleted: bool = False) -> None:
-        """보드가 생성, 수정, 삭제되었을 때 매니페스트 상의 최종 수정 이력을 기록합니다."""
+        """보드가 생성, 수정, 삭제되었을 때 매니페스트 상의 최종 수정 이력을 기록합니다.
+
+        Args:
+            board_id: 매니페스트에 등록/수정할 보드의 ID.
+            name: 보드의 한글/영문 표시 명칭.
+            deleted: 해당 보드가 삭제 상태(Soft delete)인지 여부. 기본값은 False.
+        """
         from datetime import datetime, UTC
         self.boards[board_id] = BoardManifestItem(
             name=name,

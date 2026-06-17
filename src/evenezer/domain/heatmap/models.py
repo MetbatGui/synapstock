@@ -10,9 +10,16 @@ from .value_objects import MarketCap, ChangeRatio
 
 @dataclass
 class Stock:
-    """주식 종목 엔티티
+    """주식 종목 엔티티.
     
     종목 코드로 식별되는 엔티티입니다.
+
+    Attributes:
+        code: 식별자용 주식 종목 코드.
+        name: 종목명.
+        market_cap: 시가총액 값 객체.
+        change_ratio: 등락률 값 객체.
+        theme: 이 종목이 속한 테마 객체.
     """
     code: str  # 식별자
     name: str
@@ -32,22 +39,42 @@ class Stock:
         return self.market_cap.in_trillion
     
     def weighted_change(self) -> float:
-        """시가총액으로 가중된 등락률"""
+        """시가총액으로 가중된 등락률을 계산합니다.
+
+        Returns:
+            시가총액(조 단위) * 등락률 결과값.
+        """
         return self.change_ratio.weighted_by(self.market_cap)
 
 
 @dataclass
 class Category:
-    """테마 내 하위 카테고리 (재귀적 구조)"""
+    """테마 내 하위 카테고리 (재귀적 구조).
+
+    Attributes:
+        name: 카테고리 식별 명칭.
+        stocks: 카테고리에 직접 속한 주식 종목 리스트.
+        children: 하위 세부 카테고리 매핑 딕셔너리.
+    """
     name: str # 식별자
     stocks: List[Stock] = field(default_factory=list)
     children: Dict[str, 'Category'] = field(default_factory=dict)
     
     def add_stock(self, stock: Stock) -> None:
+        """카테고리에 종목을 중복 없이 추가합니다.
+
+        Args:
+            stock: 추가할 주식 종목 객체.
+        """
         if stock not in self.stocks:
             self.stocks.append(stock)
             
     def add_child(self, category: 'Category') -> None:
+        """하위 세부 카테고리를 추가합니다.
+
+        Args:
+            category: 추가할 하위 Category 객체.
+        """
         self.children[category.name] = category
         
     @property
@@ -76,9 +103,15 @@ class Category:
 
 @dataclass
 class Theme:
-    """테마 엔티티
+    """테마 엔티티.
     
     테마명으로 식별되며 여러 종목과 카테고리를 포함합니다.
+
+    Attributes:
+        name: 테마명 식별자.
+        stocks: 테마에 속한 전체 종목 리스트 (평탄화 구조).
+        categories: 최상위 카테고리 구조 매핑 딕셔너리.
+        parent_group: 소속된 상위 그룹 명칭.
     """
     name: str  # 식별자
     stocks: List[Stock] = field(default_factory=list) # 전체 종목 리스트 (Flattened)
@@ -90,16 +123,29 @@ class Theme:
             raise ValueError("테마명은 필수입니다")
     
     def add_stock(self, stock: Stock) -> None:
-        """종목 추가 (Flat List)"""
+        """종목을 테마의 전체 리스트에 추가합니다.
+
+        Args:
+            stock: 추가할 주식 종목 객체.
+        """
         if stock not in self.stocks:
             self.stocks.append(stock)
             stock.theme = self
     
     def add_category(self, category: Category) -> None:
+        """카테고리 계층 구조를 추가합니다.
+
+        Args:
+            category: 추가할 카테고리 객체.
+        """
         self.categories[category.name] = category
             
     def remove_stock(self, stock: Stock) -> None:
-        """종목 제거"""
+        """테마 및 소속 카테고리에서 종목을 해제합니다.
+
+        Args:
+            stock: 해제할 주식 종목 객체.
+        """
         if stock in self.stocks:
             self.stocks.remove(stock)
             stock.theme = None
@@ -162,7 +208,11 @@ class Theme:
 
 @dataclass
 class Heatmap:
-    """히트맵 루트 엔티티"""
+    """히트맵 루트 엔티티.
+
+    Attributes:
+        themes: 히트맵에 구성된 테마 매핑 딕셔너리.
+    """
     themes: Dict[str, Theme] = field(default_factory=dict)
     
     @property
@@ -181,10 +231,15 @@ class Heatmap:
         weighted_sum = 0.0
         for theme in self.themes.values():
              weighted_sum += sum(stock.weighted_change() for stock in theme.stocks)
-             
+              
         return weighted_sum / total_cap.in_trillion
     
     def add_theme(self, theme: Theme) -> None:
+        """히트맵에 테마를 등록합니다.
+
+        Args:
+            theme: 등록할 Theme 객체.
+        """
         self.themes[theme.name] = theme
 
 

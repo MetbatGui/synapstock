@@ -48,12 +48,23 @@ class MarketCap:
     
     @classmethod
     def from_trillion(cls, value: float) -> 'MarketCap':
-        """조 단위 값으로부터 생성"""
+        """조 단위 값으로부터 시가총액 객체를 생성합니다.
+
+        Args:
+            value: 조 단위 시가총액 숫자.
+
+        Returns:
+            생성된 MarketCap 객체.
+        """
         return cls(value * 1_000_000_000_000)
     
     @classmethod
     def zero(cls) -> 'MarketCap':
-        """0원 시가총액"""
+        """0원 상태의 시가총액 객체를 생성합니다.
+
+        Returns:
+            시가총액 0인 MarketCap 객체.
+        """
         return cls(0.0)
 
 
@@ -71,9 +82,15 @@ class ChangeRatio:
             raise ValueError(f"등락률이 비정상적입니다: {self.value}%")
     
     def weighted_by(self, market_cap: MarketCap) -> float:
-        """시가총액으로 가중된 등락률을 계산합니다
+        """시가총액으로 가중된 등락률을 계산합니다.
         
         가중 평균 계산 시 사용: (등락률 * 시가총액)
+
+        Args:
+            market_cap: 가중치로 사용할 시가총액 MarketCap 객체.
+
+        Returns:
+            등락률 * 시가총액(조 단위) 결과값.
         """
         return self.value * market_cap.in_trillion
     
@@ -94,5 +111,9 @@ class ChangeRatio:
     
     @classmethod
     def zero(cls) -> 'ChangeRatio':
-        """보합 (0%)"""
+        """보합(0%) 상태의 등락률 객체를 생성합니다.
+
+        Returns:
+            등락률 0인 ChangeRatio 객체.
+        """
         return cls(0.0)

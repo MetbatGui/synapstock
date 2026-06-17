@@ -10,7 +10,11 @@ class ThemeDataLoaderPort(ABC):
     
     @abstractmethod
     def load_heatmap(self) -> Heatmap:
-        """테마 데이터를 로드하여 Heatmap 도메인 모델을 반환합니다."""
+        """테마 데이터를 로드하여 Heatmap 도메인 모델을 반환합니다.
+
+        Returns:
+            로드 완료된 Heatmap 도메인 모델 인스턴스.
+        """
         pass
 
 

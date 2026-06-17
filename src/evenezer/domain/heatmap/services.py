@@ -15,8 +15,7 @@ class StockValidator:
             heatmap: 검증 및 정제를 수행할 Heatmap 도메인 모델
             
         Returns:
-            pd.DataFrame: 제외된 종목들의 내역이 담긴 DataFrame
-                          (Theme, Category, StockName, Code, Reason, Value)
+            제외된 종목들의 내역이 담긴 DataFrame (컬럼: Theme, Category, StockName, Code, Reason, Value)
         """
         removed_records = []
         seen_removed_codes = set()
@@ -50,7 +49,11 @@ class StockValidator:
         return pd.DataFrame(removed_records)
 
     def _prune_empty_categories(self, theme: Theme) -> None:
-        """종목이 모두 정제되어 비어 있게 된 카테고리를 재귀적으로 트리에서 제거합니다."""
+        """종목이 모두 정제되어 비어 있게 된 카테고리를 재귀적으로 트리에서 제거합니다.
+
+        Args:
+            theme: 프루닝을 수행할 대상 Theme 객체.
+        """
         
         def prune_category(category: Category) -> bool:
             # 1. 하위 카테고리부터 재귀적으로 먼저 프루닝 수행
@@ -83,7 +86,14 @@ class StockValidator:
         removed_records: List[Dict], 
         seen_codes: set
     ) -> None:
-        """재귀적으로 카테고리를 순회하며 유효하지 않은 종목을 제거합니다."""
+        """재귀적으로 카테고리를 순회하며 유효하지 않은 종목을 제거합니다.
+
+        Args:
+            theme_name: 현재 분석 중인 테마의 식별 명칭.
+            category: 검사를 진행할 Category 객체.
+            removed_records: 제거된 종목 이력을 누적할 리스트.
+            seen_codes: 제거 처리 중복을 피하기 위해 추적하는 종목 코드 Set.
+        """
         valid_stocks = []
         for stock in category.stocks:
             if self._is_stock_valid(stock):
@@ -105,7 +115,14 @@ class StockValidator:
             self._clean_category_recursively(theme_name, child, removed_records, seen_codes)
 
     def _is_stock_valid(self, stock: Stock) -> bool:
-        """종목 데이터의 유효성을 검사합니다."""
+        """종목 데이터의 유효성을 검사합니다.
+
+        Args:
+            stock: 검사할 주식 종목 Stock 객체.
+
+        Returns:
+            종목 코드가 유효하고 시가총액이 0보다 크면 True, 그렇지 않으면 False.
+        """
         if not stock.code or stock.code == 'None':
              return False
         # 시가총액이 0 이하면 제외
