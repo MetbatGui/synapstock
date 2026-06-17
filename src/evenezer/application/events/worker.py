@@ -1,9 +1,8 @@
 import asyncio
 import logging
-import inspect
+from collections.abc import Callable, Mapping
 from datetime import datetime
-from typing import Any, Callable
-from collections.abc import Mapping
+from typing import Any
 
 from evenezer.domain.ports import EventOutboxPort
 
@@ -137,7 +136,7 @@ class OutboxWorker:
             # 3. 이벤트 핸들러 탐색 및 격발
             event_dict = item.get("event", {})
             event_class_name = event_dict.get("event_class", "")
-            
+
             handler = self._handlers.get(event_class_name)
             if not handler:
                 logger.warning(f"[OutboxWorker] 이벤트 {event_class_name}에 등록된 핸들러가 없어 완료 처리합니다.")
@@ -147,13 +146,13 @@ class OutboxWorker:
             try:
                 # 도메인 이벤트 객체로 복원 시도
                 event_obj = self._restore_event(event_dict)
-                
+
                 # 핸들러 실행 (동기/비동기 모두 호환)
                 if asyncio.iscoroutinefunction(handler):
                     await handler(event_obj)
                 else:
                     handler(event_obj)
-                
+
                 # 성공 시 완료 처리
                 self._outbox.complete(outbox_id)
                 logger.info(f"[OutboxWorker] 이벤트 {outbox_id} ({event_class_name}) 처리 완료.")

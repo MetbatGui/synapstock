@@ -1,12 +1,13 @@
 import json
+import threading
 import time
 import uuid
-import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any
-from datetime import datetime
 
 from evenezer.domain.ports import EventOutboxPort
+
 
 class LocalFileEventOutboxAdapter(EventOutboxPort):
     """로컬 파일 시스템 기반의 EventOutboxPort 구현체. 스레드 락킹과 데드레터 큐를 지원합니다."""
@@ -20,11 +21,11 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
         self.outbox_dir = Path(outbox_dir)
         self.archive_dir = self.outbox_dir / "archive"
         self.failed_dir = self.outbox_dir / "failed"
-        
+
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
         self.archive_dir.mkdir(parents=True, exist_ok=True)
         self.failed_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self._lock = threading.Lock()
 
     def _serialize_event(self, event: Any) -> dict:
@@ -66,13 +67,13 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
             저장된 아웃박스 파일의 고유 식별자(ID) 문자열.
         """
         event_dict = self._serialize_event(event)
-        
-        # DomainEvent 인스턴스에 event_id가 있으면 이를 outbox_id로 사용하고, 
+
+        # DomainEvent 인스턴스에 event_id가 있으면 이를 outbox_id로 사용하고,
         # 없을 경우 하위 호환성을 위해 새로 생성합니다.
         outbox_id = getattr(event, "event_id", None) or event_dict.get("event_id")
         if not outbox_id:
             outbox_id = f"{int(time.time())}_{uuid.uuid4().hex}"
-        
+
         payload = {
             "id": outbox_id,
             "event": event_dict,
@@ -81,7 +82,7 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
             "last_error": None,
             "created_at": datetime.now().isoformat()
         }
-        
+
         file_path = self.outbox_dir / f"{outbox_id}.json"
         with self._lock:
             file_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -122,11 +123,11 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
                     data = json.loads(file_path.read_text(encoding="utf-8"))
                     data["status"] = "COMPLETED"
                     data["completed_at"] = datetime.now().isoformat()
-                    
+
                     # 아카이브 폴더로 이동
                     archive_path = self.archive_dir / f"{outbox_id}.json"
                     archive_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-                    
+
                     # 원본 삭제
                     file_path.unlink()
                 except Exception:
@@ -147,7 +148,7 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
                     data["retry_count"] += 1
                     data["last_error"] = error_msg
                     data["updated_at"] = datetime.now().isoformat()
-                    
+
                     file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
                 except Exception:
                     pass
@@ -167,11 +168,11 @@ class LocalFileEventOutboxAdapter(EventOutboxPort):
                     data["status"] = "FAILED_PERMANENT"
                     data["last_error"] = error_msg
                     data["failed_at"] = datetime.now().isoformat()
-                    
+
                     # 실패(failed) 폴더로 이동하여 격리
                     failed_path = self.failed_dir / f"{outbox_id}.json"
                     failed_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-                    
+
                     # 원본 삭제
                     file_path.unlink()
                 except Exception:

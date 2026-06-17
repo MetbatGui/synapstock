@@ -3,13 +3,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Type
+from typing import Any
 
-from evenezer.domain.models import Board, ScrapedNews, BoardSyncManifest
+from evenezer.domain.models import Board, BoardSyncManifest, ScrapedNews
 from evenezer.domain.news.models import NewsBatch
 from evenezer.domain.statistics.models import StockSplit, StockSplitManifest
-
-
 
 
 class BoardRepositoryPort(ABC):
@@ -382,7 +380,7 @@ class EventBusPort(ABC):
     """이벤트 발행 및 구독을 담당하는 추상 포트."""
 
     @abstractmethod
-    def subscribe(self, event_type: Type[Any], handler: Callable[..., Any]) -> None:
+    def subscribe(self, event_type: type[Any], handler: Callable[..., Any]) -> None:
         """이벤트 타입에 해당하는 핸들러를 등록합니다.
 
         Args:

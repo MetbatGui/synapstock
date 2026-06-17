@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 from typing import TYPE_CHECKING, cast
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from evenezer.application.services.news_service import NewsService
     from evenezer.domain.ports import FinancialDataPort
 
+from evenezer.application.events.worker import OutboxWorker
 from evenezer.application.services.board_file_sync_service import BoardFileSyncService
 from evenezer.application.services.command_service import BoardCommandService
 from evenezer.application.services.financial_service import FinancialService
@@ -21,13 +23,23 @@ from evenezer.application.services.media_service import StockMediaService
 from evenezer.application.services.query_service import BoardQueryService
 from evenezer.application.services.report_service import ReportService
 from evenezer.application.services.statistics_service import StatisticsService
+from evenezer.application.services.stock_split_sync_service import StockSplitSyncService
 from evenezer.application.services.sync_service import BoardSyncService
 from evenezer.application.services.weekly_change_service import WeeklyChangeService
-from evenezer.application.services.stock_split_sync_service import StockSplitSyncService
+from evenezer.domain.events import (
+    BatchStocksDeletedFromBoard,
+    BoardCreated,
+    BoardDeleted,
+    NodeAdded,
+    NodeDeleted,
+    StockAddedToBoard,
+    StockDeletedFromBoard,
+)
 from evenezer.infrastructure.adapters.disclosure.disclosure_adapter import (
-
     DartDisclosureAdapter,
 )
+from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
 from evenezer.infrastructure.adapters.financial.excel_adapter import (
     ExcelFinancialDataAdapter,
 )
@@ -36,19 +48,6 @@ from evenezer.infrastructure.adapters.google.google_drive_adapter import (
 )
 from evenezer.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
-from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
-from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
-from evenezer.application.events.worker import OutboxWorker
-from evenezer.domain.events import (
-    BoardCreated,
-    BoardDeleted,
-    NodeAdded,
-    NodeDeleted,
-    StockAddedToBoard,
-    StockDeletedFromBoard,
-    BatchStocksDeletedFromBoard,
-)
-
 from evenezer.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
@@ -60,15 +59,14 @@ from evenezer.infrastructure.adapters.local.statistics_repo import (
 )
 from evenezer.infrastructure.adapters.local.stock_split_repo import LocalStockSplitRepository
 from evenezer.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
-
 from evenezer.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
 )
 from evenezer.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
-from evenezer.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 from evenezer.infrastructure.config import AppConfig
+from evenezer.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 
 
 class Container:
@@ -191,7 +189,7 @@ class Container:
                 ev.ticker, ev.board_id, ev.parent_path.split("/")
             )
             await self._board_file_sync_service.sync_with_drive()
-            
+
             # 처리 완료 상태 기록
             manifest = self._board_file_sync_service.load_local_manifest()
             manifest.mark_event_processed(ev.event_id)
@@ -206,7 +204,7 @@ class Container:
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
-            
+
             # 처리 완료 상태 기록
             manifest = self._board_file_sync_service.load_local_manifest()
             manifest.mark_event_processed(ev.event_id)
@@ -221,7 +219,7 @@ class Container:
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
-            
+
             # 처리 완료 상태 기록
             manifest = self._board_file_sync_service.load_local_manifest()
             manifest.mark_event_processed(ev.event_id)
@@ -431,6 +429,7 @@ class Container:
 
         def run_sync_in_background():
             import asyncio
+
             from evenezer.application.services.heatmap.heatmap_service import HeatmapService
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
@@ -480,7 +479,7 @@ class Container:
 
         # 2. 만약 폴더 ID인 경우, 폴더 내부에서 '재무제표' 이름을 포함한 최신 엑셀/스프레드시트 파일을 검색
         if mime_type == "application/vnd.google-apps.folder":
-            logger.info(f"[Container] 제공된 ID가 폴더이므로 폴더 내부를 검색합니다.")
+            logger.info("[Container] 제공된 ID가 폴더이므로 폴더 내부를 검색합니다.")
 
             def _find_file_in_folder():
                 try:

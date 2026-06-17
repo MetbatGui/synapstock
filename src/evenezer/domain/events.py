@@ -1,6 +1,7 @@
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any
+
 
 @dataclass(frozen=True)
 class DomainEvent:
@@ -38,19 +39,19 @@ class DomainEvent:
         event_class_name = data.get("event_class")
         event_id = data.get("event_id")
         event_data = data.get("data", {}).copy()
-        
+
         target_cls = cls
         if cls == DomainEvent and event_class_name:
             import evenezer.domain.events as ev_module
             target_cls = getattr(ev_module, event_class_name, cls)
-        
+
         # 1. 생성자 필드들을 활용하여 복원 (event_id는 init=False 이므로 생성자 필드에서 분리됨)
         inst = target_cls(**event_data)
-        
+
         # 2. 저장되어 있던 고유 event_id로 최종 복원
         if event_id:
             object.__setattr__(inst, "event_id", event_id)
-            
+
         return inst
 
 @dataclass(frozen=True)

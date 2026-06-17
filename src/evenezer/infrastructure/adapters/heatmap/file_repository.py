@@ -1,16 +1,17 @@
-import os
-import json
 import glob
-from typing import List, Dict, Any
-from evenezer.domain.heatmap.ports import ThemeDataLoaderPort
-from evenezer.domain.heatmap.models import Heatmap, Theme, Category, Stock, MarketCap, ChangeRatio
+import json
 import logging
+import os
+from typing import Any
+
+from evenezer.domain.heatmap.models import Category, ChangeRatio, Heatmap, MarketCap, Stock, Theme
+from evenezer.domain.heatmap.ports import ThemeDataLoaderPort
 
 logger = logging.getLogger(__name__)
 
 class JsonThemeDataLoader(ThemeDataLoaderPort):
     """JSON 파일들을 로드하고 파싱하여 히트맵(Heatmap) 도메인 모델을 구축하는 어댑터입니다."""
-    
+
     def __init__(self, json_dir: str = 'data/heatmap', drive_adapter = None, folder_id: str | None = None):
         """JsonThemeDataLoader를 초기화합니다.
 
@@ -58,7 +59,7 @@ class JsonThemeDataLoader(ThemeDataLoaderPort):
             # 로컬 파일과 대조하여 최신본 동기화
             for name, drive_file in drive_files_map.items():
                 local_file_path = local_dir / name
-                
+
                 # 드라이브 수정 시간 파싱
                 drive_mtime = 0.0
                 if "modifiedTime" in drive_file:
@@ -110,87 +111,87 @@ class JsonThemeDataLoader(ThemeDataLoaderPort):
             파싱 완료된 전체 Heatmap 도메인 객체.
         """
         heatmap = Heatmap()
-        
+
         json_pattern = os.path.join(self.json_dir, "theme_*.json")
         files = glob.glob(json_pattern)
-        
+
         if not files:
             logger.warning(f"{self.json_dir} 경로에 theme_*.json 파일이 없습니다.")
             return heatmap
-            
+
         for file_path in files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     data = json.load(f)
                     self._parse_theme_file(data, heatmap)
             except Exception as e:
                 logger.error(f"{file_path} 파싱 실패: {e}")
-                
+
         return heatmap
 
-    def _parse_theme_file(self, data: Dict[str, Any], heatmap: Heatmap):
+    def _parse_theme_file(self, data: dict[str, Any], heatmap: Heatmap):
         """단일 테마 JSON 파일 데이터를 읽어 테마 및 카테고리 계층 구조를 생성하고 Heatmap에 추가합니다."""
         theme_name = data.get('theme', 'Unknown')
         theme = Theme(name=theme_name)
-        
+
         seen_categories = set()
-        
+
         sectors = data.get('sectors', [])
         for sector_data in sectors:
             sector_name = sector_data.get('sector_name', 'Unknown')
-            
+
             if sector_name in seen_categories:
                 continue
             seen_categories.add(sector_name)
-            
+
             category = Category(name=sector_name)
-            
+
             if 'companies' in sector_data:
                 self._add_companies(category, sector_data['companies'], theme)
-                
+
             if 'categories' in sector_data:
                 for sub_cat_1_data in sector_data['categories']:
                     self._parse_sub_category_1(sub_cat_1_data, category, theme, seen_categories)
-            
+
             theme.add_category(category)
-            
+
         heatmap.add_theme(theme)
 
-    def _parse_sub_category_1(self, data: Dict[str, Any], parent_category: Category, theme: Theme, seen_categories: set):
+    def _parse_sub_category_1(self, data: dict[str, Any], parent_category: Category, theme: Theme, seen_categories: set):
         """하위 카테고리 1단계 데이터를 파싱하여 상위 카테고리에 자식 요소로 등록합니다."""
         name = data.get('sub_category_1', 'Unknown')
-        
+
         if name in seen_categories:
             return
         seen_categories.add(name)
-        
+
         category = Category(name=name)
-        
+
         if 'companies' in data:
             self._add_companies(category, data['companies'], theme)
-            
+
         if 'sub_categories_2' in data:
             for sub_cat_2_data in data['sub_categories_2']:
                 self._parse_sub_category_2(sub_cat_2_data, category, theme, seen_categories)
-                
+
         parent_category.add_child(category)
 
-    def _parse_sub_category_2(self, data: Dict[str, Any], parent_category: Category, theme: Theme, seen_categories: set):
+    def _parse_sub_category_2(self, data: dict[str, Any], parent_category: Category, theme: Theme, seen_categories: set):
         """하위 카테고리 2단계 데이터를 파싱하여 상위 카테고리에 자식 요소로 등록합니다."""
         name = data.get('name', 'Unknown')
-        
+
         if name in seen_categories:
             return
         seen_categories.add(name)
-        
+
         category = Category(name=name)
-        
+
         if 'companies' in data:
              self._add_companies(category, data['companies'], theme)
-             
+
         parent_category.add_child(category)
 
-    def _add_companies(self, category: Category, company_names: List[str], theme: Theme):
+    def _add_companies(self, category: Category, company_names: list[str], theme: Theme):
         """회사명 목록('이름:코드' 형식 지원)을 읽어 Stock 도메인 모델을 생성하고 카테고리 및 테마에 등록합니다."""
         for name_entry in company_names:
             name_entry = name_entry.strip()
@@ -201,7 +202,7 @@ class JsonThemeDataLoader(ThemeDataLoaderPort):
             else:
                 name = name_entry
                 code = "TBD"
-                
+
             stock = Stock(
                 code=code,
                 name=name,

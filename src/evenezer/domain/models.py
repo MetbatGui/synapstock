@@ -6,8 +6,9 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
-from evenezer.domain.statistics.models import NewListing
+
 from evenezer.domain.events import DomainEvent, NodeAdded, NodeDeleted, StockAddedToBoard, StockDeletedFromBoard
+from evenezer.domain.statistics.models import NewListing
 
 
 class Stock(BaseModel):
@@ -213,11 +214,11 @@ class Board(BaseModel):
         parent = self.find_node(parent_name)
         if not parent:
             return False
-        
+
         new_path = f"{parent_name}/{node_name}"
         if new_path in self.nodes:
             return True
-        
+
         self.nodes[new_path] = Node(
             name=node_name,
             depth=parent.depth + 1,
@@ -280,21 +281,21 @@ class Board(BaseModel):
 
         for old_path in child_paths:
             child = self.nodes.pop(old_path)
-            
+
             # 경로 갱신
             relative_part = old_path[len(node_name):]
             new_path = parent_path + relative_part
-            
+
             # 부모 경로 갱신
             if child.parent_path == node_name:
                 child.parent_path = parent_path
             else:
                 child_rel_parent = child.parent_path[len(node_name):]
                 child.parent_path = parent_path + child_rel_parent
-            
+
             # depth 갱신
             child.depth -= depth_delta
-            
+
             self.nodes[new_path] = child
 
         # 3. 본 노드 제거
@@ -367,7 +368,7 @@ class Board(BaseModel):
             lines.append(f"{prefix}[D{node.depth}] {node.name}")
             for stock in node.stocks:
                 lines.append(f"{prefix}  {stock!r}")
-            
+
             # 직계 자식 노드 탐색 및 정렬
             children = [p for p, n in self.nodes.items() if n.parent_path == path]
             children.sort()
@@ -495,7 +496,7 @@ class BoardSyncManifest(BaseModel):
         merged_event_ids = list(set(self.processed_event_ids) | set(remote.processed_event_ids))
         merged_event_ids = merged_event_ids[-200:]
 
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
         return BoardSyncManifest(
             last_updated=datetime.now(UTC).isoformat(),
             boards=merged_boards,
@@ -511,7 +512,7 @@ class BoardSyncManifest(BaseModel):
             name: 보드의 한글/영문 표시 명칭.
             deleted: 해당 보드가 삭제 상태(Soft delete)인지 여부. 기본값은 False.
         """
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
         self.boards[board_id] = BoardManifestItem(
             name=name,
             last_modified=datetime.now(UTC).timestamp(),

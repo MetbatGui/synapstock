@@ -33,7 +33,7 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
 
     async def get_daily_ranking(self, date_str: str, market: MarketType = None, subject: SupplySubject = None) -> list[DailyMarketRanking] | DailyMarketRanking | None:
         """로컬 저장소에서 당일 순위를 가져오고, 없으면 동기화합니다.
-        
+
         기존 Facade와의 호환성을 위해 market, subject가 지정되면 단일 객체를 반환합니다.
         """
         cache_key = f"{date_str}_{market}_{subject}"

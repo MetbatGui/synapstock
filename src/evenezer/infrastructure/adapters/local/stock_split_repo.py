@@ -1,8 +1,8 @@
-import os
 import json
 from pathlib import Path
+
 import pandas as pd
-from pydantic import BaseModel, Field, AliasChoices, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from evenezer.domain.ports import StockSplitRepositoryPort
 from evenezer.domain.statistics.models import StockSplit, StockSplitManifest
@@ -203,15 +203,15 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
             # 엑셀을 Pandas DataFrame으로 로드
             # 시트명은 "주식분할_YYYY년"
             sheet_name = f"주식분할_{year}년"
-            
+
             # 파일 및 시트 로드 시도
             xl = pd.ExcelFile(file_path)
             if sheet_name not in xl.sheet_names:
                 # 시트명이 다를 경우 첫 번째 시트 사용
                 sheet_name = xl.sheet_names[0]
-                
+
             df = xl.parse(sheet_name)
-            
+
             records = df.to_dict(orient="records")
             splits = []
             for record in records:
@@ -256,7 +256,7 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
         all_splits = []
         for year in years:
             all_splits.extend(self.load_by_year(year))
-            
+
         # 정렬: 배정기준일(base_date) 최신순으로 정렬
         all_splits.sort(key=lambda x: x.base_date or "", reverse=True)
         return all_splits

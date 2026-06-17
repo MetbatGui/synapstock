@@ -246,7 +246,7 @@ class MiroMindmapAdapter(MindmapPort):
             nodes_dict[current_path] = node
 
         build_domain_node(root_id, 0, None)
-        
+
         board = Board(id=board_name, name=board_name, nodes=nodes_dict)
         update_progress("로드 완료!", 1.0)
         return board
@@ -646,7 +646,7 @@ class MiroMindmapAdapter(MindmapPort):
             def calculate_y(item_tuple, depth, parent_idx=-1):
                 nonlocal global_y
                 obj, is_stock, path_or_obj = item_tuple
-                
+
                 my_idx = len(node_data_list)
                 children = []
                 if not is_stock:

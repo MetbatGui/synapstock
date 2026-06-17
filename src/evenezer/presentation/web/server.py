@@ -29,10 +29,10 @@ from evenezer.presentation.web.core.websocket_manager import manager
 from evenezer.presentation.web.routes import (
     board_routes,
     financial_routes,
+    heatmap_routes,
     report_routes,
     statistics_routes,
     stock_routes,
-    heatmap_routes,
 )
 
 # 강한 참조 유지를 위한 글로벌 백그라운드 태스크 세트
@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
     서버 시작 시 백그라운드 동기화 서비스 및 인덱스 정합성 동기화 작업을 기동하고,
     서버 종료 시 모든 백그라운드 태스크 취소 및 리소스를 회수합니다.
     """
-    
+
     # 1. DI 컨테이너 백그라운드 스레드 및 워커 명시적 기동
     from evenezer.infrastructure.container import container
     container.start_background_services()
@@ -54,8 +54,8 @@ async def lifespan(app: FastAPI):
     # 2. 인덱스 동기화 프로세스 시작 (Google Drive)
     logger.info("[Lifespan] 인덱스 동기화 프로세스 시작 (Google Drive)")
     from evenezer.presentation.web.core.dependencies import (
-        sync_news_archive,
         sync_all_new_listings_if_needed,
+        sync_news_archive,
     )
 
     async def run_sync_sequentially():
@@ -71,12 +71,12 @@ async def lifespan(app: FastAPI):
     task.add_done_callback(background_tasks.discard)
 
     logger.info("[Lifespan] 서버 초기화 완료 (동기화는 백그라운드에서 진행 중).")
-    
+
     yield
-    
+
     # ── 종료 시점 ─────────────────────────────────────────────────────────────
     logger.info("[Lifespan] Evenezer 서버 종료 중...")
-    
+
     # 1. 실행 중인 백그라운드 태스크 취소 및 대기
     if background_tasks:
         logger.info(f"[Lifespan] 실행 중인 백그라운드 태스크 {len(background_tasks)}개 취소 처리 중...")
@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
             t.cancel()
         await asyncio.gather(*background_tasks, return_exceptions=True)
         background_tasks.clear()
-        
+
     # 2. 컨테이너 서비스 리소스 해제
     await container.close_services()
     logger.info("[Lifespan] 서버 종료 프로세스 완료.")

@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, model_validator
 
 
 class MarketType(StrEnum):
@@ -79,11 +79,11 @@ class MonthlyMarketStats(BaseModel):
     @classmethod
     def aggregate_from_daily(cls, month: str, rankings: list[DailyMarketRanking]) -> "MonthlyMarketStats":
         """여러 일별 랭킹 데이터를 합산하여 월간 통계를 생성합니다.
-        
+
         Args:
             month: 기준 월 (YYYY-MM).
             rankings: 합산할 일별 랭킹 리스트.
-            
+
         Returns:
             합산된 MonthlyMarketStats 인스턴스.
 

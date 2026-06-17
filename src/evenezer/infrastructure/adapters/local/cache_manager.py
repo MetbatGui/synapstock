@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class LocalCacheManager:
     """로컬 캐시 상태를 관리하는 매니저 클래스.
-    
+
     데이터 소스(예: Google Drive)의 파일 메타데이터를 로컬 매니페스트에 저장하고
     변경 사항이 있을 때만 업데이트를 허용하도록 돕습니다.
     """

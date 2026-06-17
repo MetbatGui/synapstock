@@ -1,7 +1,8 @@
 import logging
 import os
+
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from evenezer.domain.ports import KrxDataPort, PriceDataPort
 
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class NativeKrxAdapter(KrxDataPort, PriceDataPort):
-    """KRX 내부 비공식 API를 직접 호출하여 데이터를 수집하는 어댑터. 
+    """KRX 내부 비공식 API를 직접 호출하여 데이터를 수집하는 어댑터.
     세션 만료 자동 복구 및 재시도 메커니즘을 지원합니다.
     """
 
@@ -124,13 +125,13 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
                 raise RuntimeError("OTP 발급 실패 (세션 만료 가능성)")
 
             down_resp = self.session.post(self.download_url, data={"code": otp_code})
-            
+
             # 다운로드 응답이 로그인 유도 HTML인 경우 세션 만료 처리
             if b"html" in down_resp.content[:100].lower():
                 logger.error("[KRX] 다운로드 응답이 엑셀이 아닌 HTML 형식입니다. 세션을 만료 처리합니다.")
                 self.is_logged_in = False
                 raise RuntimeError("엑셀 다운로드 응답이 올바르지 않음 (세션 만료)")
-                
+
             return down_resp.content
         except Exception as e:
             if not isinstance(e, RuntimeError):
@@ -190,13 +191,13 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
                 raise RuntimeError("OTP 발급 실패 (세션 만료 가능성)")
 
             down_resp = self.session.post(self.download_url, data={"code": otp_code})
-            
+
             # 다운로드 응답이 로그인 유도 HTML인 경우 세션 만료 처리
             if b"html" in down_resp.content[:100].lower():
                 logger.error("[KRX] 다운로드 응답이 엑셀이 아닌 HTML 형식입니다. 세션을 만료 처리합니다.")
                 self.is_logged_in = False
                 raise RuntimeError("엑셀 다운로드 응답이 올바르지 않음 (세션 만료)")
-                
+
             return down_resp.content
         except Exception as e:
             if not isinstance(e, RuntimeError):
@@ -238,13 +239,13 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         }
         try:
             resp = self.session.post(self.api_url, data=payload)
-            
+
             # 응답이 비정상이거나 HTML 형식인 경우 세션 만료 의심
             if resp.status_code != 200 or b"html" in resp.content[:100].lower():
                 logger.error("[KRX] 시세 API 응답이 올바르지 않습니다. 세션을 초기화합니다.")
                 self.is_logged_in = False
                 raise RuntimeError("시세 API 응답 이상 (세션 만료)")
-                
+
             data = resp.json()
             return data.get("OutBlock_1", []) or data.get("output", [])
         except Exception as e:

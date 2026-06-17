@@ -35,15 +35,15 @@ class LocalFileStorageAdapter(StoragePort):
         """
         p = Path(path)
         base_resolved = self.base_dir.resolve()
-        
+
         if p.is_absolute():
             resolved_path = p.resolve()
         else:
             resolved_path = (base_resolved / p).resolve()
-            
+
         if not resolved_path.is_relative_to(base_resolved):
             raise ValueError(f"Access Denied: Path traversal detected for path '{path}'")
-            
+
         return resolved_path
 
     async def path_exists(self, path: str, **kwargs) -> bool:

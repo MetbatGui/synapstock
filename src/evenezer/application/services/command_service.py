@@ -2,17 +2,17 @@
 
 from typing import Any, cast
 
-from evenezer.domain.models import Board, Stock
-from evenezer.domain.ports import BoardRepositoryPort, EventBusPort
 from evenezer.domain.events import (
+    BatchStocksDeletedFromBoard,
     BoardCreated,
     BoardDeleted,
     NodeAdded,
     NodeDeleted,
     StockAddedToBoard,
     StockDeletedFromBoard,
-    BatchStocksDeletedFromBoard,
 )
+from evenezer.domain.models import Board, Stock
+from evenezer.domain.ports import BoardRepositoryPort, EventBusPort
 
 
 class BoardCommandService:
@@ -94,7 +94,7 @@ class BoardCommandService:
         parent_path = self._resolve_node_path(board, parent_name)
         if not parent_path:
             return False
-        
+
         success = cast(bool, board.add_node(parent_path, new_node_name))
         if success:
             self._repository.save(board)
@@ -108,7 +108,7 @@ class BoardCommandService:
         parent_path = self._resolve_node_path(board, parent_name)
         if not parent_path:
             return False
-        
+
         success = cast(bool, board.add_stock_to_node(parent_path, Stock(name=stock_name, ticker=ticker)))
         if success:
             self._repository.save(board)
@@ -122,7 +122,7 @@ class BoardCommandService:
         node_path = self._resolve_node_path(board, node_name)
         if not node_path:
             return False
-            
+
         success = cast(bool, board.delete_node(node_path))
         if success:
             self._repository.save(board)
@@ -176,5 +176,5 @@ class BoardCommandService:
             # 개별 StockDeleted 이벤트를 디스패치하지 않고 일괄 처리를 위해 비운 뒤 배치 이벤트를 발행
             board.pull_events()
             await self._event_bus.publish_async(BatchStocksDeletedFromBoard(board_id=board_name, tickers=tickers))
-                
+
         return any_success

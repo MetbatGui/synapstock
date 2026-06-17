@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import Any, Callable, Type
+from collections.abc import Callable
+from typing import Any
 
 from evenezer.domain.ports import EventBusPort
 
@@ -18,10 +19,10 @@ class InMemoryEventBusAdapter(EventBusPort):
         Args:
             sync_mode: True일 경우 테스트 및 하위 호환성을 위해 모든 비동기 핸들러를 순차적으로 완료 대기(await)합니다.
         """
-        self._handlers: dict[Type[Any], list[Callable[..., Any]]] = {}
+        self._handlers: dict[type[Any], list[Callable[..., Any]]] = {}
         self._sync_mode = sync_mode  # 테스트 및 하위 호환성 모드를 위한 동기 완료 강제 옵션
 
-    def subscribe(self, event_type: Type[Any], handler: Callable[..., Any]) -> None:
+    def subscribe(self, event_type: type[Any], handler: Callable[..., Any]) -> None:
         """이벤트 타입에 해당하는 핸들러를 등록합니다.
 
         Args:

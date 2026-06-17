@@ -3,9 +3,9 @@ from evenezer.domain.statistics.models import (
     MarketType,
     MonthlyMarketStats,
     RankingItem,
-    SupplySubject,
     StockSplit,
     StockSplitManifest,
+    SupplySubject,
 )
 
 __all__ = [

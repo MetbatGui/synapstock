@@ -3,9 +3,8 @@
 import json
 from pathlib import Path
 
-from evenezer.domain.models import Board, Node, Stock, BoardSyncManifest
+from evenezer.domain.models import Board, BoardSyncManifest, Node, Stock
 from evenezer.domain.ports import BoardRepositoryPort, BoardSyncManifestRepositoryPort
-
 
 DEFAULT_ROOT = Path("data/board")
 
@@ -38,10 +37,10 @@ class LocalBoardRepository(BoardRepositoryPort):
         """
         base_resolved = self.root_dir.resolve()
         target_path = (base_resolved / f"{name}.json").resolve()
-        
+
         if not target_path.is_relative_to(base_resolved):
             raise ValueError(f"Access Denied: Path traversal detected for board name '{name}'")
-            
+
         return target_path
 
     def load(self, name: str) -> Board:
@@ -118,7 +117,7 @@ class LocalBoardRepository(BoardRepositoryPort):
 
                 current_path = f"{parent_path}/{n_name}"
                 child = Node(name=n_name, depth=parent_depth + 1, parent_path=parent_path, stocks=[])
-                
+
                 for co in item.get("companies", []):
                     child.stocks.append(Stock(name=co, ticker=""))
 

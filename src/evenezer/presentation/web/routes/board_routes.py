@@ -103,7 +103,7 @@ async def get_board_data(name: str, response: Response) -> dict | JSONResponse:
             if not node:
                 # 안전 장치
                 return {"name": path.split("/")[-1], "nodes": [], "stocks": []}
-                
+
             stocks_list = []
             for s in node.stocks:
                 stock_dict = {"name": s.name, "ticker": s.ticker, "reports": s.reports, "news": s.news}
@@ -270,7 +270,7 @@ async def add_stock(board: str, parent: str, name: str, ticker: str) -> dict | J
                 board_display_name = existing_board_obj.name
             except Exception:
                 board_display_name = existing_board.replace("theme_", "")
-            
+
             path_str = " > ".join(path)
             return JSONResponse(
                 status_code=409,
@@ -435,6 +435,7 @@ async def sync_virtual_boards() -> dict | JSONResponse:
 
 
 from pydantic import BaseModel
+
 
 class BatchIgnoreRequest(BaseModel):
     tickers: list[str]

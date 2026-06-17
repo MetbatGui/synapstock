@@ -62,10 +62,10 @@ class GoogleDriveAdapter(StoragePort):
         import threading
         if not hasattr(self, "_thread_local_services"):
             self._thread_local_services = threading.local()
-            
+
         if not getattr(self._thread_local_services, "service", None):
             logger.info(f"[GoogleDrive] 스레드 {threading.current_thread().name} 전용 API 서비스 생성...")
-            
+
             # 토큰 만료 검사 및 갱신은 인스턴스 락(self._lock)으로 감싸 스레드 안전성을 보장합니다.
             with self._lock:
                 creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
@@ -73,9 +73,9 @@ class GoogleDriveAdapter(StoragePort):
                     creds.refresh(Request())
                     with open(self.token_file, "w") as token:
                         token.write(creds.to_json())
-                        
+
             self._thread_local_services.service = build("drive", "v3", credentials=creds, static_discovery=False)
-            
+
         return self._thread_local_services.service
 
 
@@ -159,7 +159,7 @@ class GoogleDriveAdapter(StoragePort):
                 }
                 file = self.service.files().create(body=file_metadata, fields="id").execute()
                 return cast(str, file.get("id", ""))
-                
+
         return self._execute_api_call(_do_get_or_create)
 
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
@@ -193,7 +193,7 @@ class GoogleDriveAdapter(StoragePort):
                     .execute()
                 )
                 return results.get("files", [])
-                
+
             files = self._execute_api_call(_list_files)
 
             # 정확히 일치하거나 NFC 정규화 시 일치하는 항목 검색
