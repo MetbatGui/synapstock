@@ -29,6 +29,12 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             )
         }
+        # Connection Pooling을 위해 단일 AsyncClient 인스턴스를 유지합니다.
+        self._client = httpx.AsyncClient(headers=self.headers, timeout=self.timeout, follow_redirects=True)
+
+    async def close(self) -> None:
+        """클라이언트 리소스를 우아하게 닫습니다."""
+        await self._client.aclose()
 
     async def scrape(self, url: str) -> ScrapedNews | None:
         """URL에서 뉴스 제목과 날짜를 추출한다.
@@ -40,11 +46,11 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
             Optional[ScrapedNews]: 추출된 뉴스 정보, 실패 시 None.
         """
         try:
-            async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout, follow_redirects=True) as client:
-                response = await client.get(url)
+            response = await self._client.get(url)
 
-                if response.status_code != 200:
-                    return None
+            if response.status_code != 200:
+                return None
+
 
                 # 응답 인코딩 처리
                 html = response.text

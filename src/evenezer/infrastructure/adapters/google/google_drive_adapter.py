@@ -57,14 +57,19 @@ class GoogleDriveAdapter(StoragePort):
             
         if not getattr(self._thread_local_services, "service", None):
             logger.info(f"[GoogleDrive] 스레드 {threading.current_thread().name} 전용 API 서비스 생성...")
-            creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-                with open(self.token_file, "w") as token:
-                    token.write(creds.to_json())
+            
+            # 토큰 만료 검사 및 갱신은 인스턴스 락(self._lock)으로 감싸 스레드 안전성을 보장합니다.
+            with self._lock:
+                creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                    with open(self.token_file, "w") as token:
+                        token.write(creds.to_json())
+                        
             self._thread_local_services.service = build("drive", "v3", credentials=creds, static_discovery=False)
             
         return self._thread_local_services.service
+
 
     def _get_root_id(self, folder: str | None = None) -> str:
         """키워드에 해당하는 폴더 ID를 반환합니다."""
@@ -101,36 +106,29 @@ class GoogleDriveAdapter(StoragePort):
             logger.error("[GoogleDrive] 인증 실패", exc_info=True)
             raise RuntimeError(f"Google Drive 인증 실패: {e}")
 
-    @retry(
-        wait=wait_exponential(multiplier=1, max=10),
-        stop=stop_after_attempt(3),
-        retry=retry_if_not_exception_type(ValueError),
-    )
     def _get_or_create_folder(self, folder_name: str, parent_id: str = "root") -> str:
         """폴더를 찾거나 생성합니다."""
         query = (
             f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' "
             f"and '{parent_id}' in parents and trashed = false"
         )
-        results = self.service.files().list(q=query, fields="files(id, name)").execute()
-        files = results.get("files", [])
+        def _do_get_or_create():
+            results = self.service.files().list(q=query, fields="files(id, name)").execute()
+            files = results.get("files", [])
 
-        if files:
-            return str(files[0]["id"])
-        else:
-            file_metadata = {
-                "name": folder_name,
-                "mimeType": "application/vnd.google-apps.folder",
-                "parents": [parent_id],
-            }
-            file = self.service.files().create(body=file_metadata, fields="id").execute()
-            return cast(str, file.get("id", ""))
+            if files:
+                return str(files[0]["id"])
+            else:
+                file_metadata = {
+                    "name": folder_name,
+                    "mimeType": "application/vnd.google-apps.folder",
+                    "parents": [parent_id],
+                }
+                file = self.service.files().create(body=file_metadata, fields="id").execute()
+                return cast(str, file.get("id", ""))
+                
+        return self._execute_api_call(_do_get_or_create)
 
-    @retry(
-        wait=wait_exponential(multiplier=1, max=20),
-        stop=stop_after_attempt(5),
-        retry=retry_if_not_exception_type(ValueError),
-    )
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
         """경로에 해당하는 파일/폴더의 ID를 찾습니다."""
         parts = path.strip("/").split("/")
@@ -146,12 +144,15 @@ class GoogleDriveAdapter(StoragePort):
                 continue
 
             # 한글 유니코드 정규화(NFC/NFD) 문제 대응을 위해 하위 목록 전체 조회 후 비교
-            results = (
-                self.service.files()
-                .list(q=f"'{current_parent_id}' in parents and trashed = false", fields="files(id, name, mimeType)")
-                .execute()
-            )
-            files = results.get("files", [])
+            def _list_files():
+                results = (
+                    self.service.files()
+                    .list(q=f"'{current_parent_id}' in parents and trashed = false", fields="files(id, name, mimeType)")
+                    .execute()
+                )
+                return results.get("files", [])
+                
+            files = self._execute_api_call(_list_files)
 
             # 정확히 일치하거나 NFC 정규화 시 일치하는 항목 검색
             part_nfc = unicodedata.normalize("NFC", part)
@@ -167,6 +168,7 @@ class GoogleDriveAdapter(StoragePort):
             current_parent_id = matched_file["id"]
 
         return current_parent_id
+
 
     def _ensure_path_directories(self, path: str, folder: str | None = None, root_id: str | None = None) -> str:
         """파일 경로의 상위 디렉토리들을 생성하고 마지막 부모 폴더 ID를 반환합니다."""
@@ -299,13 +301,15 @@ class GoogleDriveAdapter(StoragePort):
                     return []
 
                 query = f"'{folder_id}' in parents and trashed = false"
-                results = (
-                    self.service.files()
-                    .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
-                    .execute()
-                )
+                def _do_list():
+                    results = (
+                        self.service.files()
+                        .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
+                        .execute()
+                    )
+                    return results.get("files", [])
 
-                files = results.get("files", [])
+                files = self._execute_api_call(_do_list)
                 logger.info(f"[GoogleDrive] 폴더 내 파일 조회 성공: {len(files)}개 발견")
                 return cast(list[dict], files)
             except Exception as e:
@@ -313,6 +317,7 @@ class GoogleDriveAdapter(StoragePort):
                 return []
 
         return await asyncio.to_thread(_list)
+
 
     async def list_files(self, folder: str) -> list[dict]:
         """등록된 폴더 키워드를 사용하여 파일 목록을 조회합니다."""

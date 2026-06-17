@@ -135,4 +135,5 @@ async def test_worker_failed_permanent_after_max_retries(mock_outbox):
     await worker.process_pending_events()
     
     mock_handler.assert_not_called()
-    mock_outbox.complete.assert_called_once_with("12345_uuid")
+    mock_outbox.fail_permanent.assert_called_once_with("12345_uuid", "Max retries exceeded")
+    mock_outbox.complete.assert_not_called()

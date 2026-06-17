@@ -281,12 +281,24 @@ class Container:
         self._report_service = None
         self._init_report_service()
 
-        # 백그라운드 동기화 기동 (모든 서비스 초기화 완비 후 안전하게 실행)
+    def start_background_services(self) -> None:
+        """백그라운드 동기화 스레드 및 아웃박스 워커를 명시적으로 기동합니다."""
+        logger.info("[Container] 백그라운드 서비스 기동 시작...")
         self.sync_financial_statements_from_drive()
         self.sync_boards_from_drive_in_background()
         self.sync_stock_splits_from_drive_in_background()
         self.sync_heatmap_from_drive_in_background()
         self._outbox_worker.start()
+        logger.info("[Container] 모든 백그라운드 서비스 기동 완료.")
+
+    async def close_services(self) -> None:
+        """백그라운드 워커 및 네트워크 리소스를 안전하게 해제합니다."""
+        logger.info("[Container] 서비스 종료 및 리소스 해제 중...")
+        self._outbox_worker.stop()
+        if hasattr(self, "_news_scraper_adapter") and self._news_scraper_adapter:
+            await self._news_scraper_adapter.close()
+        logger.info("[Container] 서비스 종료 완료.")
+
 
     def _init_google_drive(self):
         """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""

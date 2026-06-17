@@ -33,5 +33,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Ensure virtual environment executables (like uvicorn, evenezer, evenezer-bot) are directly accessible
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Create a non-root user and group, then grant ownership of /app
+RUN groupadd -g 1001 appgroup && \
+    useradd -r -u 1001 -g appgroup -d /app appuser && \
+    chown -R appuser:appgroup /app
+
+# Switch to the non-root user
+USER appuser
+
 # Default CMD (can be overridden in docker-compose.yml)
 CMD ["evenezer"]

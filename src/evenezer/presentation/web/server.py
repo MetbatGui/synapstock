@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import threading
@@ -34,8 +35,60 @@ from evenezer.presentation.web.routes import (
     heatmap_routes,
 )
 
+# 강한 참조 유지를 위한 글로벌 백그라운드 태스크 세트
+background_tasks = set()
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── 시작 시점 ─────────────────────────────────────────────────────────────
+    logger.info("[Lifespan] Evenezer 서버 시작 중...")
+    
+    # 1. DI 컨테이너 백그라운드 스레드 및 워커 명시적 기동
+    from evenezer.infrastructure.container import container
+    container.start_background_services()
+
+    # 2. 인덱스 동기화 프로세스 시작 (Google Drive)
+    logger.info("[Lifespan] 인덱스 동기화 프로세스 시작 (Google Drive)")
+    from evenezer.presentation.web.core.dependencies import (
+        sync_news_archive,
+        sync_all_new_listings_if_needed,
+    )
+
+    async def run_sync_sequentially():
+        try:
+            await sync_indices_if_needed(force=True)
+            await sync_news_archive()
+            await sync_all_new_listings_if_needed()
+        except Exception as e:
+            logger.error(f"[Lifespan] 백그라운드 동기화 중 오류 발생: {e}")
+
+    task = asyncio.create_task(run_sync_sequentially())
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
+
+    logger.info("[Lifespan] 서버 초기화 완료 (동기화는 백그라운드에서 진행 중).")
+    
+    yield
+    
+    # ── 종료 시점 ─────────────────────────────────────────────────────────────
+    logger.info("[Lifespan] Evenezer 서버 종료 중...")
+    
+    # 1. 실행 중인 백그라운드 태스크 취소 및 대기
+    if background_tasks:
+        logger.info(f"[Lifespan] 실행 중인 백그라운드 태스크 {len(background_tasks)}개 취소 처리 중...")
+        for t in background_tasks:
+            t.cancel()
+        await asyncio.gather(*background_tasks, return_exceptions=True)
+        background_tasks.clear()
+        
+    # 2. 컨테이너 서비스 리소스 해제
+    await container.close_services()
+    logger.info("[Lifespan] 서버 종료 프로세스 완료.")
+
+
 # ── 앱 생성 ─────────────────────────────────────────────────────────────────
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # ── 정적 파일 마운트 ─────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -128,34 +181,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# ── 서버 시작 이벤트 ─────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup_event():
-    """서버 시작 시 인덱스 동기화 및 초기 설정을 수행합니다."""
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.info("[Startup] Evenezer 서버 시작 중...")
-
-    # 리포트 및 뉴스 인덱스 동기화 (충돌 방지를 위해 백그라운드에서 순차 실행)
-    logger.info("[Startup] 인덱스 동기화 프로세스 시작 (Google Drive)")
-    from evenezer.presentation.web.core.dependencies import (
-        sync_news_archive,
-        sync_all_new_listings_if_needed,
-    )
-
-    async def run_sync_sequentially():
-        try:
-            await sync_indices_if_needed(force=True)
-            await sync_news_archive()
-            await sync_all_new_listings_if_needed()
-        except Exception as e:
-            logger.error(f"[Startup] 동기화 중 오류 발생: {e}")
-
-    # 하나의 태스크로 묶어서 실행
-    asyncio.create_task(run_sync_sequentially())
-
-    logger.info("[Startup] 서버 초기화 완료 (동기화는 백그라운드에서 진행 중).")
+# ── 서버 시작/종료 이벤트 (lifespan에서 통합 관리) ─────────────────────────────
 
 
 # ── 실행 헬퍼 ────────────────────────────────────────────────────────────────
