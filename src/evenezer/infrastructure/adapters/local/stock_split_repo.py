@@ -109,15 +109,24 @@ class StockSplitExcelDTO(BaseModel):
 
 
 class LocalStockSplitRepository(StockSplitRepositoryPort):
-    """주식 분할(액면분할) 데이터를 로컬 파일 및 엑셀에서 관리하는 저장소 구현체."""
+    """주식 분할(액면분할/병합) 데이터를 로컬 파일 및 Excel 파일로부터 로드하여 관리하는 저장소 어댑터입니다."""
 
     def __init__(self, data_root: str = "data/statistics/stock_split"):
+        """LocalStockSplitRepository를 초기화합니다.
+
+        Args:
+            data_root: 주식 분할 관련 데이터 파일이 저장되는 디렉터리 경로.
+        """
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.manifest_path = self.root / "stock_splits_manifest.json"
 
     def load_manifest(self) -> StockSplitManifest | None:
-        """로컬 매니페스트 정보를 불러옵니다."""
+        """로컬 저장소로부터 주식 분할 데이터 연도별 매니페스트 정보를 로드합니다.
+
+        Returns:
+            StockSplitManifest 객체, 파일이 없거나 예외 발생 시 None.
+        """
         if not self.manifest_path.exists():
             return None
         try:
@@ -128,33 +137,62 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
             return None
 
     def save_manifest(self, manifest: StockSplitManifest) -> None:
-        """로컬 매니페스트 정보를 저장합니다."""
+        """현재 주식 분할 매니페스트 정보를 JSON 파일에 직렬화하여 영속화합니다.
+
+        Args:
+            manifest: 저장할 StockSplitManifest 인스턴스.
+        """
         self.root.mkdir(parents=True, exist_ok=True)
         with open(self.manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest.model_dump(), f, indent=2, ensure_ascii=False)
 
     def save_excel_file(self, filename: str, content: bytes) -> None:
-        """엑셀 파일 데이터를 로컬 저장소에 저장합니다."""
+        """구글 드라이브 등으로부터 수집된 Excel 원본 데이터 바이트를 로컬 파일로 저장합니다.
+
+        Args:
+            filename: 저장할 Excel 파일명.
+            content: 파일에 기록할 바이너리 바이트.
+        """
         self.root.mkdir(parents=True, exist_ok=True)
         file_path = self.root / filename
         with open(file_path, "wb") as f:
             f.write(content)
 
     def save_manifest_file(self, content: bytes) -> None:
-        """매니페스트 JSON 데이터를 로컬 저장소에 저장합니다."""
+        """매니페스트 JSON 원본 바이트 데이터를 로컬에 즉시 파일로 영속화합니다.
+
+        Args:
+            content: 매니페스트 파일 내용 바이트.
+        """
         self.root.mkdir(parents=True, exist_ok=True)
         with open(self.manifest_path, "wb") as f:
             f.write(content)
 
     def get_file_mtime(self, filename: str) -> float | None:
-        """로컬에 다운로드된 파일의 최종 수정 시간(mtime)을 구합니다."""
+        """로컬 저장소 내의 주식 분할 데이터 파일의 마지막 수정 시각(timestamp)을 조회합니다.
+
+        Args:
+            filename: 대상 파일명.
+
+        Returns:
+            마지막 수정 시각을 나타내는 float timestamp, 파일이 없을 경우 None.
+        """
         file_path = self.root / filename
         if not file_path.exists():
             return None
         return file_path.stat().st_mtime
 
     def load_by_year(self, year: str) -> list[StockSplit]:
-        """특정 연도의 주식 분할 이력을 불러옵니다."""
+        """특정 연도의 주식 분할 이력 데이터를 Excel 파일로부터 파싱하여 도메인 객체 목록으로 반환합니다.
+
+        엑셀 데이터 중 비어 있는 행은 필터링하며, Pydantic DTO를 거쳐 형식 검증 및 클렌징을 적용합니다.
+
+        Args:
+            year: 조회 및 파싱 대상 연도 구분 문자열.
+
+        Returns:
+            정제 완료된 StockSplit 도메인 모델 목록.
+        """
         # 파일은 "액면분할(YYYY년).xlsx" 형태로 저장됨
         filename = f"액면분할({year}년).xlsx"
         file_path = self.root / filename
@@ -193,7 +231,13 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
             return []
 
     def load_all(self) -> list[StockSplit]:
-        """모든 주식 분할 이력을 불러옵니다."""
+        """현재 로컬 저장소에 누적된 모든 연도의 주식 분할 이력 데이터를 병합하여 반환합니다.
+
+        반환 결과는 배정기준일(base_date) 최신순으로 정렬됩니다.
+
+        Returns:
+            전체 StockSplit 도메인 모델 목록.
+        """
         manifest = self.load_manifest()
         years = []
         if manifest:

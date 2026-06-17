@@ -11,19 +11,30 @@ DEFAULT_ROOT = Path("data/board")
 
 
 class LocalBoardRepository(BoardRepositoryPort):
-    """로컬 파일시스템(JSON)을 기반으로 Board를 저장/불러오기한다.
-
-    Attributes:
-        root_dir: JSON 파일이 저장되는 루트 디렉터리.
-    """
+    """로컬 파일시스템(JSON)을 기반으로 Board를 저장 및 조회하는 어댑터입니다."""
 
     def __init__(self, root_dir: Path = DEFAULT_ROOT) -> None:
+        """LocalBoardRepository를 초기화합니다.
+
+        Args:
+            root_dir: JSON 파일이 저장되는 루트 디렉터리 경로.
+        """
         self.root_dir = root_dir
         self.root_dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, name: str) -> Path:
-        """보드 파일명을 기준으로 저장소 디렉터리 하위 경로를 생성한다.
-        경로 순회(Path Traversal) 공격 방지를 위해 root_dir 내에 위치하는지 검증한다.
+        """보드 명칭에 대응하는 로컬 JSON 파일 경로를 생성하고 검증합니다.
+
+        경로 Traversal 공격 방지를 위해 생성된 절대 경로가 root_dir 하위에 포함되는지 대조합니다.
+
+        Args:
+            name: 보드 파일의 기본 이름 (예: 'virtual_korea').
+
+        Returns:
+            검증 완료된 파일 시스템 상의 Path 객체.
+
+        Raises:
+            ValueError: 경로 traversal이 감지된 경우.
         """
         base_resolved = self.root_dir.resolve()
         target_path = (base_resolved / f"{name}.json").resolve()
@@ -34,7 +45,20 @@ class LocalBoardRepository(BoardRepositoryPort):
         return target_path
 
     def load(self, name: str) -> Board:
-        """name.json 파일을 읽어 Board로 파싱한다. 테마별 JSON 구조를 지원한다."""
+        """지정된 보드 이름의 JSON 파일을 읽어 Board 도메인 모델로 역직렬화합니다.
+
+        기본형 JSON 포맷 외에도 구형 트리 구조, 레거시 theme_*.json 포맷을
+        자동 감지하여 도메인 모델에 호환되도록 마이그레이션하여 로드합니다.
+
+        Args:
+            name: 불러올 보드의 고유 식별 명칭.
+
+        Returns:
+            마이그레이션이 적용된 Board 도메인 인스턴스.
+
+        Raises:
+            FileNotFoundError: 대상 보드 파일이 로컬 디렉터리에 존재하지 않는 경우.
+        """
         path = self._path(name)
         if not path.exists():
             raise FileNotFoundError(f"Board '{name}' not found: {path}")
@@ -110,21 +134,36 @@ class LocalBoardRepository(BoardRepositoryPort):
         return Board(id=name, name=b_name, nodes=nodes_dict)
 
     def save(self, board: Board) -> None:
-        """Board를 id.json 파일로 저장한다. id가 없으면 name을 시도한다."""
+        """Board 인스턴스를 지정된 JSON 파일 경로에 직렬화하여 저장합니다.
+
+        Args:
+            board: 저장할 Board 도메인 인스턴스.
+        """
         filename = board.id or board.name
         self._path(filename).write_text(
             board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True), encoding="utf-8"
         )
 
     def list_boards(self) -> list[str]:
-        """루트 디렉터리의 theme_* 또는 virtual_* 형식의 .json 파일 이름 목록을 반환한다."""
+        """저장소 디렉터리 내에 저장된 theme_* 또는 virtual_* 형태의 보드 파일 이름 목록을 반환합니다.
+
+        Returns:
+            정렬된 보드 식별 명칭(파일명의 stem) 목록.
+        """
         return sorted(
             p.stem for p in self.root_dir.glob("*.json")
             if p.name.startswith("theme_") or p.name.startswith("virtual_")
         )
 
     def delete(self, name: str) -> None:
-        """이름에 해당하는 Board 파일을 삭제한다."""
+        """이름에 매칭되는 보드 JSON 파일을 삭제합니다.
+
+        Args:
+            name: 삭제할 보드의 식별 명칭.
+
+        Raises:
+            FileNotFoundError: 삭제 대상 보드 파일이 없는 경우.
+        """
         path = self._path(name)
         if path.exists():
             path.unlink()
@@ -133,12 +172,24 @@ class LocalBoardRepository(BoardRepositoryPort):
 
 
 class LocalBoardSyncManifestRepository(BoardSyncManifestRepositoryPort):
-    """로컬 JSON 파일을 기반으로 통합 매니페스트를 저장하고 조회하는 어댑터."""
+    """로컬 JSON 파일을 기반으로 통합 동기화 매니페스트 데이터를 저장하고 조회하는 어댑터입니다."""
 
     def __init__(self, manifest_path: Path = Path("data/board/board_sync_manifest.json")) -> None:
+        """LocalBoardSyncManifestRepository를 초기화합니다.
+
+        Args:
+            manifest_path: 매니페스트 JSON 파일이 저장되는 경로.
+        """
         self.manifest_path = manifest_path
 
     def load(self) -> BoardSyncManifest:
+        """매니페스트 JSON 파일을 읽어 BoardSyncManifest 도메인 객체로 변환합니다.
+
+        파일이 존재하지 않거나 로드 실패 시 빈 구조의 매니페스트 인스턴스를 반환합니다.
+
+        Returns:
+            검증 완료된 BoardSyncManifest 객체.
+        """
         if not self.manifest_path.exists():
             return BoardSyncManifest()
         try:
@@ -149,6 +200,11 @@ class LocalBoardSyncManifestRepository(BoardSyncManifestRepositoryPort):
             return BoardSyncManifest()
 
     def save(self, manifest: BoardSyncManifest) -> None:
+        """BoardSyncManifest 도메인 인스턴스를 JSON 포맷 파일로 직렬화하여 영속화합니다.
+
+        Args:
+            manifest: 저장할 BoardSyncManifest 인스턴스.
+        """
         self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
         self.manifest_path.write_text(
             manifest.model_dump_json(indent=2, ensure_ascii=False),

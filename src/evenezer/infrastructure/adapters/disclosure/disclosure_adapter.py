@@ -120,7 +120,12 @@ class DartDisclosureAdapter(DisclosurePort):
             return []
 
     def clear_cache(self, ticker: str | None = None) -> None:
-        """캐시를 초기화합니다. 특정 ticker가 주어지면 해당 종목 캐시만 삭제합니다."""
+        """메모리에 저장된 공시 정보 캐시를 초기화합니다.
+
+        Args:
+            ticker: 특정 종목의 캐시만 삭제하고자 할 때 해당 종목의 티커 심볼.
+                지정하지 않으면 모든 캐시 데이터를 삭제합니다.
+        """
         if ticker:
             if ticker in self._cache:
                 del self._cache[ticker]

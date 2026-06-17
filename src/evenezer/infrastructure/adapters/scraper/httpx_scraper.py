@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 class HttpxNewsScraperAdapter(NewsScraperPort):
-    """httpx와 BeautifulSoup을 사용하여 뉴스 메타데이터를 추출하는 어댑터."""
+    """httpx와 BeautifulSoup 라이브러리를 사용하여 웹 문서로부터 뉴스 제목 및 발행일을 추출하는 어댑터입니다."""
 
     def __init__(self, timeout: int = 10):
-        """초기화.
+        """HttpxNewsScraperAdapter를 초기화합니다.
 
         Args:
-            timeout (int): HTTP 요청 타임아웃 (초). 기본값 10.
+            timeout: HTTP 요청 시의 타임아웃 제한 시간 (초). 기본값은 10.
         """
         self.timeout = timeout
         self.headers = {
@@ -33,17 +33,21 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
         self._client = httpx.AsyncClient(headers=self.headers, timeout=self.timeout, follow_redirects=True)
 
     async def close(self) -> None:
-        """클라이언트 리소스를 우아하게 닫습니다."""
+        """클라이언트 리소스를 안전하게 닫고 해제합니다."""
         await self._client.aclose()
 
     async def scrape(self, url: str) -> ScrapedNews | None:
-        """URL에서 뉴스 제목과 날짜를 추출한다.
+        """지정된 뉴스 URL에 비동기 GET 요청을 보내 정보를 파싱하고 스크랩된 데이터를 반환합니다.
+
+        오픈 그래프 메타데이터(og:title)와 일반 타이틀 태그로부터 뉴스 제목을 조회하며,
+        메타 속성(published_time, date 등) 및 본문 정규식 매칭을 통해 뉴스 발행일을 추출합니다.
+        날짜 파싱 실패 시 오늘 날짜를 폴백 값으로 부여합니다.
 
         Args:
-            url (str): 스크래핑할 뉴스 URL.
+            url: 스크래핑 대상 뉴스의 웹 URL 주소.
 
         Returns:
-            Optional[ScrapedNews]: 추출된 뉴스 정보, 실패 시 None.
+            추출 완료된 ScrapedNews 도메인 인스턴스. 스크래핑 실패 또는 응답 불능 시 None.
         """
         try:
             response = await self._client.get(url)

@@ -16,6 +16,7 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
     BASE_URL = "https://data.krx.co.kr"
 
     def __init__(self):
+        """NativeKrxAdapter를 초기화하고 HTTP 세션 및 인증 변수들을 설정합니다."""
         self.session = requests.Session()
         self.username = os.getenv("KRX_USERNAME")
         self.password = os.getenv("KRX_PASSWORD")
@@ -37,7 +38,11 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         self.session.headers.update(self.headers)
 
     def _login(self) -> bool:
-        """KRX 정보데이터시스템 로그인 세션을 획득한다."""
+        """KRX 정보데이터시스템에 로그인하여 세션을 획득합니다.
+
+        Returns:
+            로그인 성공 시 True, 실패 시 False.
+        """
         if not self.username or not self.password:
             logger.error("[KRX] 로그인 계정 정보(KRX_USERNAME/PASSWORD)가 설정되지 않았습니다.")
             return False
@@ -77,7 +82,19 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         reraise=True
     )
     def fetch_net_purchase_data(self, market: str, investor: str, date_str: str) -> bytes:
-        """투자자별 순매수 전종목 엑셀 수집 (MDCSTAT02401)."""
+        """투자자별 순매수 전종목 엑셀 원본 데이터를 다운로드합니다 (MDCSTAT02401).
+
+        Args:
+            market: 대상 시장 코드 (예: 'STK' - 코스피, 'KSQ' - 코스닥).
+            investor: 투자자 구분 코드 (예: '7050' - 기관, '9000' - 외국인).
+            date_str: 조회 기준일 문자열 ('YYYYMMDD' 형식).
+
+        Returns:
+            다운로드된 엑셀 바이너리 데이터.
+
+        Raises:
+            RuntimeError: 로그인 실패, OTP 발급 실패 또는 다운로드 응답 오류 발생 시.
+        """
         if not self.is_logged_in:
             if not self._login():
                 raise RuntimeError("KRX 로그인에 실패하여 수집을 시작할 수 없습니다.")
@@ -128,7 +145,18 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         reraise=True
     )
     def fetch_investor_trading_data(self, market: str, date_str: str) -> bytes:
-        """종목별 투자자 거래실적 수집 (MDCSTAT02201)."""
+        """종목별 투자자 거래실적 엑셀 원본 데이터를 다운로드합니다 (MDCSTAT02201).
+
+        Args:
+            market: 대상 시장 코드 (예: 'STK' - 코스피, 'KSQ' - 코스닥).
+            date_str: 조회 기준일 문자열 ('YYYYMMDD' 형식).
+
+        Returns:
+            다운로드된 엑셀 바이너리 데이터.
+
+        Raises:
+            RuntimeError: 로그인 실패, OTP 발급 실패 또는 다운로드 응답 오류 발생 시.
+        """
         if not self.is_logged_in:
             if not self._login():
                 raise RuntimeError("KRX 로그인에 실패하여 수집을 시작할 수 없습니다.")
@@ -183,7 +211,18 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         reraise=True
     )
     def fetch_market_prices(self, market: str, date_str: str) -> list[dict]:
-        """전종목 등락률/시세 조회 (MDCSTAT01501)."""
+        """지정된 일자의 전종목 등락률 및 시세 정보를 JSON 형태로 조회합니다 (MDCSTAT01501).
+
+        Args:
+            market: 대상 시장 코드 (예: 'STK' - 코스피, 'KSQ' - 코스닥).
+            date_str: 조회 기준일 문자열 ('YYYYMMDD' 형식).
+
+        Returns:
+            종목별 시세 데이터 딕셔너리 목록.
+
+        Raises:
+            RuntimeError: 로그인 실패 또는 API 응답 오류 발생 시.
+        """
         if not self.is_logged_in:
             if not self._login():
                 raise RuntimeError("KRX 로그인에 실패하여 조회를 시작할 수 없습니다.")
@@ -215,6 +254,14 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
             raise e
 
     def get_price_info(self, ticker: str, date_str: str) -> dict | None:
-        """특정 종목 일자별 시세 조회 (MDCSTAT01701)."""
+        """특정 종목의 일자별 시세 정보를 조회합니다 (MDCSTAT01701).
+
+        Args:
+            ticker: 종목 티커 심볼.
+            date_str: 조회 기준일 문자열 ('YYYYMMDD' 형식).
+
+        Returns:
+            해당 종목의 시세 정보 딕셔너리. 구현되지 않은 경우 None.
+        """
         # ISO 종목 풀코드 조회를 위한 임시 맵 필요
         pass

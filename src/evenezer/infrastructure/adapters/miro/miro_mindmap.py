@@ -21,9 +21,10 @@ class MiroMindmapAdapter(MindmapPort):
     """
 
     def __init__(self, api_token: str):
-        """
+        """MiroMindmapAdapter를 초기화하고 HTTP 세션 및 타임아웃, 재시도 정책을 설정합니다.
+
         Args:
-            api_token: Miro API Access Token.
+            api_token: Miro API 액세스 토큰.
         """
         self.api_token = api_token
         self.base_url = "https://api.miro.com/v2"
@@ -53,7 +54,7 @@ class MiroMindmapAdapter(MindmapPort):
         """현재 토큰으로 접근 가능한 모든 Miro 보드의 이름을 나열합니다.
 
         Returns:
-            list[str]: 보드 이름 목록.
+            보드 이름 목록.
         """
         res = self.session.get(f"{self.base_url}/boards")
         res.raise_for_status()
@@ -65,10 +66,10 @@ class MiroMindmapAdapter(MindmapPort):
         """이름으로 보드 ID를 조회하며, 존재하지 않으면 새로 생성합니다.
 
         Args:
-            board_name: 보드 이름.
+            board_name: 조회 및 생성할 대상 보드 이름.
 
         Returns:
-            str: Miro 보드 ID.
+            대상 Miro 보드의 고유 ID.
         """
         res = self.session.get(f"{self.base_url}/boards")
         res.raise_for_status()
@@ -90,10 +91,10 @@ class MiroMindmapAdapter(MindmapPort):
         """이름으로 기존 보드의 ID를 조회합니다.
 
         Args:
-            board_name: 보드 이름.
+            board_name: 찾고자 하는 Miro 보드 이름.
 
         Returns:
-            str: Miro 보드 ID.
+            Miro 보드의 고유 ID.
 
         Raises:
             FileNotFoundError: 주어진 이름의 보드를 찾을 수 없는 경우.
@@ -108,7 +109,14 @@ class MiroMindmapAdapter(MindmapPort):
         raise FileNotFoundError(f"Miro board not found: {board_name}")
 
     def _extract_text_from_html(self, content: str) -> str:
-        """HTML 형태의 텍스트에서 순수 텍스트만 추출한다."""
+        """HTML 태그와 엔티티가 포함된 문자열에서 순수 텍스트만 추출하고 정규화합니다.
+
+        Args:
+            content: 원본 HTML 문자열.
+
+        Returns:
+            HTML 태그가 제거되고 화이트스페이스가 정리된 순수 문자열.
+        """
         import html
 
         # 태그 제거
@@ -121,16 +129,14 @@ class MiroMindmapAdapter(MindmapPort):
         return text.strip()
 
     def load(self, board_name: str, progress_callback: Callable[[str, float], None] | None = None) -> Board:
-        """Miro 보드 구조로부터 Board 도메인 객체를 복원합니다.
-
-        Shape와 커넥터를 분석하여 계층 구조를 재구성합니다.
+        """Miro 보드의 Shape와 커넥터 구조를 비동기적으로 스캔하여 Board 도메인 객체로 역직렬화합니다.
 
         Args:
-            board_name: 불러올 보드의 이름.
-            progress_callback: 진행 상태 업데이트를 위한 선택적 콜백.
+            board_name: 복원할 Miro 보드 이름.
+            progress_callback: 단계별 진행률을 알리기 위한 콜백 함수.
 
         Returns:
-            Board: 재구성된 보드 객체.
+            Miro 보드 데이터로부터 재구성된 Board 도메인 객체.
         """
 
         def update_progress(msg, val):
@@ -246,13 +252,13 @@ class MiroMindmapAdapter(MindmapPort):
         return board
 
     def save(self, board: Board, progress_callback: Callable[[str, float], None] | None = None) -> None:
-        """현재 Board 데이터로 Miro 보드를 덮어씁니다.
+        """현재 Board 데이터로 대상 Miro 보드를 완전히 덮어씌웁니다.
 
-        기존의 모든 아이템을 삭제하고 새로 동기화 작업을 수행합니다.
+        보드 내 기존의 모든 아이템을 완전히 삭제(초기화)한 후 새 구조로 동기화를 진행합니다.
 
         Args:
-            board: 저장할 보드 데이터.
-            progress_callback: 진행 상태 업데이트를 위한 선택적 콜백.
+            board: 저장할 Board 도메인 인스턴스.
+            progress_callback: 단계별 진행률 업데이트용 콜백.
         """
 
         def update_progress(msg, val):
@@ -281,20 +287,21 @@ class MiroMindmapAdapter(MindmapPort):
         self.sync(board, progress_callback=progress_callback)
 
     def sync(self, board: Board, progress_callback: Callable[[str, float], None] | None = None) -> None:
-        """변경된 부분만 Miro 보드에 동기화합니다.
+        """변경된 노드 및 주식 정보만 Miro 마인드맵에 차분 동기화(Incremental Sync)합니다.
 
-        아이템과 커넥터의 생성, 업데이트, 삭제를 처리합니다.
+        새로운 가상 레이아웃을 계산한 뒤, 캐싱 맵을 통해 변경(이동, 내용 및 스타일 갱신), 생성, 삭제가
+        필요한 노드를 선별하여 대량/병합 API 요청을 병렬로 수행합니다.
 
         Args:
-            board: 동기화할 보드 데이터.
-            progress_callback: 진행 상태 업데이트를 위한 선택적 콜백.
+            board: 동기화할 Board 데이터.
+            progress_callback: 단계별 진행률 업데이트용 콜백.
         """
 
         def update_progress(msg, val):
             if progress_callback:
                 progress_callback(msg, val)
 
-        update_progress(f"보드 '{board.name}' 동기화 준비 중...", 0.05)
+        update_progress(f"보드 '{board.name}' ...", 0.05)
         board_id = self._get_or_create_board_id(board.name)
 
         # 1. 가상 레이아웃 계산
@@ -429,7 +436,14 @@ class MiroMindmapAdapter(MindmapPort):
         update_progress("동기화 완료!", 1.0)
 
     def _get_current_connectors(self, board_id: str) -> list[dict]:
-        """현재 Miro 보드에 생성된 모든 커넥션 정보를 조회합니다."""
+        """현재 Miro 보드 상에 맺어져 있는 모든 커넥터 정보를 쿼리하여 반환합니다.
+
+        Args:
+            board_id: Miro 보드 고유 ID.
+
+        Returns:
+            커넥터 딕셔너리 정보 목록.
+        """
         current_connectors = []
         cursor = ""
         while True:
@@ -447,7 +461,15 @@ class MiroMindmapAdapter(MindmapPort):
         return current_connectors
 
     def _determine_connector_snap(self, start_x: float, end_x: float) -> tuple[str, str]:
-        """부모와 자식 간의 x좌표 위치 관계에 따라 커넥션 스냅 지점을 결정합니다."""
+        """부모 요소와 자식 요소의 상대적 위치(X좌표)에 맞추어 연결선의 시작/끝 스냅(방향)을 계산합니다.
+
+        Args:
+            start_x: 시작 요소(부모)의 X좌표.
+            end_x: 종료 요소(자식)의 X좌표.
+
+        Returns:
+            시작 스냅 방향('left'/'right')과 종료 스냅 방향의 튜플.
+        """
         start_snap = "right" if end_x > start_x else "left"
         end_snap = "left" if end_x > start_x else "right"
         return start_snap, end_snap
@@ -455,7 +477,16 @@ class MiroMindmapAdapter(MindmapPort):
     def _build_target_connectors(
         self, board: Board, item_ids: dict, conn_map: dict
     ) -> tuple[list[dict], set[tuple[str, str]]]:
-        """도메인 데이터 구조를 분석하여 Miro에 추가해야 할 신규 커넥터 정보와 현재 유효한 커넥터 쌍 세트를 계산합니다."""
+        """도메인 보드 계층을 분석해 생성해야 할 대상 커넥터와 현재 유효한 커넥션 쌍 목록을 각각 집계합니다.
+
+        Args:
+            board: 대상 Board 도메인 모델.
+            item_ids: 렌더링된 요소 객체 id와 Miro 아이템 정보 맵.
+            conn_map: 기존 Miro 커넥션 쌍 정보를 맵핑해둔 딕셔너리.
+
+        Returns:
+            새롭게 생성해야 할 커넥터 정보 목록과 유효한 연결 쌍 세트의 튜플.
+        """
         target_conn_data = []
         target_conns_set = set()
 
@@ -510,7 +541,13 @@ class MiroMindmapAdapter(MindmapPort):
         return target_conn_data, target_conns_set
 
     def _execute_connector_sync(self, board_id: str, create_targets: list[dict], delete_targets: list[str]) -> None:
-        """병렬 스레드풀을 활용해 커넥터의 대량 추가 및 삭제를 처리합니다."""
+        """병렬 스레드풀을 통해 보드 커넥터의 추가 및 삭제 동기화를 실제로 격격 기동합니다.
+
+        Args:
+            board_id: Miro 보드 ID.
+            create_targets: 생성할 신규 커넥터 페이로드 목록.
+            delete_targets: 삭제할 만료 커넥터 ID 목록.
+        """
         def post_conn(payload):
             self.session.post(f"{self.base_url}/boards/{board_id}/connectors", json=payload)
 
@@ -522,7 +559,16 @@ class MiroMindmapAdapter(MindmapPort):
             executor.map(delete_conn, delete_targets)
 
     def _refresh_connectors(self, board_id: str, item_ids: dict, board: Board) -> None:
-        """커넥터 상태를 파악하여 변경된 부분만 동기화 (차분 업데이트)."""
+        """현재 마인드맵 전체의 연결선(Connector) 상태를 갱신합니다.
+
+        기존 연결 정보와 도메인의 연결 정보를 비교 분석하여 유효하지 않은 선은 병렬 삭제하고
+        누락된 연결선만 추가 기동합니다.
+
+        Args:
+            board_id: Miro 보드 ID.
+            item_ids: 렌더링된 요소 객체 id와 Miro 아이템 정보 맵.
+            board: 기준 Board 도메인 모델.
+        """
         current_connectors = self._get_current_connectors(board_id)
 
         # (startItem_id, endItem_id) -> connector_id 맵 구성
@@ -543,9 +589,13 @@ class MiroMindmapAdapter(MindmapPort):
         self._execute_connector_sync(board_id, target_conn_data, to_delete_conns)
 
     def _calculate_balanced_layout(self, board: Board) -> list:
-        """루트 노드의 자식들을 좌우로 균등 배치하고 x, y 좌표가 계산된 정보를 반환.
+        """보드 데이터를 바탕으로 루트 노드를 중심으로 좌우 대칭 균형(Balanced Tree) 레이아웃 좌표를 연산합니다.
+
+        Args:
+            board: 배치 레이아웃을 계산할 대상 Board.
+
         Returns:
-            list[tuple]: [(obj, depth, x, y, is_stock), ...]
+            계산이 완료된 각 노드 요소 튜플들의 리스트. 튜플 구조는 (obj, depth, x, y, is_stock).
         """
         root_path = next((p for p, n in board.nodes.items() if n.parent_path is None), None)
         if not root_path:

@@ -9,11 +9,12 @@ from evenezer.domain.heatmap.ports import KrxDataPort
 logger = logging.getLogger(__name__)
 
 class KrxRepository(KrxDataPort):
-    """KRX API 직접 호출 기반 데이터 저장소 (외부 의존성 없음)"""
+    """KRX 정보데이터시스템 JSON API 직접 호출 기반의 주식 정보 수집 리포지토리입니다."""
     
     BASE_URL = "https://data.krx.co.kr"
     
     def __init__(self):
+        """KrxRepository를 초기화하고 HTTP 세션 헤더 및 환경 변수 기반 로그인 자격 증명을 로드합니다."""
         self.session = requests.Session()
         self.user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         self.session.headers.update({
@@ -33,7 +34,10 @@ class KrxRepository(KrxDataPort):
         self.is_logged_in = False
 
     def _login(self) -> None:
-        """KRX 정보데이터시스템 로그인 세션 쿠키 갱신"""
+        """KRX 정보데이터시스템 회원 정보로 로그인 세션을 갱신하여 쿠키를 설정합니다.
+
+        자격 증명 정보가 없으면 익명 사용자로 계속 진행합니다.
+        """
         if not self.username or not self.password:
             logger.debug("KRX_USERNAME 또는 KRX_PASSWORD 환경변수가 설정되지 않아 익명(Anonymous) 세션으로 진행합니다.")
             return
@@ -76,13 +80,15 @@ class KrxRepository(KrxDataPort):
             self.is_logged_in = False
 
     def fetch_listing(self, date: Optional[datetime] = None) -> pd.DataFrame:
-        """직접 KRX JSON API(MDCSTAT01501)를 호출하여 전종목 데이터를 수집합니다.
-        
+        """직접 KRX JSON API(MDCSTAT01501)를 호출하여 특정 기준일의 전종목 데이터를 수집합니다.
+
+        지정된 날짜가 영업일이 아닐 경우, 최대 10일 전까지 역순으로 탐색하며 영업일 데이터를 수집합니다.
+
         Args:
-            date: 조회할 기준일. None이면 오늘 날짜를 기준으로 조회합니다.
-        
+            date: 조회할 기준일. None일 경우 오늘 날짜를 기준으로 수집을 시작합니다.
+
         Returns:
-            KRX 종목 데이터프레임 (Code, Name, Marcap, ChagesRatio 컬럼 포함)
+            KRX 전종목 주가 정보 데이터프레임. ['Code', 'Name', 'Marcap', 'ChagesRatio'] 컬럼이 포함됩니다.
         """
         target_base = date or datetime.now()
         
