@@ -19,6 +19,14 @@ class NewsService:
         drive_adapter: StoragePort | None = None,
         news_folder_id: str | None = None,
     ):
+        """NewsService를 초기화합니다.
+
+        Args:
+            repository: 뉴스 데이터 영속성 관리를 위한 포트.
+            scraper: 뉴스 URL 파싱 및 정보 추출을 위한 스크래퍼 포트.
+            drive_adapter: 구글 드라이브 동기화를 수행할 저장소 어댑터 포트 (선택 사항).
+            news_folder_id: 구글 드라이브의 뉴스 폴더 식별자 ID (선택 사항).
+        """
         self.repository = repository
         self.scraper = scraper
         self.drive_adapter = drive_adapter
@@ -108,11 +116,22 @@ class NewsService:
             logger.error(f"[NewsService] 동기화 중 치명적 오류: {e}", exc_info=True)
 
     def _parse_drive_mtime(self, mtime_str: str) -> float:
-        """드라이브의 ISO 시각 문자열을 timestamp로 변환합니다. (개선 B)"""
+        """드라이브의 ISO 시각 문자열을 timestamp로 변환합니다.
+
+        Args:
+            mtime_str: 구글 드라이브 파일의 ISO 8601 시각 형식 문자열.
+
+        Returns:
+            Epoch 타임스탬프 실수(float) 값.
+        """
         return datetime.fromisoformat(mtime_str.replace("Z", "+00:00")).timestamp()
 
     async def _update_local_metadata(self, drive_metadata: dict):
-        """로컬 뉴스 파일 상태를 기반으로 메타데이터를 갱신하고 드라이브에 업로드합니다. (개선 C)"""
+        """로컬 뉴스 파일 상태를 기반으로 메타데이터를 갱신하고 드라이브에 업로드합니다.
+
+        Args:
+            drive_metadata: 이전 원격/로컬 메타데이터 통합본 딕셔너리.
+        """
         local_metadata = {}
         for file_path in self.repository.get_all_batch_files():
             filename = file_path.name
@@ -132,8 +151,16 @@ class NewsService:
     async def add_news_from_url(
         self, url: str, ticker: str | None = None, stock_name: str | None = None
     ) -> NewsItem | None:
-        """URL로부터 뉴스를 스크래핑하여 아카이브에 추가하고 동기화합니다."""
+        """URL로부터 뉴스를 스크래핑하여 아카이브에 추가하고 동기화합니다.
 
+        Args:
+            url: 스크래핑할 뉴스의 웹 링크 URL.
+            ticker: 연관 주식 종목 코드 (6자리) (선택 사항).
+            stock_name: 연관 주식 종목명 (선택 사항).
+
+        Returns:
+            성공적으로 생성 및 저장된 NewsItem 객체. 실패 시 None.
+        """
         # 1. 스크래핑 수행
         scraped = await self.scraper.scrape(url)
         if not scraped or not scraped.title:
@@ -148,8 +175,17 @@ class NewsService:
     async def save_news(
         self, title: str, url: str, ticker: str | None = None, stock_name: str | None = None
     ) -> NewsItem | None:
-        """이미 확보된 뉴스 정보를 아카이브에 저장하고 동기화합니다."""
+        """이미 확보된 뉴스 정보를 아카이브에 저장하고 동기화합니다.
 
+        Args:
+            title: 저장할 뉴스 제목.
+            url: 뉴스 원본 링크 URL (ID 해시값 계산용).
+            ticker: 연관 주식 종목 코드 (6자리) (선택 사항).
+            stock_name: 연관 주식 종목명 (선택 사항).
+
+        Returns:
+            저장 완료된 NewsItem 객체. 이미 존재할 경우 기존 객체를 반환하며, 실패 시 None.
+        """
         # 1. NewsItem 생성 (저장 시각 및 URL 해시 기준)
         url_hash = hashlib.md5(url.encode()).hexdigest()
         item = NewsItem(
@@ -191,7 +227,11 @@ class NewsService:
         return None
 
     async def _sync_to_drive(self, batch: NewsBatch):
-        """특정 배치를 구글 드라이브에 업로드합니다."""
+        """특정 뉴스 배치를 구글 드라이브에 업로드합니다.
+
+        Args:
+            batch: 업로드할 일별 뉴스 배치(NewsBatch) 객체.
+        """
         if not self.drive_adapter or not self.news_folder_id:
             return
 
@@ -213,11 +253,25 @@ class NewsService:
             logger.error(f"[NewsService] 구글 드라이브 동기화 중 오류: {e}")
 
     def get_news_by_date(self, date_str: str) -> NewsBatch | None:
-        """특정 날짜의 뉴스 배치를 조회합니다."""
+        """특정 날짜의 뉴스 배치를 조회합니다.
+
+        Args:
+            date_str: 조회 대상 일자 문자열 (YYYY-MM-DD).
+
+        Returns:
+            해당 날짜의 뉴스 배치(NewsBatch) 객체. 없으면 None.
+        """
         return self.repository.load_batch(date_str)
 
     def get_news_for_stock(self, ticker: str) -> list[NewsItem]:
-        """특정 종목에 아카이브된 뉴스 목록을 조회합니다 (메모리 캐시 활용)."""
+        """특정 종목에 아카이브된 뉴스 목록을 메모리 캐시를 기반으로 조회합니다.
+
+        Args:
+            ticker: 조회 대상 주식 종목 코드 (6자리).
+
+        Returns:
+            해당 종목과 연관된 뉴스 목록 리스트.
+        """
         if not self._is_indexed:
             self._rebuild_index()
         return self._news_cache.get(ticker, [])

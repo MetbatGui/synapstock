@@ -19,6 +19,14 @@ class OutboxWorker:
         max_retries: int = 5,
         base_delay: float = 2.0,
     ) -> None:
+        """OutboxWorker를 초기화합니다.
+
+        Args:
+            outbox: 아웃박스 저장소 포트 객체.
+            handlers: 이벤트 클래스 이름을 키로, 실행할 핸들러 함수를 값으로 갖는 매핑 객체.
+            max_retries: 이벤트별 최대 재시도 횟수 한계값. 기본값은 5.
+            base_delay: 지수 백오프의 기준 딜레이 초(seconds). 기본값은 2.0.
+        """
         self._outbox = outbox
         self._handlers = handlers
         self._max_retries = max_retries
@@ -27,7 +35,7 @@ class OutboxWorker:
         self._running = False
 
     def start(self) -> None:
-        """백그라운드 이벤트 처리 데몬 루프를 시작합니다."""
+        """백그라운드 폴링 데몬 루프를 비동기 태스크로 시작합니다."""
         if not self._running:
             try:
                 loop = asyncio.get_running_loop()
@@ -41,7 +49,7 @@ class OutboxWorker:
                 )
 
     def stop(self) -> None:
-        """백그라운드 이벤트 처리 데몬 루프를 종료합니다."""
+        """실행 중인 백그라운드 폴링 데몬 루프 태스크를 안전하게 취소하고 종료합니다."""
         self._running = False
         if self._task:
             self._task.cancel()
@@ -49,6 +57,7 @@ class OutboxWorker:
             logger.info("[OutboxWorker] 백그라운드 폴링 데몬이 종료되었습니다.")
 
     async def _run_loop(self) -> None:
+        """5초마다 대기 중인 이벤트를 감지하여 소모하는 백그라운드 무한 루프입니다."""
         while self._running:
             try:
                 await self.process_pending_events()
@@ -57,6 +66,14 @@ class OutboxWorker:
             await asyncio.sleep(5.0)
 
     def _should_retry_now(self, event_item: dict) -> bool:
+        """지수 백오프 계산 규칙에 근거하여 지금 재시도를 진행할 타이밍인지 여부를 확인합니다.
+
+        Args:
+            event_item: 아웃박스 저장소에서 가져온 이벤트 세부 데이터 딕셔너리.
+
+        Returns:
+            대기 시간이 경과하여 즉시 처리가 가능하면 True, 아직 딜레이 시간이 남아 있으면 False.
+        """
         retry_count = event_item.get("retry_count", 0)
         if retry_count == 0:
             return True
@@ -80,6 +97,14 @@ class OutboxWorker:
             return True
 
     def _restore_event(self, event_dict: dict) -> Any:
+        """딕셔너리 구조로 저장된 이벤트 데이터를 DomainEvent 인스턴스로 복원합니다.
+
+        Args:
+            event_dict: 역직렬화할 원본 이벤트 정보 딕셔너리.
+
+        Returns:
+            복원 완료된 DomainEvent 객체 또는 복원 실패 시 원본 event_dict를 그대로 반환.
+        """
         try:
             from evenezer.domain.events import DomainEvent
             return DomainEvent.from_dict(event_dict)

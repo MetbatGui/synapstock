@@ -6,6 +6,11 @@ class FinancialService:
     """재무 분석 비즈니스 로직을 처리하는 서비스."""
 
     def __init__(self, repository: FinancialRepository):
+        """FinancialService를 초기화합니다.
+
+        Args:
+            repository: 재무 데이터 연동을 위한 저장소 포트 인터페이스 객체.
+        """
         self.repository = repository
         self._cache = {}  # {key: result_dict}
         self._last_mtime = 0.0
@@ -21,14 +26,31 @@ class FinancialService:
             pass
 
     def get_available_quarters(self, metric: FinancialMetric) -> list[str]:
-        """선택 가능한 모든 분기 리스트를 반환합니다."""
+        """선택 가능한 모든 분기 리스트를 반환합니다.
+
+        Args:
+            metric: 대상 재무 지표 구분 (매출액, 영업이익 등).
+
+        Returns:
+            사용 가능한 분기 명칭 리스트 (예: ['2023.4Q', '2024.1Q']).
+        """
         return self.repository.get_all_quarters(metric)
 
     def get_top_growers(
         self, metric: FinancialMetric, target_quarter: str | None = None, top_n: int = 500, min_value: float = 1.0
     ) -> dict:
         """직전 분기 대비 등락률이 높은 상위 종목을 추출합니다. (QoQ)
+
         일반 성장과 흑자 전환 결과를 동시에 반환하며 캐싱을 지원합니다.
+
+        Args:
+            metric: 대상 재무 지표 구분.
+            target_quarter: 기준 분기 명칭 (예: '2024.1Q'). None인 경우 최신 분기 자동 지정.
+            top_n: 추출할 상위 결과 개수 제한. 기본값은 500.
+            min_value: 시계열 최소 기준 금액. 이보다 작은 절댓값 실적의 매칭은 제외. 기본값은 1.0.
+
+        Returns:
+            'normal'(일반 성장)과 'turnaround'(흑자 전환)을 키로 하는 분석 아이템 딕셔너리.
         """
         self._update_cache_if_modified()
         if not target_quarter:
@@ -105,7 +127,17 @@ class FinancialService:
         self, metric: FinancialMetric, target_quarter: str | None = None, count: int = 3, min_value: float = 1.0
     ) -> dict:
         """지정한 분기부터 과거 N분기 동안 연속으로 실적이 상승한 종목을 추출합니다.
+
         일반 성장과 흑자 전환 결과를 동시에 반환하며 캐싱을 지원합니다.
+
+        Args:
+            metric: 대상 재무 지표 구분.
+            target_quarter: 기준 분기 명칭. None인 경우 최신 분기 자동 지정.
+            count: 실적 상승이 연속되어야 할 기간 수. 기본값은 3.
+            min_value: 시계열 최소 기준 금액. 기본값은 1.0.
+
+        Returns:
+            'normal'(일반 성장)과 'turnaround'(흑자 전환)을 키로 하는 분석 아이템 딕셔너리.
         """
         self._update_cache_if_modified()
         if not target_quarter:
@@ -173,7 +205,14 @@ class FinancialService:
         return result
 
     def _get_prev_quarter(self, quarter_str: str) -> str:
-        """'2024.1Q' 형식에서 직전 분기 문자열을 반환합니다."""
+        """'2024.1Q' 형식에서 직전 분기 문자열을 반환합니다.
+
+        Args:
+            quarter_str: 기준 분기 명칭.
+
+        Returns:
+            직전 분기 명칭 문자열. 오류 발생 시 빈 문자열.
+        """
         try:
             year, q_str = quarter_str.split(".")
             year = int(year)
@@ -185,7 +224,15 @@ class FinancialService:
             return ""
 
     def _get_recent_quarters(self, start_quarter: str, count: int = 5) -> list[str]:
-        """시작 분기부터 역순으로 지정된 개수만큼의 분기 리스트를 반환합니다. (오름차순 정렬됨)"""
+        """시작 분기부터 역순으로 지정된 개수만큼의 분기 리스트를 반환합니다. (오름차순 정렬됨)
+
+        Args:
+            start_quarter: 역산 기준 시작 분기.
+            count: 역산할 분기 개수. 기본값은 5.
+
+        Returns:
+            정렬된 시간 순서의 분기 명칭 리스트.
+        """
         try:
             year, q_str = start_quarter.split(".")
             year = int(year)
@@ -207,7 +254,15 @@ class FinancialService:
             return [start_quarter]
 
     def _calculate_change_rate(self, curr: float, prev: float) -> float:
-        """등락률 계산 로직. (기저값이 0이 아님을 보장받고 호출됨)"""
+        """등락률 계산 및 반올림 처리를 수행합니다.
+
+        Args:
+            curr: 현재 실적 금액.
+            prev: 이전 실적 금액.
+
+        Returns:
+            계산 완료된 백분율(%) 등락률 값.
+        """
         # 표준 등락률 공식 (음수 기저 효과 대응)
         rate = (curr - prev) / abs(prev) * 100.0
         return round(rate, 2)
