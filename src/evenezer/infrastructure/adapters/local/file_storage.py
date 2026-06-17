@@ -96,6 +96,9 @@ class LocalFileStorageAdapter(StoragePort):
     async def put_file(self, path: str, data: bytes, **kwargs) -> bool:
         """지정된 바이너리 데이터를 파일로 작성합니다. 상위 디렉토리가 없으면 함께 생성합니다.
 
+        원자적 쓰기(Atomic Write) 방식으로 데이터를 임시 파일에 기록한 뒤
+        기존 대상 파일에 안전하게 대체하여 파일 데이터의 손상을 원천 예방합니다.
+
         Args:
             path: 데이터를 작성할 파일 경로.
             data: 기록할 바이너리 바이트 데이터.
@@ -105,11 +108,23 @@ class LocalFileStorageAdapter(StoragePort):
         """
         abs_path = self._get_abs_path(path)
         def _put():
+            import os
+            import tempfile
             try:
                 # 부모 디렉토리가 없으면 생성
                 abs_path.parent.mkdir(parents=True, exist_ok=True)
-                abs_path.write_bytes(data)
-                return True
+                # 동일 디렉토리 내에 임시 파일 작성
+                with tempfile.NamedTemporaryFile(dir=abs_path.parent, delete=False) as tmp_file:
+                    tmp_file.write(data)
+                    tmp_path = Path(tmp_file.name)
+                try:
+                    # 원자적으로 덮어쓰기 대체
+                    os.replace(tmp_path, abs_path)
+                    return True
+                except Exception:
+                    if tmp_path.exists():
+                        tmp_path.unlink()
+                    raise
             except Exception as e:
                 logger.error(f"Failed to write file {path}: {e}")
                 return False
