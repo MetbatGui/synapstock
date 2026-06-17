@@ -91,13 +91,24 @@ The `brain/` module contains Claude/AI integration for analysis tasks. `scripts/
 
 ## Development Methodology
 
-### 1. 브랜치 네이밍 컨벤션 (Branch Strategy)
+### 1. 브랜치 네이밍 컨벤션 및 깃 워크플로우 (Branch Strategy & Git Workflow)
 작업의 성격에 따라 아래 5가지 접두사를 명확히 구분하여 사용합니다.
 - `feature/`: 새로운 기능 개발
 - `fix/`: 버그 수정
 - `refactor/`: 기능 변화 없는 코드 구조/성능 개선
 - `chore/`: 빌드, 패키지 매니저, CI/CD 등 설정 변경
 - `hotfix/`: 운영 환경의 치명적인 버그 긴급 수정
+
+**깃 워크플로우 운영 규칙**:
+- **브랜치 기반 개발**: 어떠한 작업(단순 문서 수정 포함)이든 `master` 브랜치에서 직접 개발하거나 커밋하지 않으며, 항상 목적에 부합하는 브랜치를 생성하여 작업합니다.
+- **원격 반영 (Push)**: 로컬 브랜치에서 작업하는 과정에서 항상 변경 사항을 원격 저장소에 push합니다.
+- **비-속도전진 병합 (Non-Fast-Forward Merge)**:
+  - 작업이 끝난 브랜치를 `master` 브랜치에 병합할 때는 반드시 `git merge --no-ff <branch_name>` 옵션을 사용합니다.
+  - 이는 Fast-forward를 방지하여 명시적인 병합 커밋(Merge Commit)의 흔적을 남기기 위함입니다.
+- **병합 커밋의 PR 리포트화**:
+  - `--no-ff` 병합 시 생성되는 병합 커밋 메시지를 마치 Pull Request(PR) 리포트처럼 상세히 작성합니다.
+  - 해당 병합 커밋 메시지에는 이 브랜치에서 수행된 구체적인 변경 사항 요약, 설계 결정, 검증 결과를 포함하여 히스토리를 완벽하게 문서화해야 합니다.
+
 
 ### 2. 이상적인 문제 해결 워크플로우 (TDD & Integration Loop)
 작업의 성격(신규 기능 개발 vs 버그 수정)에 따라 워크플로우를 다르게 적용합니다. feat/와 fix/는 문제 접근 방식이 다릅니다.
