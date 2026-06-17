@@ -1,9 +1,8 @@
+import asyncio
 import json
 import logging
-import asyncio
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
 
 from evenezer.domain.ports import StockSplitRepositoryPort, StoragePort
 from evenezer.domain.statistics.models import StockSplitManifest
@@ -39,7 +38,7 @@ class StockSplitSyncService:
         try:
             # 1. 드라이브 폴더 내 파일 목록 조회 (StoragePort 추상 메서드 사용)
             files = await self._drive_adapter.list_files_in_folder("", root_id=self._folder_id)
-            
+
             # 매니페스트 파일 찾기
             manifest_file = next((f for f in files if "manifest" in f.get("name", "").lower()), None)
             if not manifest_file:
@@ -118,7 +117,7 @@ class StockSplitSyncService:
                 results = await asyncio.gather(*tasks)
                 if not all(results):
                     logger.warning("[StockSplitSync] 일부 파일 다운로드에 실패하였습니다.")
-            
+
             # 5. 매니페스트 저장
             self._repository.save_manifest(remote_manifest)
             logger.info("[StockSplitSync] 로컬 매니페스트 갱신 및 저장 완료")

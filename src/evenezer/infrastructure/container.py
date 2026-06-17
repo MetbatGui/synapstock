@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 from typing import TYPE_CHECKING, cast
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from evenezer.application.services.news_service import NewsService
     from evenezer.domain.ports import FinancialDataPort
 
+from evenezer.application.events.worker import OutboxWorker
 from evenezer.application.services.board_file_sync_service import BoardFileSyncService
 from evenezer.application.services.command_service import BoardCommandService
 from evenezer.application.services.financial_service import FinancialService
@@ -21,13 +23,23 @@ from evenezer.application.services.media_service import StockMediaService
 from evenezer.application.services.query_service import BoardQueryService
 from evenezer.application.services.report_service import ReportService
 from evenezer.application.services.statistics_service import StatisticsService
+from evenezer.application.services.stock_split_sync_service import StockSplitSyncService
 from evenezer.application.services.sync_service import BoardSyncService
 from evenezer.application.services.weekly_change_service import WeeklyChangeService
-from evenezer.application.services.stock_split_sync_service import StockSplitSyncService
+from evenezer.domain.events import (
+    BatchStocksDeletedFromBoard,
+    BoardCreated,
+    BoardDeleted,
+    NodeAdded,
+    NodeDeleted,
+    StockAddedToBoard,
+    StockDeletedFromBoard,
+)
 from evenezer.infrastructure.adapters.disclosure.disclosure_adapter import (
-
     DartDisclosureAdapter,
 )
+from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
+from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
 from evenezer.infrastructure.adapters.financial.excel_adapter import (
     ExcelFinancialDataAdapter,
 )
@@ -36,19 +48,6 @@ from evenezer.infrastructure.adapters.google.google_drive_adapter import (
 )
 from evenezer.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
-from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventBusAdapter
-from evenezer.infrastructure.adapters.events.file_outbox import LocalFileEventOutboxAdapter
-from evenezer.application.events.worker import OutboxWorker
-from evenezer.domain.events import (
-    BoardCreated,
-    BoardDeleted,
-    NodeAdded,
-    NodeDeleted,
-    StockAddedToBoard,
-    StockDeletedFromBoard,
-    BatchStocksDeletedFromBoard,
-)
-
 from evenezer.infrastructure.adapters.local.file_storage import (
     LocalFileStorageAdapter,
 )
@@ -60,21 +59,21 @@ from evenezer.infrastructure.adapters.local.statistics_repo import (
 )
 from evenezer.infrastructure.adapters.local.stock_split_repo import LocalStockSplitRepository
 from evenezer.infrastructure.adapters.miro.miro_mindmap import MiroMindmapAdapter
-
 from evenezer.infrastructure.adapters.scraper.httpx_scraper import (
     HttpxNewsScraperAdapter,
 )
 from evenezer.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
-from evenezer.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 from evenezer.infrastructure.config import AppConfig
+from evenezer.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
 
 
 class Container:
     """애플리케이션 전역 의존성을 조립하고 관리하는 컨테이너 클래스."""
 
     def __init__(self):
+        """Container를 초기화하고 전역 애플리케이션 의존성(어댑터, 서비스, 포트)을 조립합니다."""
         # 1. 설정 로드 (환경 변수 및 기본 경로)
         self.config = AppConfig.load()
 
@@ -190,7 +189,7 @@ class Container:
                 ev.ticker, ev.board_id, ev.parent_path.split("/")
             )
             await self._board_file_sync_service.sync_with_drive()
-            
+
             # 처리 완료 상태 기록
             manifest = self._board_file_sync_service.load_local_manifest()
             manifest.mark_event_processed(ev.event_id)
@@ -205,7 +204,7 @@ class Container:
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
-            
+
             # 처리 완료 상태 기록
             manifest = self._board_file_sync_service.load_local_manifest()
             manifest.mark_event_processed(ev.event_id)
@@ -220,18 +219,18 @@ class Container:
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
             await self._board_file_sync_service.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
             await self._board_file_sync_service.sync_with_drive()
-            
+
             # 처리 완료 상태 기록
             manifest = self._board_file_sync_service.load_local_manifest()
             manifest.mark_event_processed(ev.event_id)
             self._board_file_sync_service.save_local_manifest(manifest)
 
-        worker_handlers = {
+        board_handlers = {
             "StockAddedToBoard": handle_stock_added,
             "StockDeletedFromBoard": handle_stock_deleted,
             "BatchStocksDeletedFromBoard": handle_batch_stocks_deleted,
         }
-        self._outbox_worker = OutboxWorker(outbox=self._outbox, handlers=worker_handlers)
+        self._outbox_worker = OutboxWorker(outbox=self._outbox, handlers=board_handlers)
 
         from evenezer.application.services.news_service import NewsService
 
@@ -282,7 +281,7 @@ class Container:
         self._init_report_service()
 
     def start_background_services(self) -> None:
-        """백그라운드 동기화 스레드 및 아웃박스 워커를 명시적으로 기동합니다."""
+        """재무제표, 테마 보드, 주식 분할, 히트맵 등의 백그라운드 동기화 스레드 및 아웃박스 워커를 기동합니다."""
         logger.info("[Container] 백그라운드 서비스 기동 시작...")
         self.sync_financial_statements_from_drive()
         self.sync_boards_from_drive_in_background()
@@ -292,7 +291,7 @@ class Container:
         logger.info("[Container] 모든 백그라운드 서비스 기동 완료.")
 
     async def close_services(self) -> None:
-        """백그라운드 워커 및 네트워크 리소스를 안전하게 해제합니다."""
+        """백그라운드 아웃박스 워커와 네트워크 스크래퍼 세션 등의 리소스를 안전하게 종료하고 해제합니다."""
         logger.info("[Container] 서비스 종료 및 리소스 해제 중...")
         self._outbox_worker.stop()
         if hasattr(self, "_news_scraper_adapter") and self._news_scraper_adapter:
@@ -301,7 +300,9 @@ class Container:
 
 
     def _init_google_drive(self):
-        """환경 설정 및 보안 파일 확인 후 Google Drive 어댑터를 초기화한다."""
+        """환경 변수 및 로컬 secrets 디렉토리의 자격 증명 파일(token.json, client_secret.json) 정보를 확인하고
+        구글 드라이브 어댑터 인스턴스를 조립합니다.
+        """
         token_path = self.config.secrets_dir / "token.json"
         client_secret_path = self.config.secrets_dir / "client_secret.json"
 
@@ -337,7 +338,7 @@ class Container:
             logger.error(f"[Container] Google Drive 어댑터 초기화 실패: {e}")
 
     def _init_report_service(self):
-        """Google Drive 어댑터가 활성화된 경우 리포트 서비스를 조립한다."""
+        """Google Drive 어댑터 및 리포트 폴더 ID가 유효한 경우, 파일 동기화 기반의 ReportService를 초기화합니다."""
         if self._drive_adapter and self.config.report_folder_id:
             self._report_service = ReportService(
                 cloud_storage=self._drive_adapter,
@@ -347,9 +348,7 @@ class Container:
             )
 
     def sync_financial_statements_from_drive(self):
-        """Google Drive로부터 재무제표 엑셀 파일을 백그라운드에서 비동기적으로 다운로드하여 동기화합니다.
-        (서버 기동 시 블로킹 방지를 위해 백그라운드 스레드로 실행합니다.)
-        """
+        """Google Drive에 업로드된 최신 재무제표 엑셀 파일을 로컬에 동기화하기 위한 백그라운드 데몬 스레드를 실행합니다."""
         if not self._drive_adapter or not self.config.financial_statements_id:
             logger.info("[Container] 재무제표 구글 드라이브 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
             return
@@ -373,7 +372,7 @@ class Container:
         logger.info("[Container] 백그라운드 재무제표 동기화 스레드를 성공적으로 시작했습니다.")
 
     def sync_boards_from_drive_in_background(self):
-        """Google Drive로부터 가상/테마 보드 파일을 백그라운드 스레드에서 양방향 동기화합니다."""
+        """로컬 가상/테마 보드 데이터와 Google Drive 내 파일을 양방향 동기화하는 백그라운드 데몬 스레드를 실행합니다."""
         if not self._drive_adapter or not self.config.theme_folder_id:
             logger.info("[Container] 가상/테마 보드 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
             return
@@ -397,7 +396,7 @@ class Container:
         logger.info("[Container] 백그라운드 가상/테마 보드 동기화 스레드를 성공적으로 시작했습니다.")
 
     def sync_stock_splits_from_drive_in_background(self):
-        """Google Drive로부터 주식 분할(액면분할) 데이터를 백그라운드 스레드에서 다운로드하여 동기화합니다."""
+        """Google Drive로부터 액면분할/합병 데이터를 주기적으로 조회해 로컬 저장소에 반영하는 백그라운드 동기화 스레드를 기동합니다."""
         if not self._drive_adapter or not self.config.stock_split_folder_id:
             logger.info("[Container] 주식 분할 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
             return
@@ -421,7 +420,7 @@ class Container:
         logger.info("[Container] 백그라운드 주식 분할 동기화 스레드를 성공적으로 시작했습니다.")
 
     def sync_heatmap_from_drive_in_background(self):
-        """Google Drive로부터 히트맵 테마 JSON 파일들을 백그라운드 스레드에서 동기화합니다."""
+        """Google Drive에 업로드된 히트맵용 테마 JSON 파일군을 로컬 캐시 폴더와 동기화하는 백그라운드 스레드를 기동합니다."""
         if not self._drive_adapter:
             logger.info("[Container] 어댑터가 활성화되지 않아 히트맵 동기화를 건너뜁니다.")
             return
@@ -430,6 +429,7 @@ class Container:
 
         def run_sync_in_background():
             import asyncio
+
             from evenezer.application.services.heatmap.heatmap_service import HeatmapService
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
@@ -448,6 +448,7 @@ class Container:
 
 
     async def _sync_financial_statements_async(self):
+        """Google Drive에 있는 최신 재무제표 파일을 비동기적으로 다운로드하고 로컬 파일 변경 시점을 업데이트합니다."""
         import os
         from datetime import datetime
 
@@ -478,7 +479,7 @@ class Container:
 
         # 2. 만약 폴더 ID인 경우, 폴더 내부에서 '재무제표' 이름을 포함한 최신 엑셀/스프레드시트 파일을 검색
         if mime_type == "application/vnd.google-apps.folder":
-            logger.info(f"[Container] 제공된 ID가 폴더이므로 폴더 내부를 검색합니다.")
+            logger.info("[Container] 제공된 ID가 폴더이므로 폴더 내부를 검색합니다.")
 
             def _find_file_in_folder():
                 try:

@@ -29,12 +29,16 @@ class GoogleDriveAdapter(StoragePort):
     SCOPES = ["https://www.googleapis.com/auth/drive"]
 
     def __init__(self, token_file: str, folders: dict[str, str] | None = None, client_secret_file: str | None = None):
-        """GoogleDriveAdapter 초기화.
+        """GoogleDriveAdapter를 초기화합니다.
 
         Args:
-            token_file (str): Token JSON 파일 경로.
-            folders (dict[str, str]): {'name': 'id'} 형식의 폴더 매핑.
-            client_secret_file (Optional[str]): Refresh Token 갱신을 위한 Client Secret 파일 경로.
+            token_file: OAuth 2.0 사용자 자격 증명이 담긴 Token JSON 파일 경로.
+            folders: {'name': 'id'} 형식의 드라이브 폴더 키워드 및 ID 매핑 사전.
+            client_secret_file: Refresh Token 갱신을 위해 제공되는 클라이언트 비밀번호 파일 경로 (선택 사항).
+
+        Raises:
+            ValueError: token_file 인자가 누락되었을 때.
+            FileNotFoundError: 지정된 토큰 파일이 로컬 디렉토리에 없을 때.
         """
         self.token_file = token_file
         self.folders = folders or {}
@@ -50,14 +54,18 @@ class GoogleDriveAdapter(StoragePort):
 
     @property
     def service(self):
-        """다중 스레드 안전성(Thread-safety)을 위해 호출하는 스레드별로 독립적인 Drive API 서비스 인스턴스를 제공합니다."""
+        """다중 스레드 안전성(Thread-safety)을 위해 호출하는 스레드별로 독립적인 Drive API 서비스 인스턴스를 제공합니다.
+
+        Returns:
+            현재 실행 스레드 전용의 구글 API 서비스 클라이언트 객체.
+        """
         import threading
         if not hasattr(self, "_thread_local_services"):
             self._thread_local_services = threading.local()
-            
+
         if not getattr(self._thread_local_services, "service", None):
             logger.info(f"[GoogleDrive] 스레드 {threading.current_thread().name} 전용 API 서비스 생성...")
-            
+
             # 토큰 만료 검사 및 갱신은 인스턴스 락(self._lock)으로 감싸 스레드 안전성을 보장합니다.
             with self._lock:
                 creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
@@ -65,14 +73,24 @@ class GoogleDriveAdapter(StoragePort):
                     creds.refresh(Request())
                     with open(self.token_file, "w") as token:
                         token.write(creds.to_json())
-                        
+
             self._thread_local_services.service = build("drive", "v3", credentials=creds, static_discovery=False)
-            
+
         return self._thread_local_services.service
 
 
     def _get_root_id(self, folder: str | None = None) -> str:
-        """키워드에 해당하는 폴더 ID를 반환합니다."""
+        """키워드에 해당하는 폴더 ID를 반환합니다.
+
+        Args:
+            folder: folders 딕셔너리에 등록해 둔 폴더 검색 키워드.
+
+        Returns:
+            조회된 구글 드라이브 폴더의 고유 ID.
+
+        Raises:
+            ValueError: 폴더 키워드가 지정되지 않았거나 등록되어 있지 않은 경우.
+        """
         if not folder:
             if len(self.folders) == 1:
                 return list(self.folders.values())[0]
@@ -87,7 +105,14 @@ class GoogleDriveAdapter(StoragePort):
         return self.folders[folder]
 
     def _authenticate(self):
-        """Google Drive API 인증 (OAuth 2.0 Token)."""
+        """Google Drive API 인증 (OAuth 2.0 Token)을 수행하고 서비스 인스턴스를 생성합니다.
+
+        Returns:
+            구글 API 서비스 클라이언트 객체.
+
+        Raises:
+            RuntimeError: Google Drive API 빌드 및 통신 인증 실패 시 발생.
+        """
         logger.info(f"[GoogleDrive] 인증 시도 (Token: {self.token_file})")
         try:
             creds = Credentials.from_authorized_user_file(self.token_file, self.SCOPES)
@@ -107,7 +132,15 @@ class GoogleDriveAdapter(StoragePort):
             raise RuntimeError(f"Google Drive 인증 실패: {e}")
 
     def _get_or_create_folder(self, folder_name: str, parent_id: str = "root") -> str:
-        """폴더를 찾거나 생성합니다."""
+        """지정된 부모 폴더 하위에 특정 이름의 폴더가 있는지 조회하고, 없으면 새로 생성합니다.
+
+        Args:
+            folder_name: 조회 및 생성할 폴더 이름.
+            parent_id: 부모 폴더의 고유 ID. 기본값은 "root".
+
+        Returns:
+            대상 폴더의 구글 드라이브 고유 ID.
+        """
         query = (
             f"name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' "
             f"and '{parent_id}' in parents and trashed = false"
@@ -126,11 +159,20 @@ class GoogleDriveAdapter(StoragePort):
                 }
                 file = self.service.files().create(body=file_metadata, fields="id").execute()
                 return cast(str, file.get("id", ""))
-                
+
         return self._execute_api_call(_do_get_or_create)
 
     def _get_file_id(self, path: str, folder: str | None = None, root_id: str | None = None) -> str | None:
-        """경로에 해당하는 파일/폴더의 ID를 찾습니다."""
+        """구글 드라이브 상에서 파일 경로를 해석하여 해당 파일/폴더의 고유 ID를 조회합니다.
+
+        Args:
+            path: 구글 드라이브 내의 파일 상대 경로 (예: 'subfolder/data.json').
+            folder: 탐색을 시작할 베이스 폴더 키워드.
+            root_id: 시작 베이스 폴더의 명시적인 구글 드라이브 ID.
+
+        Returns:
+            조회 완료된 파일의 고유 ID 문자열. 파일이 없을 경우 None.
+        """
         parts = path.strip("/").split("/")
 
         # 1. 명시적 root_id -> 2. folder 키워드 -> 3. Error
@@ -151,7 +193,7 @@ class GoogleDriveAdapter(StoragePort):
                     .execute()
                 )
                 return results.get("files", [])
-                
+
             files = self._execute_api_call(_list_files)
 
             # 정확히 일치하거나 NFC 정규화 시 일치하는 항목 검색
@@ -171,7 +213,16 @@ class GoogleDriveAdapter(StoragePort):
 
 
     def _ensure_path_directories(self, path: str, folder: str | None = None, root_id: str | None = None) -> str:
-        """파일 경로의 상위 디렉토리들을 생성하고 마지막 부모 폴더 ID를 반환합니다."""
+        """제시된 파일 경로에서 상위 디렉토리 계층 구조가 구글 드라이브 상에 존재하도록 보장하고 생성합니다.
+
+        Args:
+            path: 파일 전체 상대 경로.
+            folder: 베이스 시작 폴더 키워드.
+            root_id: 베이스 시작 폴더 ID.
+
+        Returns:
+            파일이 생성될 직계 부모 폴더의 구글 드라이브 고유 ID.
+        """
         parts = path.strip("/").split("/")
         dir_parts = parts[:-1]
 
@@ -188,14 +239,33 @@ class GoogleDriveAdapter(StoragePort):
         retry=retry_if_not_exception_type(ValueError),
     )
     def _execute_api_call(self, func, *args, **kwargs):
-        """Google Drive API 호출을 재시도 로직과 함께 실행합니다. 스레드 소켓 충돌 방지 락을 사용합니다."""
+        """Google Drive API 호출을 락 장치를 획득하여 동기적으로 안전하게 기동합니다.
+
+        Args:
+            func: 호출할 실행 대상 함수.
+            *args: 함수 전달 인수.
+            **kwargs: 함수 전달 키워드 인수.
+
+        Returns:
+            대상 함수 실행에 따른 결과물.
+        """
         with self._lock:
             return func(*args, **kwargs)
 
     async def get_file(
         self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs
     ) -> bytes | None:
-        """Google Drive에서 바이너리 파일을 다운로드합니다 (강력한 재시도 포함)."""
+        """Google Drive에서 바이너리 파일을 다운로드합니다.
+
+        Args:
+            path: 다운로드 대상 파일 경로.
+            folder: 대상 베이스 폴더 키워드.
+            root_id: 대상 베이스 폴더 고유 ID.
+            **kwargs: 추가 설정 변수.
+
+        Returns:
+            성공 시 다운로드된 바이너리 바이트 배열, 파일이 없거나 오류 발생 시 None.
+        """
         logger.debug(f"[GoogleDrive] get_file 요청: {path} (folder={folder})")
 
         def _get():
@@ -228,8 +298,18 @@ class GoogleDriveAdapter(StoragePort):
     async def put_file(
         self, path: str, data: bytes, folder: str | None = None, root_id: str | None = None, **kwargs
     ) -> bool:
-        """바이너리 데이터를 Google Drive에 직접 업로드합니다."""
+        """바이너리 데이터를 Google Drive에 지정된 경로로 업로드합니다.
 
+        Args:
+            path: 업로드하여 생성/수정될 파일 경로.
+            data: 업로드할 원본 바이너리 데이터.
+            folder: 베이스 폴더 키워드.
+            root_id: 베이스 폴더 ID.
+            **kwargs: 추가 설정 인수.
+
+        Returns:
+            성공적으로 업로드 완료 시 True, 실패 시 False.
+        """
         def _put():
             try:
                 if path.endswith(".xlsx"):
@@ -258,7 +338,7 @@ class GoogleDriveAdapter(StoragePort):
     def _upload_file(
         self, data: io.BytesIO, path: str, mime_type: str, folder: str | None = None, root_id: str | None = None
     ):
-        """데이터를 업로드합니다. 재시도 시 스트림 위치를 초기화합니다."""
+        """데이터 스트림으로부터 파일을 드라이브 상에 생성하거나 이미 존재하는 경우 덮어씌웁니다."""
         data.seek(0)
         filename = os.path.basename(path)
         parent_id = self._ensure_path_directories(path, folder=folder, root_id=root_id)
@@ -282,6 +362,7 @@ class GoogleDriveAdapter(StoragePort):
     async def ensure_directory(
         self, path: str, folder: str | None = None, root_id: str | None = None, **kwargs
     ) -> bool:
+        """지정된 디렉토리 상대 경로가 드라이브 내에 안전하게 존재하도록 보장합니다."""
         def _ensure():
             try:
                 self._ensure_path_directories(path + "/dummy", folder=folder, root_id=root_id)

@@ -62,7 +62,14 @@ class AppConfig(BaseModel):
 
     @classmethod
     def load(cls, load_env: bool = True) -> "AppConfig":
-        """.env 파일과 시스템 환경 변수로부터 설정을 로드합니다."""
+        """환경 변수 및 .env 파일로부터 설정을 로드하여 AppConfig 인스턴스를 생성합니다.
+
+        Args:
+            load_env: True일 경우 dotenv를 통해 .env 파일을 로드합니다.
+
+        Returns:
+            로드 완료된 AppConfig 설정 인스턴스.
+        """
         if load_env:
             load_dotenv()
 

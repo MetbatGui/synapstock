@@ -18,13 +18,17 @@ class NaverTickerSearchAdapter(TickerSearchPort):
     BASE_URL = "https://m.stock.naver.com/front-api/search/autoComplete"
 
     def __init__(self, cache_path: str | None = None) -> None:
-        """어댑터를 초기화하고 캐시가 지정된 경우 로드합니다."""
+        """NaverTickerSearchAdapter를 초기화합니다.
+
+        Args:
+            cache_path: 로컬 주식 정보 및 별칭(alias) 캐시 파일 경로.
+        """
         self.cache_path = cache_path
         self._name_map: dict[str, dict[str, str]] = {}
         self._load_cache()
 
     def _load_cache(self) -> None:
-        """stock_cache.json을 읽어 이름/별칭 -> {name, ticker} 매핑을 구축합니다."""
+        """로컬 stock_cache.json 파일을 로드하여 정규명 및 별칭(alias)에서 티커 정보로의 매핑을 구축합니다."""
         if not self.cache_path:
             return
 
@@ -59,7 +63,17 @@ class NaverTickerSearchAdapter(TickerSearchPort):
             logger.warning(f"[NaverTickerSearch] 캐시 로드 실패: {e}")
 
     def search(self, query: str) -> list[dict[str, str]]:
-        """로컬 캐시를 우선 검색한 후 네이버 검색 결과를 가져옵니다."""
+        """지정된 질의어에 해당하는 주식 티커 정보를 조회합니다.
+
+        로컬 캐시(별칭 매핑 포함)를 우선 조회하여 일치하는 항목이 있으면 즉시 반환하고,
+        없을 경우 네이버 모바일 주식 검색 API를 호출하여 결과를 가져옵니다.
+
+        Args:
+            query: 검색할 종목명 또는 질의어.
+
+        Returns:
+            검색 결과 종목 정보 딕셔너리 목록. 각 항목은 {"name": 정규화된 종목명, "ticker": 티커코드} 구조.
+        """
         results: list[dict[str, str]] = []
         low_query = query.lower().strip()
 

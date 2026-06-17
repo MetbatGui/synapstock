@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, model_validator
 
 
 class MarketType(StrEnum):
@@ -79,13 +79,16 @@ class MonthlyMarketStats(BaseModel):
     @classmethod
     def aggregate_from_daily(cls, month: str, rankings: list[DailyMarketRanking]) -> "MonthlyMarketStats":
         """여러 일별 랭킹 데이터를 합산하여 월간 통계를 생성합니다.
-        
+
         Args:
             month: 기준 월 (YYYY-MM).
             rankings: 합산할 일별 랭킹 리스트.
-            
+
         Returns:
             합산된 MonthlyMarketStats 인스턴스.
+
+        Raises:
+            ValueError: rankings 리스트가 비어 있는 경우.
         """
         if not rankings:
             # 빈 리스트일 경우 기본값 반환 (첫 번째 인자의 마켓/주체 정보가 없으므로 호출자 책임)
@@ -483,6 +486,12 @@ class NewListing(BaseModel):
         1. ASSIGNED 상태가 최우선
         2. IGNORED 상태가 PENDING보다 우선
         3. 상태가 같은 경우 updated_at 타임스탬프가 최신인 쪽을 우선
+
+        Args:
+            other: 병합할 다른 NewListing 객체.
+
+        Returns:
+            병합 비즈니스 규칙이 적용된 최종 NewListing 인스턴스.
         """
         l_status = self.status
         r_status = other.status
@@ -584,7 +593,14 @@ class StockSplit(BaseModel):
 
     @model_validator(mode="after")
     def validate_business_rules(self) -> "StockSplit":
-        """비즈니스 도메인 규칙을 자율 검증합니다."""
+        """비즈니스 도메인 규칙을 자율 검증합니다.
+
+        Returns:
+            자기 자신(StockSplit) 인스턴스.
+
+        Raises:
+            ValueError: 회사명 또는 접수번호가 비어있거나, 분할 비율이 0 이하인 경우.
+        """
         if not self.company_name.strip():
             raise ValueError("회사명은 필수값이며 비어 있을 수 없습니다.")
         if not self.receipt_no.strip():

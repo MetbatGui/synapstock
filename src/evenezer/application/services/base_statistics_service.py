@@ -3,14 +3,14 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from evenezer.domain.statistics.models import BaseModel
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
-class BaseStatisticsService(ABC, Generic[T]):
+class BaseStatisticsService[T: BaseModel](ABC):
     """통계 서비스의 공통 로직을 처리하는 추상 베이스 클래스."""
 
     def __init__(self, drive_adapter, folder_id: str):
@@ -102,7 +102,7 @@ class BaseStatisticsService(ABC, Generic[T]):
                             cached_data = load_cache_func()
                             if cached_data:
                                 return cached_data if isinstance(cached_data, list) else [cached_data]
-                            
+
             # 4. 파일 다운로드
             if folder_name:
                 content = await self.drive_adapter.get_file(latest_file["name"], folder=folder_name)

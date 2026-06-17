@@ -14,7 +14,12 @@ logger = logging.getLogger("BatchSyncScript")
 
 
 def run_batch_sync(start_date: str, end_date: str = None):
-    """시장 데이터 일괄 수집 실행"""
+    """지정된 날짜 범위 내의 KRX 시장 통계 및 수급 데이터를 일괄 동기화하여 수집합니다.
+
+    Args:
+        start_date: 수집 시작 날짜 ('YYYYMMDD' 형식).
+        end_date: 수집 종료 날짜 ('YYYYMMDD' 형식). 생략 시 오늘까지의 데이터를 동기화합니다.
+    """
     market_service = container.market_data_service
 
     logger.info(f"=== 배치 수집 시작: {start_date} ~ {end_date or '오늘'} ===")

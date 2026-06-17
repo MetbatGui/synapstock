@@ -2,11 +2,9 @@ import json
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
 
-from evenezer.domain.models import Board, BoardSyncManifest, BoardManifestItem
-from evenezer.domain.ports import BoardRepositoryPort, StoragePort, BoardSyncManifestRepositoryPort
-
+from evenezer.domain.models import Board, BoardManifestItem, BoardSyncManifest
+from evenezer.domain.ports import BoardRepositoryPort, BoardSyncManifestRepositoryPort, StoragePort
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +214,7 @@ class BoardFileSyncService:
                 self.save_local_manifest(manifest)
                 logger.info(f"[BoardFileSync] 신규상장주 배치 완료 감지: {ticker} -> {board_id}")
 
-                
+
                 # 가상보드 대기 목록에서 자동 제거
                 await self._remove_from_virtual_ipo_board(ticker)
 

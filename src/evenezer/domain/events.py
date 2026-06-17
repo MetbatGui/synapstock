@@ -1,6 +1,7 @@
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any
+
 
 @dataclass(frozen=True)
 class DomainEvent:
@@ -12,7 +13,11 @@ class DomainEvent:
         object.__setattr__(self, "event_id", str(uuid.uuid4()))
 
     def to_dict(self) -> dict[str, Any]:
-        """도메인 이벤트를 역직렬화 가능한 dict 형식으로 변환합니다."""
+        """도메인 이벤트를 역직렬화 가능한 dict 형식으로 변환합니다.
+
+        Returns:
+            이벤트 ID, 이벤트 클래스 이름, 그리고 이벤트 속성 데이터들을 포함하는 딕셔너리.
+        """
         d = asdict(self)
         event_id = d.pop("event_id", None)
         return {
@@ -23,23 +28,30 @@ class DomainEvent:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DomainEvent":
-        """직렬화된 dict 데이터로부터 올바른 도메인 이벤트 인스턴스를 복원합니다."""
+        """직렬화된 dict 데이터로부터 올바른 도메인 이벤트 인스턴스를 복원합니다.
+
+        Args:
+            data: 직렬화된 이벤트 정보 딕셔너리.
+
+        Returns:
+            원래의 구체적인 도메인 이벤트 클래스(예: BoardCreated 등) 인스턴스.
+        """
         event_class_name = data.get("event_class")
         event_id = data.get("event_id")
         event_data = data.get("data", {}).copy()
-        
+
         target_cls = cls
         if cls == DomainEvent and event_class_name:
             import evenezer.domain.events as ev_module
             target_cls = getattr(ev_module, event_class_name, cls)
-        
+
         # 1. 생성자 필드들을 활용하여 복원 (event_id는 init=False 이므로 생성자 필드에서 분리됨)
         inst = target_cls(**event_data)
-        
+
         # 2. 저장되어 있던 고유 event_id로 최종 복원
         if event_id:
             object.__setattr__(inst, "event_id", event_id)
-            
+
         return inst
 
 @dataclass(frozen=True)

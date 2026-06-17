@@ -3,13 +3,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Type
+from typing import Any
 
-from evenezer.domain.models import Board, ScrapedNews, BoardSyncManifest
+from evenezer.domain.models import Board, BoardSyncManifest, ScrapedNews
 from evenezer.domain.news.models import NewsBatch
 from evenezer.domain.statistics.models import StockSplit, StockSplitManifest
-
-
 
 
 class BoardRepositoryPort(ABC):
@@ -150,31 +148,77 @@ class StoragePort(ABC):
 
     @abstractmethod
     async def path_exists(self, path: str, **kwargs) -> bool:
-        """경로 존재 여부를 확인한다."""
+        """경로 존재 여부를 확인합니다.
+
+        Args:
+            path: 확인할 파일 또는 디렉토리 경로.
+            **kwargs: 추가적인 어댑터별 설정 인수.
+
+        Returns:
+            경로가 존재하면 True, 그렇지 않으면 False.
+        """
 
     @abstractmethod
     async def ensure_directory(self, path: str, **kwargs) -> bool:
-        """디렉토리 존재를 보장(없으면 생성)한다."""
+        """디렉토리 존재를 보장(없으면 생성)합니다.
+
+        Args:
+            path: 생성하거나 존재를 보장할 디렉토리 경로.
+            **kwargs: 추가적인 어댑터별 설정 인수.
+
+        Returns:
+            성공적으로 보장되었거나 새로 생성했으면 True, 실패 시 False.
+        """
 
     @abstractmethod
     async def get_file(self, path: str, **kwargs) -> bytes | None:
-        """파일 내용을 바이너리 바이트로 가져온다."""
+        """파일 내용을 바이너리 바이트로 가져옵니다.
+
+        Args:
+            path: 읽어올 파일 경로.
+            **kwargs: 추가적인 어댑터별 설정 인수.
+
+        Returns:
+            파일 내용 바이너리 데이터. 파일이 없거나 오류 발생 시 None.
+        """
 
     @abstractmethod
     async def put_file(self, path: str, data: bytes, **kwargs) -> bool:
-        """바이트 데이터를 파일로 저장한다."""
+        """바이트 데이터를 파일로 저장합니다.
+
+        Args:
+            path: 저장할 파일 경로.
+            data: 저장할 바이너리 바이트 데이터.
+            **kwargs: 추가적인 어댑터별 설정 인수.
+
+        Returns:
+            성공적으로 저장되었으면 True, 실패 시 False.
+        """
 
     @abstractmethod
     async def list_files_in_folder(self, folder_path: str, **kwargs) -> list[dict]:
-        """특정 폴더 내의 파일 목록을 조회한다.
+        """특정 폴더 내의 파일 목록을 조회합니다.
+
+        Args:
+            folder_path: 조회할 폴더 경로.
+            **kwargs: 추가적인 어댑터별 설정 인수.
 
         Returns:
-            List[dict]: [{'id': '...', 'name': '...'}, ...]
+            파일 메타데이터 리스트. 각 항목은 {'id': str, 'name': str} 형식의 딕셔너리.
         """
 
     @abstractmethod
     async def download_file(self, filename: str, local_path: str, **kwargs) -> bool:
-        """파일을 원자적으로(Atomic) 특정 경로에 다운로드한다."""
+        """파일을 원자적으로(Atomic) 특정 로컬 경로에 다운로드합니다.
+
+        Args:
+            filename: 다운로드할 원격 파일 이름.
+            local_path: 저장될 로컬 파일 경로.
+            **kwargs: 추가적인 어댑터별 설정 인수.
+
+        Returns:
+            성공적으로 다운로드되었으면 True, 실패 시 False.
+        """
 
 
 class TickerSearchPort(ABC):
@@ -182,13 +226,13 @@ class TickerSearchPort(ABC):
 
     @abstractmethod
     def search(self, query: str) -> list[dict[str, str]]:
-        """검색어에 해당하는 종목 리스트를 반환한다.
+        """검색어에 해당하는 종목 리스트를 반환합니다.
 
         Args:
-            query: 검색어 (기업명 등)
+            query: 검색할 기업명 또는 초성 등 검색어.
 
         Returns:
-            list[dict[str, str]]: [{'name': '...', 'ticker': '...'}, ...]
+            검색 결과 종목 정보 리스트. 각 항목은 {'name': str, 'ticker': str} 형식의 딕셔너리.
         """
 
 
@@ -197,7 +241,14 @@ class NewsScraperPort(ABC):
 
     @abstractmethod
     async def scrape(self, url: str) -> ScrapedNews | None:
-        """URL에서 뉴스 제목과 날짜를 추출한다."""
+        """URL에서 뉴스 제목과 날짜를 추출합니다.
+
+        Args:
+            url: 스크래핑할 뉴스의 웹 URL.
+
+        Returns:
+            성공적으로 파싱 및 가공된 ScrapedNews 객체. 실패 시 None.
+        """
 
 
 class KrxDataPort(ABC):
@@ -205,11 +256,28 @@ class KrxDataPort(ABC):
 
     @abstractmethod
     def fetch_net_purchase_data(self, market: str, investor: str, date_str: str) -> bytes:
-        """특정 날짜의 투자자별 순매수 데이터(엑셀 바이너리)를 가져온다."""
+        """특정 날짜의 투자자별 순매수 데이터(엑셀 바이너리)를 가져옵니다.
+
+        Args:
+            market: 대상 시장 (예: 'KOSPI', 'KOSDAQ').
+            investor: 투자자 구분 (예: '기관합계', '외국인합계', '개인').
+            date_str: 조회 대상 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            KRX 서버로부터 수신된 엑셀 파일 바이너리 데이터.
+        """
 
     @abstractmethod
     def fetch_market_prices(self, market: str, date_str: str) -> list[dict]:
-        """특정 날짜의 전종목 시세/대금 데이터를 가져온다."""
+        """특정 날짜의 전종목 시세/대금 데이터를 가져옵니다.
+
+        Args:
+            market: 대상 시장 (예: 'ALL', 'KOSPI', 'KOSDAQ').
+            date_str: 조회 대상 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            각 종목별 시세 및 거래 대금 정보 딕셔너리 리스트.
+        """
 
 
 class PriceDataPort(ABC):
@@ -217,7 +285,15 @@ class PriceDataPort(ABC):
 
     @abstractmethod
     def get_price_info(self, ticker: str, date_str: str) -> dict | None:
-        """특정 종목의 가격 및 신고가 정보를 가져온다."""
+        """특정 종목의 가격 및 신고가 정보를 가져옵니다.
+
+        Args:
+            ticker: 주식 종목 코드 (6자리).
+            date_str: 조회 기준 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            종가, 대비율, 신고가 갱신 여부 등을 포함하는 딕셔너리. 데이터가 없으면 None.
+        """
 
 
 class NewsRepositoryPort(ABC):
@@ -304,18 +380,31 @@ class EventBusPort(ABC):
     """이벤트 발행 및 구독을 담당하는 추상 포트."""
 
     @abstractmethod
-    def subscribe(self, event_type: Type[Any], handler: Callable[..., Any]) -> None:
-        """이벤트 타입에 해당하는 핸들러를 등록합니다."""
+    def subscribe(self, event_type: type[Any], handler: Callable[..., Any]) -> None:
+        """이벤트 타입에 해당하는 핸들러를 등록합니다.
+
+        Args:
+            event_type: 구독할 이벤트 클래스 타입.
+            handler: 이벤트가 발생했을 때 호출될 핸들러 함수 또는 콜백.
+        """
         pass
 
     @abstractmethod
     def publish(self, event: Any) -> None:
-        """이벤트를 발행하여 등록된 핸들러들을 실행합니다."""
+        """이벤트를 동기적으로 발행하여 등록된 핸들러들을 즉시 실행합니다.
+
+        Args:
+            event: 발행할 이벤트 인스턴스.
+        """
         pass
 
     @abstractmethod
     async def publish_async(self, event: Any) -> None:
-        """이벤트를 비동기적으로 발행하고 모든 핸들러의 실행 완료를 대기합니다."""
+        """이벤트를 비동기적으로 발행하고 모든 핸들러의 실행 완료를 대기합니다.
+
+        Args:
+            event: 발행할 이벤트 인스턴스.
+        """
         pass
 
 
@@ -324,27 +413,52 @@ class EventOutboxPort(ABC):
 
     @abstractmethod
     def save(self, event: Any) -> str:
-        """이벤트를 PENDING 상태로 영속 저장소에 기록하고 고유 ID를 반환합니다."""
+        """이벤트를 PENDING 상태로 영속 저장소에 기록하고 고유 ID를 반환합니다.
+
+        Args:
+            event: 저장할 이벤트 인스턴스 객체.
+
+        Returns:
+            저장된 아웃박스 이벤트의 고유 ID (파일명 또는 UUID 등).
+        """
         pass
 
     @abstractmethod
     def load_pending(self) -> list[dict]:
-        """처리 대기 중인(PENDING) 이벤트 목록을 조회합니다."""
+        """처리 대기 중인(PENDING) 이벤트 목록을 조회합니다.
+
+        Returns:
+            대기 중인 이벤트 딕셔너리 정보 리스트.
+        """
         pass
 
     @abstractmethod
     def complete(self, outbox_id: str) -> None:
-        """이벤트 처리를 완료하고 아카이브 또는 제거 처리합니다."""
+        """이벤트 처리를 완료하고 아카이브 또는 제거 처리합니다.
+
+        Args:
+            outbox_id: 완료 처리할 아웃박스 이벤트 고유 ID.
+        """
         pass
 
     @abstractmethod
     def fail(self, outbox_id: str, error_msg: str) -> None:
-        """이벤트 처리 실패를 기록하고 재시도 카운트를 갱신합니다."""
+        """이벤트 처리 실패를 기록하고 재시도 카운트를 갱신합니다.
+
+        Args:
+            outbox_id: 실패를 기록할 아웃박스 이벤트 고유 ID.
+            error_msg: 실패 원인 에러 메시지.
+        """
         pass
 
     @abstractmethod
     def fail_permanent(self, outbox_id: str, error_msg: str) -> None:
-        """이벤트 처리가 영구적으로 실패했음을 기록하고(재시도 중단) 격리 처리합니다."""
+        """이벤트 처리가 영구적으로 실패했음을 기록하고(재시도 중단) 격리 처리합니다.
+
+        Args:
+            outbox_id: 영구 실패 처리할 아웃박스 이벤트 고유 ID.
+            error_msg: 최종 에러 메시지.
+        """
         pass
 
 

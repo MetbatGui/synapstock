@@ -21,17 +21,10 @@ async def get_stock_info(ticker: str) -> dict | JSONResponse:
     모든 보드를 순회하여 일치하는 종목을 탐색합니다.
 
     Args:
-        ticker (str): 조회할 종목 티커 심볼 (예: ``"005930"``).
+        ticker: 조회할 종목 티커 심볼 (예: "005930").
 
     Returns:
-        dict: 다음 키를 포함하는 딕셔너리:
-            - ``ticker`` (str): 요청한 티커.
-            - ``name`` (str | None): 종목명. 찾지 못한 경우 ``None``.
-            - ``reports`` (list[str]): 등록된 리포트 경로 목록.
-            - ``news`` (list[dict]): 등록된 뉴스 목록.
-
-    Raises:
-        JSONResponse (500): 조회 중 예외 발생 시.
+        종목 기본 정보를 담은 딕셔너리 또는 500 JSONResponse.
     """
     try:
         result = query_service.get_stock_by_ticker(ticker)
@@ -67,12 +60,12 @@ async def get_financials(name: str, metric: str = "매출액", period: str = "�
     """특정 기업의 재무 데이터를 반환합니다 (지표 및 기간 선택 가능).
 
     Args:
-        name (str): 조회할 기업명.
-        metric (str): 조회할 지표 (매출액, 영업이익, 당기순이익). 기본값 "매출액".
-        period (str): 조회 기간 (분기별, 연간). 기본값 "분기별".
+        name: 조회할 기업명.
+        metric: 조회할 지표 (매출액, 영업이익, 당기순이익). 기본값 "매출액".
+        period: 조회 기간 (분기별, 연간). 기본값 "분기별".
 
     Returns:
-        list[dict]: 재무 데이터 목록.
+        재무 데이터 목록. 에러 시 500 JSONResponse.
     """
     try:
         if not name:
@@ -85,7 +78,14 @@ async def get_financials(name: str, metric: str = "매출액", period: str = "�
 
 @router.get("/api/stock/search", response_model=None)
 async def search_stock(q: str = "") -> list | JSONResponse:
-    """종목명 또는 티커로 검색하여 결과를 반환합니다."""
+    """종목명 또는 티커로 검색하여 결과를 반환합니다.
+
+    Args:
+        q: 검색 질의어 (종목명 혹은 티커).
+
+    Returns:
+        검색 결과 목록. 에러 시 500 JSONResponse.
+    """
     try:
         results = query_service.search_ticker(q)
         return cast(list, results)
@@ -100,14 +100,7 @@ async def get_all_stocks_flat() -> list | JSONResponse:
     전체 검색 기능의 클라이언트 캐싱에 사용됩니다.
 
     Returns:
-        list[dict]: 전체 종목 목록. 각 항목은 다음 키를 포함합니다:
-            - ``ticker`` (str): 티커 심볼.
-            - ``name`` (str): 종목명.
-            - ``board`` (str): 소속 보드 파일명.
-            - ``path`` (list[str]): 루트에서 해당 종목까지의 노드 이름 경로.
-
-    Raises:
-        JSONResponse (500): 조회 중 예외 발생 시.
+        전체 종목 목록. 에러 시 500 JSONResponse.
     """
     try:
         results = query_service.get_all_stocks_flat()
@@ -121,14 +114,10 @@ async def get_disclosures(ticker: str) -> list | JSONResponse:
     """특정 종목의 DART 공시 목록을 반환합니다.
 
     Args:
-        ticker (str): 조회할 종목 티커 심볼.
+        ticker: 조회할 종목 티커 심볼. "none"이거나 빈 문자열이면 빈 목록을 반환합니다.
 
     Returns:
-        list[dict]: 공시 목록. 각 항목은 ``{"rcpNo": str, "title": str, "date": str}`` 형태.
-            ``ticker``가 ``"none"``이거나 빈 문자열이면 빈 목록을 반환합니다.
-
-    Raises:
-        JSONResponse (500): 조회 중 예외 발생 시.
+        공시 목록. 에러 시 500 JSONResponse.
     """
     try:
         if not ticker or ticker == "none":
@@ -142,7 +131,12 @@ async def get_disclosures(ticker: str) -> list | JSONResponse:
 @router.get("/api/news/scrape", response_model=None)
 async def scrape_news(url: str) -> dict | JSONResponse:
     """뉴스 URL에서 제목과 날짜를 스크래핑하여 반환합니다.
-    NewsService를 사용하여 일관된 스크래핑 결과를 보장합니다.
+
+    Args:
+        url: 스크래핑할 뉴스 URL.
+
+    Returns:
+        스크랩 성공한 뉴스 메타데이터 딕셔너리, 실패 시 400/500 JSONResponse.
     """
     if not (url.startswith("http://") or url.startswith("https://")):
         return JSONResponse(status_code=400, content={"message": "Invalid URL format"})
@@ -163,18 +157,14 @@ async def add_stock_news(board: str, ticker: str, title: str, date: str, url: st
     """종목에 뉴스 정보를 추가합니다.
 
     Args:
-        board (str): 대상 보드 파일명.
-        ticker (str): 뉴스를 추가할 종목 티커.
-        title (str): 뉴스 기사 제목.
-        date (str): ``YYYY-MM-DD`` 형식의 기사 날짜.
-        url (str): 뉴스 기사 URL.
+        board: 대상 보드 파일명.
+        ticker: 뉴스를 추가할 종목 티커.
+        title: 뉴스 기사 제목.
+        date: YYYY-MM-DD 형식의 기사 날짜.
+        url: 뉴스 기사 URL.
 
     Returns:
-        dict: ``{"status": "success"}`` 또는 404 오류 응답.
-
-    Raises:
-        JSONResponse (404): 해당 종목을 찾을 수 없는 경우.
-        JSONResponse (500): 처리 중 예외 발생 시.
+        상태 성공 메시지 또는 404/500 JSONResponse.
     """
     try:
         success = await media_service.add_stock_news(board, ticker, title, date, url)

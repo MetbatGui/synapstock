@@ -7,11 +7,32 @@ from evenezer.domain.ports import FinancialDataPort
 
 
 class ExcelFinancialDataAdapter(FinancialDataPort):
+    """Excel 파일 기반의 재무 데이터 제공 어댑터입니다.
+
+    각 시트에서 기업들의 재무제표(매출액, 영업이익 등)를 분기/연간 단위로 읽어옵니다.
+    """
+
     def __init__(self, file_path: Path):
+        """ExcelFinancialDataAdapter를 초기화합니다.
+
+        Args:
+            file_path: 재무제표 Excel 파일 경로.
+        """
         self.file_path = file_path
         self._sheets: dict[str, pd.DataFrame] = {}  # 시트별 캐시
 
     def _load_sheet(self, sheet_name: str) -> pd.DataFrame | None:
+        """엑셀 파일에서 지정된 시트의 데이터를 Pandas DataFrame으로 로드합니다.
+
+        Args:
+            sheet_name: 로드할 엑셀 시트 이름.
+
+        Returns:
+            로드된 DataFrame 객체. 시트 로드 실패 시 None.
+
+        Raises:
+            FileNotFoundError: 지정된 경로에 엑셀 파일이 존재하지 않는 경우.
+        """
         if sheet_name not in self._sheets:
             if not self.file_path.exists():
                 raise FileNotFoundError(f"Financial data file not found: {self.file_path}")
@@ -33,10 +54,18 @@ class ExcelFinancialDataAdapter(FinancialDataPort):
     def get_financial_data(
         self, company_name: str, metric: str = "매출액", period: str = "분기별"
     ) -> list[dict[str, Any]]:
-        """
-        특정 기업의 재무 데이터를 리스트 형태로 반환합니다.
-        지표(metric)와 기간(period)에 따라 해당 시트에서 데이터를 조회합니다.
-        연간 데이터가 없는 경우 분기별 데이터를 합산하여 유사 연간 데이터를 생성합니다.
+        """특정 기업의 재무 지표 데이터를 시기순 목록으로 반환합니다.
+
+        연간 데이터를 조회할 때 실제 연간 데이터 시트가 없으면, 분기별 데이터를 합산하여
+        유사(pseudo) 연간 데이터를 구성하여 제공합니다.
+
+        Args:
+            company_name: 조회 대상 기업명.
+            metric: 재무 지표 명칭 (예: '매출액', '영업이익'). 기본값은 '매출액'.
+            period: 조회 주기 구분 ('연간', '분기별'). 기본값은 '분기별'.
+
+        Returns:
+            각 시기별 데이터 목록. 각 항목은 {"quarter": 시기 문자열, "value": 정수값 또는 None} 형태.
         """
         # 시트 이름 보정 (분기별 -> 분기)
         period_suffix = "분기" if period == "분기별" else period
@@ -73,7 +102,15 @@ class ExcelFinancialDataAdapter(FinancialDataPort):
         return result
 
     def _get_pseudo_annual_data(self, company_name: str, metric: str) -> list[dict[str, Any]]:
-        """분기 데이터를 합산하여 연간 데이터를 생성합니다."""
+        """분기 데이터를 합산하여 연간 유사 데이터를 생성합니다.
+
+        Args:
+            company_name: 기업명.
+            metric: 재무 지표 명칭.
+
+        Returns:
+            연도별로 합산된 재무 데이터 목록.
+        """
         quarterly_data = self.get_financial_data(company_name, metric, "분기별")
         if not quarterly_data:
             return []

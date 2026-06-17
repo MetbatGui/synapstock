@@ -1,5 +1,3 @@
-from datetime import datetime
-from typing import Any
 from evenezer.domain.models import Board, Stock
 from evenezer.domain.statistics.models import NewListing
 
