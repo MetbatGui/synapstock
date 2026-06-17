@@ -3,6 +3,7 @@ import logging
 import inspect
 from datetime import datetime
 from typing import Any, Callable
+from collections.abc import Mapping
 
 from evenezer.domain.ports import EventOutboxPort
 
@@ -14,7 +15,7 @@ class OutboxWorker:
     def __init__(
         self,
         outbox: EventOutboxPort,
-        handlers: dict[str, Callable[..., Any]],
+        handlers: Mapping[str, Callable[..., Any]],
         max_retries: int = 5,
         base_delay: float = 2.0,
     ) -> None:

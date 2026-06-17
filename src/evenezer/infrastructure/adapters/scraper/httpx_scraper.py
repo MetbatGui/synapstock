@@ -52,48 +52,48 @@ class HttpxNewsScraperAdapter(NewsScraperPort):
                 return None
 
 
-                # 응답 인코딩 처리
-                html = response.text
-                soup = BeautifulSoup(html, "html.parser")
+            # 응답 인코딩 처리
+            html = response.text
+            soup = BeautifulSoup(html, "html.parser")
 
-                # 1. 제목 추출
-                title = ""
-                og_title = soup.find("meta", property="og:title")
-                if isinstance(og_title, Tag):
-                    title = str(og_title.get("content", ""))
-                if not title:
-                    title_tag = soup.find("title")
-                    if title_tag:
-                        title = title_tag.get_text().strip()
+            # 1. 제목 추출
+            title = ""
+            og_title = soup.find("meta", property="og:title")
+            if isinstance(og_title, Tag):
+                title = str(og_title.get("content", ""))
+            if not title:
+                title_tag = soup.find("title")
+                if title_tag:
+                    title = title_tag.get_text().strip()
 
-                # 2. 날짜 추출
-                date_str = ""
-                date_tags = [
-                    ("meta", {"property": "article:published_time"}),
-                    ("meta", {"property": "og:pubdate"}),
-                    ("meta", {"name": "pubdate"}),
-                    ("meta", {"name": "date"}),
-                ]
+            # 2. 날짜 추출
+            date_str = ""
+            date_tags = [
+                ("meta", {"property": "article:published_time"}),
+                ("meta", {"property": "og:pubdate"}),
+                ("meta", {"name": "pubdate"}),
+                ("meta", {"name": "date"}),
+            ]
 
-                for tag_name, attrs in date_tags:
-                    tag = soup.find(tag_name, attrs)
-                    if isinstance(tag, Tag):
-                        content = str(tag.get("content", ""))
-                        if content:
-                            date_match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", content)
-                            if date_match:
-                                date_str = date_match.group(1).replace(".", "-").replace("/", "-")
-                                break
+            for tag_name, attrs in date_tags:
+                tag = soup.find(tag_name, attrs)
+                if isinstance(tag, Tag):
+                    content = str(tag.get("content", ""))
+                    if content:
+                        date_match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", content)
+                        if date_match:
+                            date_str = date_match.group(1).replace(".", "-").replace("/", "-")
+                            break
 
-                # 본문에서 날짜 패턴 검색 폴백 (YYYY.MM.DD 등)
-                if not date_str:
-                    match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", html)
-                    if match:
-                        date_str = match.group(1).replace(".", "-").replace("/", "-")
-                    else:
-                        date_str = datetime.now().strftime("%Y-%m-%d")
+            # 본문에서 날짜 패턴 검색 폴백 (YYYY.MM.DD 등)
+            if not date_str:
+                match = re.search(r"(\d{4}[.\-/]\d{2}[.\-/]\d{2})", html)
+                if match:
+                    date_str = match.group(1).replace(".", "-").replace("/", "-")
+                else:
+                    date_str = datetime.now().strftime("%Y-%m-%d")
 
-                return ScrapedNews(title=title, date=date_str, url=url)
+            return ScrapedNews(title=title, date=date_str, url=url)
 
         except Exception as e:
             logger.error(f"[HttpxNewsScraperAdapter] Error scraping {url}: {e}")
