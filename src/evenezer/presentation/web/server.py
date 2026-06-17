@@ -41,8 +41,11 @@ background_tasks = set()
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── 시작 시점 ─────────────────────────────────────────────────────────────
-    logger.info("[Lifespan] Evenezer 서버 시작 중...")
+    """FastAPI 애플리케이션의 시작 및 종료 수명 주기(lifespan) 이벤트를 관리합니다.
+
+    서버 시작 시 백그라운드 동기화 서비스 및 인덱스 정합성 동기화 작업을 기동하고,
+    서버 종료 시 모든 백그라운드 태스크 취소 및 리소스를 회수합니다.
+    """
     
     # 1. DI 컨테이너 백그라운드 스레드 및 워커 명시적 기동
     from evenezer.infrastructure.container import container
@@ -120,10 +123,10 @@ async def get_main_app(request: Request):
     """메인 통합 웹 애플리케이션 페이지를 서빙합니다.
 
     Args:
-        request (Request): FastAPI Request 객체.
+        request: FastAPI Request 객체.
 
     Returns:
-        HTMLResponse: ``index.html`` 템플릿 응답.
+        HTMLResponse: index.html 템플릿 응답.
     """
     return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "main"})
 
@@ -133,30 +136,52 @@ async def get_stock_dashboard(request: Request, ticker: str):
     """개별 종목 대시보드 페이지를 서빙합니다.
 
     Args:
-        request (Request): FastAPI Request 객체.
-        ticker (str): URL 경로에 포함된 종목 티커 심볼.
+        request: FastAPI Request 객체.
+        ticker: URL 경로에 포함된 종목 티커 심볼.
 
     Returns:
-        HTMLResponse: ``index.html`` 템플릿 응답.
+        HTMLResponse: index.html 템플릿 응답.
     """
     return templates.TemplateResponse("index.html", {"request": request, "ticker": ticker, "mode": "dashboard"})
 
 
 @app.get("/statistics", response_class=HTMLResponse)
 async def get_statistics_page(request: Request):
-    """수급 통계 분석 페이지 기본 진입점을 서빙합니다."""
+    """수급 통계 분석 페이지 기본 진입점을 서빙합니다.
+
+    Args:
+        request: FastAPI Request 객체.
+
+    Returns:
+        HTMLResponse: index.html 템플릿 응답.
+    """
     return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "statistics"})
 
 
 @app.get("/heatmap", response_class=HTMLResponse)
 async def get_heatmap_page(request: Request):
-    """테마 히트맵 분석 최상위 탭 페이지를 서빙합니다."""
+    """테마 히트맵 분석 최상위 탭 페이지를 서빙합니다.
+
+    Args:
+        request: FastAPI Request 객체.
+
+    Returns:
+        HTMLResponse: index.html 템플릿 응답.
+    """
     return templates.TemplateResponse("index.html", {"request": request, "ticker": None, "mode": "heatmap"})
 
 
 @app.get("/statistics/{subpath:path}", response_class=HTMLResponse)
 async def get_statistics_subpage(request: Request, subpath: str):
-    """수급 분석 서브 라우트(netbuy/ranking 등)를 위해 SPA 템플릿을 서빙합니다."""
+    """수급 분석 서브 라우트(netbuy/ranking 등)를 위해 SPA 템플릿을 서빙합니다.
+
+    Args:
+        request: FastAPI Request 객체.
+        subpath: 수급 통계 하위 카테고리 경로 문자열.
+
+    Returns:
+        HTMLResponse: index.html 템플릿 응답.
+    """
     return templates.TemplateResponse(
         "index.html", {"request": request, "ticker": None, "mode": f"statistics-{subpath.replace('/', '-')}"}
     )
@@ -167,11 +192,10 @@ async def get_statistics_subpage(request: Request, subpath: str):
 async def websocket_endpoint(websocket: WebSocket):
     """실시간 로그 스트리밍을 위한 WebSocket 연결을 처리합니다.
 
-    연결된 클라이언트를 ``manager`` 싱글턴에 등록하고,
-    연결이 끊쳤(``WebSocketDisconnect``) 데 자동으로 제거합니다.
+    연결된 클라이언트를 manager 싱글턴에 등록하고 연결이 끊길 때까지 대기합니다.
 
     Args:
-        websocket (WebSocket): FastAPI WebSocket 연결 객체.
+        websocket: FastAPI WebSocket 연결 객체.
     """
     await manager.connect(websocket)
     try:
@@ -188,11 +212,11 @@ async def websocket_endpoint(websocket: WebSocket):
 def run_server(port: int = 8090):
     """Uvicorn 서버를 실행합니다.
 
-    보안을 위해 기본적으로 로컬호스트(``127.0.0.1``)에 바인딩하며 언급된 포트로 서버를 구동합니다.
-    환경 변수 ``EVENEZER_HOST``가 지정되면 해당 호스트에 바인딩합니다.
+    보안을 위해 기본적으로 로컬호스트(127.0.0.1)에 바인딩하며 리스닝 포트로 서버를 구동합니다.
+    환경 변수 EVENEZER_HOST가 지정되면 해당 호스트에 바인딩합니다.
 
     Args:
-        port (int): 리스닝할 TCP 포트 번호. 기본값은 ``8090``.
+        port: 리스닝할 TCP 포트 번호. 기본값은 8090.
     """
     host = os.environ.get("EVENEZER_HOST", "127.0.0.1")
     uvicorn.run(app, host=host, port=port, log_level="info")
@@ -204,10 +228,10 @@ def start_web_server_background(port: int = 8090):
     GUI/런처에서 비동기적으로 서버를 시작할 때 사용합니다.
 
     Args:
-        port (int): 리스닝할 TCP 포트 번호. 기본값은 ``8090``.
+        port: 리스닝할 TCP 포트 번호. 기본값은 8090.
 
     Returns:
-        threading.Thread: 시작된 백그라운드 스레드 객체.
+        시작된 백그라운드 스레드 객체.
     """
     thread = threading.Thread(target=run_server, args=(port,), daemon=True)
     thread.start()

@@ -27,7 +27,15 @@ async def get_weekly_change(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
     force_sync: bool = Query(False, description="강제 동기화 여부"),
 ):
-    """특정 날짜의 주간 등락률 데이터를 가져옵니다."""
+    """특정 날짜의 주간 등락률 데이터를 가져옵니다.
+
+    Args:
+        date (str): 조회 날짜 (YYYY-MM-DD).
+        force_sync (bool): 강제 동기화 여부. Defaults to False.
+
+    Returns:
+        dict: 주간 등락률 데이터를 포함하는 딕셔너리.
+    """
     try:
         if not weekly_change_service:
             raise HTTPException(status_code=500, detail="Weekly change service not available")
@@ -44,7 +52,11 @@ async def get_weekly_change(
 
 @router.get("/weekly-change/dates", response_model=None)
 async def get_weekly_change_dates():
-    """주간 등락률 데이터가 존재하는 날짜 목록을 반환합니다."""
+    """주간 등락률 데이터가 존재하는 날짜 목록을 반환합니다.
+
+    Returns:
+        list[str]: 데이터가 존재하는 날짜(YYYY-MM-DD) 목록.
+    """
     try:
         if not weekly_change_service:
             return []
@@ -56,7 +68,14 @@ async def get_weekly_change_dates():
 
 @router.post("/weekly-change/sync", response_model=None)
 async def sync_weekly_change(date: str | None = Query(None, description="동기화할 특정 날짜 (YYYY-MM-DD)")):
-    """구글 드라이브로부터 주간 등락률 데이터를 동기화합니다."""
+    """구글 드라이브로부터 주간 등락률 데이터를 동기화합니다.
+
+    Args:
+        date (str | None): 동기화할 특정 날짜 (YYYY-MM-DD).
+
+    Returns:
+        dict: 동기화 결과를 포함하는 딕셔너리.
+    """
     try:
         if not weekly_change_service:
             raise HTTPException(status_code=500, detail="Weekly change service not available")
@@ -77,7 +96,16 @@ async def get_daily_ranking(
     market: MarketType = Query(MarketType.KOSPI, description="시장 구분 (KOSPI/KOSDAQ)"),
     subject: SupplySubject = Query(SupplySubject.FOREIGN, description="수급 주체 (FOREIGN/INSTITUTION)"),
 ):
-    """특정일의 분석된 수급 순위를 가져옵니다."""
+    """특정일의 분석된 수급 순위를 가져옵니다.
+
+    Args:
+        date (str): 조회 날짜 (YYYY-MM-DD).
+        market (MarketType): 시장 구분 (KOSPI/KOSDAQ). Defaults to MarketType.KOSPI.
+        subject (SupplySubject): 수급 주체 (FOREIGN/INSTITUTION). Defaults to SupplySubject.FOREIGN.
+
+    Returns:
+        dict: 수급 순위 리스트 등을 포함하는 결과 딕셔너리.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -101,7 +129,14 @@ async def get_daily_ranking(
 
 @router.get("/daily-summary", response_model=None)
 async def get_daily_summary(date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)")):
-    """지정된 날짜의 코스피/코스닥 × 외국인/기관 4가지 조합 수급 순위를 모두 가져옵니다."""
+    """지정된 날짜의 코스피/코스닥 × 외국인/기관 4가지 조합 수급 순위를 모두 가져옵니다.
+
+    Args:
+        date (str): 조회 날짜 (YYYY-MM-DD).
+
+    Returns:
+        dict: 4가지 조합(KOSPI FOREIGN, KOSPI INSTITUTION, KOSDAQ FOREIGN, KOSDAQ INSTITUTION)의 순위 요약 데이터.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -114,7 +149,14 @@ async def get_daily_summary(date: str = Query(..., description="조회 날짜 (Y
 
 @router.get("/monthly-summary", response_model=None)
 async def get_monthly_summary(month: str = Query(..., description="조회 월 (YYYY-MM)")):
-    """지정된 월의 코스피/코스닥 × 외국인/기관 4가지 조합 월간 누적 수급 순위를 가져옵니다."""
+    """지정된 월의 코스피/코스닥 × 외국인/기관 4가지 조합 월간 누적 수급 순위를 가져옵니다.
+
+    Args:
+        month (str): 조회 월 (YYYY-MM).
+
+    Returns:
+        dict: 4가지 조합의 월간 누적 순위 요약 데이터.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -147,7 +189,15 @@ async def get_monthly_summary(month: str = Query(..., description="조회 월 (Y
 async def get_available_dates(
     market: MarketType = Query(MarketType.KOSPI), subject: SupplySubject = Query(SupplySubject.FOREIGN)
 ):
-    """통계 데이터가 존재하는 날짜 목록을 반환합니다."""
+    """통계 데이터가 존재하는 날짜 목록을 반환합니다.
+
+    Args:
+        market (MarketType): 시장 구분 (KOSPI/KOSDAQ). Defaults to MarketType.KOSPI.
+        subject (SupplySubject): 수급 주체 (FOREIGN/INSTITUTION). Defaults to SupplySubject.FOREIGN.
+
+    Returns:
+        list[str]: 데이터가 존재하는 날짜(YYYY-MM-DD) 목록.
+    """
     try:
         if not statistics_service:
             return []
@@ -162,7 +212,11 @@ async def get_available_dates(
 
 @router.post("/sync", response_model=None)
 async def sync_statistics():
-    """구글 드라이브로부터 최신 수급 통계 데이터를 동기화합니다."""
+    """구글 드라이브로부터 최신 수급 통계 데이터를 동기화합니다.
+
+    Returns:
+        dict: 동기화 작업 결과 요약 데이터.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -179,7 +233,15 @@ async def get_ceiling_report(
     date: str = Query(..., description="조회 날짜 (YYYY-MM-DD)"),
     force_sync: bool = Query(False, description="강제 동기화 여부"),
 ):
-    """특정 날짜의 상한가 분석 리포트를 가져옵니다."""
+    """특정 날짜의 상한가 분석 리포트를 가져옵니다.
+
+    Args:
+        date (str): 조회 날짜 (YYYY-MM-DD).
+        force_sync (bool): 강제 동기화 여부. Defaults to False.
+
+    Returns:
+        dict: 상한가 데이터 항목 및 분석 메시지를 포함하는 딕셔너리.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -196,7 +258,11 @@ async def get_ceiling_report(
 
 @router.get("/ceiling-years", response_model=None)
 async def get_ceiling_years():
-    """상한가 분석이 가능한 연도 목록을 반환합니다."""
+    """상한가 분석이 가능한 연도 목록을 반환합니다.
+
+    Returns:
+        list[str]: 데이터가 존재하는 연도(YYYY) 목록.
+    """
     try:
         if not statistics_service:
             return [datetime.now().strftime("%Y")]
@@ -209,7 +275,14 @@ async def get_ceiling_years():
 
 @router.get("/ceiling-dates", response_model=None)
 async def get_ceiling_dates(year: str | None = Query(None, description="조회할 연도 (YYYY)")):
-    """특정 연도의 상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다."""
+    """특정 연도의 상한가 분석 데이터가 존재하는 날짜 목록을 반환합니다.
+
+    Args:
+        year (str | None): 조회할 연도 (YYYY).
+
+    Returns:
+        list[str]: 해당 연도의 날짜(YYYY-MM-DD) 목록.
+    """
     try:
         if not statistics_service:
             return []
@@ -236,7 +309,14 @@ async def get_ceiling_dates(year: str | None = Query(None, description="조회�
 
 @router.get("/bonus-issue", response_model=None)
 async def get_bonus_issue(force_sync: bool = Query(False, description="강제 동기화 여부")):
-    """무상증자 공시 분석 데이터를 가져옵니다."""
+    """무상증자 공시 분석 데이터를 가져옵니다.
+
+    Args:
+        force_sync (bool): 강제 동기화 여부. Defaults to False.
+
+    Returns:
+        dict: 무상증자 공시 데이터 목록 및 갯수.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -303,7 +383,15 @@ async def get_new_listing(
     year: str = Query("all", description="조회 연도 (YYYY) 또는 'all' (모든 연도)"),
     force_sync: bool = Query(False, description="강제 동기화 여부"),
 ):
-    """신규상장주(IPO) 분석 데이터를 가져옵니다."""
+    """신규상장주(IPO) 분석 데이터를 가져옵니다.
+
+    Args:
+        year (str): 조회 연도 (YYYY) 또는 'all'. Defaults to 'all'.
+        force_sync (bool): 강제 동기화 여부. Defaults to False.
+
+    Returns:
+        dict: 신규상장주 데이터 목록 및 갯수.
+    """
     try:
         if not statistics_service:
             raise HTTPException(status_code=500, detail="Statistics service not available")
@@ -320,7 +408,15 @@ async def get_stock_splits(
     year: str | None = Query(None, description="조회 연도 (YYYY)"),
     force_sync: bool = Query(False, description="강제 동기화 여부"),
 ):
-    """주식 분할(액면분할) 이력 데이터를 가져옵니다."""
+    """주식 분할(액면분할) 이력 데이터를 가져옵니다.
+
+    Args:
+        year (str | None): 조회 연도 (YYYY).
+        force_sync (bool): 강제 동기화 여부. Defaults to False.
+
+    Returns:
+        dict: 주식 분할 이력 목록 및 갯수.
+    """
     try:
         if not stock_split_repo:
             raise HTTPException(status_code=500, detail="Stock split repository not available")
@@ -342,7 +438,11 @@ async def get_stock_splits(
 
 @router.post("/stock-splits/sync", response_model=None)
 async def sync_stock_splits():
-    """구글 드라이브로부터 주식 분할 데이터를 수동 동기화합니다."""
+    """구글 드라이브로부터 주식 분할 데이터를 수동 동기화합니다.
+
+    Returns:
+        dict: 동기화 성공 여부와 메시지.
+    """
     try:
         if not stock_split_sync_service:
             raise HTTPException(status_code=500, detail="Stock split sync service not available")

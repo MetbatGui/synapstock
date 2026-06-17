@@ -16,13 +16,12 @@ class HeatmapVisualizer:
         output_file: str = 'theme_heatmap.html',
         initial_depth: int = 3
     ):
-        """ViewModel을 기반으로 Plotly Treemap을 생성하고 저장합니다.
+        """ViewModel을 기반으로 Plotly Treemap을 생성하고 HTML 파일로 저장합니다.
         
         Args:
-            view_model: HeatmapViewModel
-            output_file: 출력 파일명
-            initial_depth: 초기 표시 깊이 (기본값: 3 = Root + Group + Theme)
-                          클릭 시 하위 레벨로 drill-down됨
+            view_model (HeatmapViewModel): 히트맵 렌더링에 필요한 노드 및 메타데이터를 담은 뷰 모델.
+            output_file (str): 결과를 저장할 HTML 파일의 경로 및 파일명. Defaults to 'theme_heatmap.html'.
+            initial_depth (int): 초기 표시 깊이 (기본값: 3 = Root + Group + Theme). 클릭 시 drill-down됩니다. Defaults to 3.
         """
         custom_colorscale = [
             [0.0, 'blue'],
@@ -74,7 +73,13 @@ class HeatmapVisualizer:
     def create_treemap(self, df_final: pd.DataFrame, group_stats: dict, output_file: str = 'theme_heatmap.html'):
         """데이터프레임을 기반으로 Plotly Treemap을 생성하고 저장합니다. (기존 API - 하위 호환)
         
-        DEPRECATED: 하위 호환을 위해 유지하지만, create_treemap_from_viewmodel 사용을 권장합니다.
+        DEPRECATED:
+            하위 호환을 위해 유지하지만, 대신 ``create_treemap_from_viewmodel``의 사용을 권장합니다.
+
+        Args:
+            df_final (pd.DataFrame): 테마 및 종목 정보를 포함하는 최종 시가총액/등락률 데이터프레임.
+            group_stats (dict): 중간 그룹별 통계(시총 및 등락률 가중합 등) 정보를 포함하는 딕셔너리.
+            output_file (str): 결과를 저장할 HTML 파일의 경로 및 파일명. Defaults to 'theme_heatmap.html'.
         """
         from evenezer.domain.heatmap.theme_config import THEME_HIERARCHY
         

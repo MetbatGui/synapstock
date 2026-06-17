@@ -18,7 +18,14 @@ router = APIRouter()
 
 @router.get("/api/reports/local", response_model=None)
 async def get_local_reports(name: str):
-    """지정된 종목명이 포함된 리포트 목록을 반환합니다."""
+    """지정된 종목명이 매칭되는 리포트 목록을 반환합니다.
+
+    Args:
+        name: 조회할 종목명.
+
+    Returns:
+        종목에 매칭되는 리포트 목록 리스트. 에러 시 500 JSONResponse.
+    """
     try:
         if not report_service:
             return []
@@ -41,7 +48,11 @@ async def get_local_reports(name: str):
 
 @router.get("/api/reports/counts", response_model=None)
 async def get_report_counts():
-    """전체 종목별 리포트 수량을 집계하여 반환합니다."""
+    """전체 종목별 리포트 수량을 집계하여 반환합니다.
+
+    Returns:
+        종목명을 키로 하고 리포트 개수를 값으로 하는 딕셔너리. 에러 시 500 JSONResponse.
+    """
     try:
         if not report_service:
             return {}
@@ -53,7 +64,11 @@ async def get_report_counts():
 
 @router.post("/api/reports/sync", response_model=None)
 async def sync_reports_index():
-    """Google Drive에서 최신 인덱스 파일을 강제로 동기화합니다."""
+    """Google Drive에서 최신 인덱스 파일을 강제로 동기화합니다.
+
+    Returns:
+        동기화 성공 또는 실패 여부를 담은 메시지 딕셔너리.
+    """
     if not report_service:
         return JSONResponse(status_code=400, content={"message": "Cloud sync not configured"})
 
@@ -68,7 +83,16 @@ async def sync_reports_index():
 
 @router.get("/report_files/{filename}", response_model=None)
 async def serve_report_file(filename: str):
-    """PDF 리포트 파일을 서빙합니다 (로컬 없으면 클라우드 자동 다운로드)."""
+    """지정된 PDF 리포트 파일을 서빙합니다.
+
+    로컬에 파일이 없을 경우 구글 드라이브로부터 실시간 다운로드를 시도하여 서빙합니다.
+
+    Args:
+        filename: 서빙할 리포트 파일명.
+
+    Returns:
+        FileResponse를 통한 PDF 파일 바이너리 스트림 또는 404/400 오류 메시지.
+    """
     from fastapi.responses import FileResponse
 
     if not report_service:

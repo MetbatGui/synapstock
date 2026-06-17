@@ -338,7 +338,16 @@ async def upload_stock_report(board: str, ticker: str, file: UploadFile = File(.
 
 @router.post("/api/stock/report/add_link", response_model=None)
 async def add_stock_report_link(board: str, ticker: str, report_path: str) -> dict | JSONResponse:
-    """종목에 리포트 링크를 추가합니다."""
+    """종목에 리포트 링크를 추가합니다.
+
+    Args:
+        board (str): 대상 보드 파일명.
+        ticker (str): 대상 종목 티커.
+        report_path (str): 추가할 리포트의 URL 또는 파일 경로.
+
+    Returns:
+        dict: ``{"status": "success"}`` 또는 404 오류 응답.
+    """
     success = await media_service.add_stock_report_link(board, ticker, report_path)
     if success:
         return {"status": "success"}
@@ -372,7 +381,14 @@ async def delete_stock_report(board: str, ticker: str, report_path: str) -> dict
 
 @router.post("/api/board/create", response_model=None)
 async def create_board(name: str) -> dict | JSONResponse:
-    """새로운 가상 보드를 생성합니다."""
+    """새로운 가상 보드를 생성합니다.
+
+    Args:
+        name (str): 생성할 가상 보드의 이름.
+
+    Returns:
+        dict: ``{"status": "success"}`` 또는 500 오류 응답.
+    """
     success = command_service.create_board(name)
     if success:
         return {"status": "success"}
@@ -381,7 +397,14 @@ async def create_board(name: str) -> dict | JSONResponse:
 
 @router.post("/api/board/delete", response_model=None)
 async def delete_board(name: str) -> dict | JSONResponse:
-    """보드 전체를 삭제합니다."""
+    """보드 전체를 삭제합니다.
+
+    Args:
+        name (str): 삭제할 보드 파일명.
+
+    Returns:
+        dict: ``{"status": "success"}`` 또는 404 오류 응답.
+    """
     success = command_service.delete_board(name)
     if success:
         return {"status": "success"}
@@ -390,7 +413,11 @@ async def delete_board(name: str) -> dict | JSONResponse:
 
 @router.post("/api/board/virtual/sync", response_model=None)
 async def sync_virtual_boards() -> dict | JSONResponse:
-    """구글 드라이브 클라우드 저장소와 로컬 가상/테마 보드 파일들을 실시간으로 양방향 동기화합니다."""
+    """구글 드라이브 클라우드 저장소와 로컬 가상/테마 보드 파일들을 실시간으로 양방향 동기화합니다.
+
+    Returns:
+        dict: ``{"status": "success", "message": str}`` 또는 500 오류 응답.
+    """
     try:
         success = await board_file_sync_service.sync_with_drive()
         if success:
@@ -414,7 +441,14 @@ class BatchIgnoreRequest(BaseModel):
 
 @router.post("/api/board/virtual/batch-ignore", response_model=None)
 async def batch_ignore_virtual_board_stocks(request: BatchIgnoreRequest) -> dict | JSONResponse:
-    """가상 보드 대기열에서 여러 종목을 일괄 제외 처리합니다."""
+    """가상 보드 대기열에서 여러 종목을 일괄 제외 처리합니다.
+
+    Args:
+        request (BatchIgnoreRequest): 일괄 제외할 종목들의 티커 목록을 포함하는 요청 바디.
+
+    Returns:
+        dict: ``{"status": "success", "message": str}`` 또는 400/500 오류 응답.
+    """
     try:
         success = await command_service.batch_ignore_stocks("virtual_신규상장주", request.tickers)
         if success:

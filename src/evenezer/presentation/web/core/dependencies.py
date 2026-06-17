@@ -30,7 +30,11 @@ stock_split_repo = container._stock_split_repo
 
 
 async def sync_indices_if_needed(force: bool = False):
-    """(하위 호환성 유지) ReportService를 통해 동기화를 수행합니다."""
+    """(하위 호환성 유지) ReportService를 통해 동기화를 수행합니다.
+
+    Args:
+        force (bool): 강제 동기화 수행 여부. Defaults to False.
+    """
     if report_service:
         if force:
             await report_service.sync_index()

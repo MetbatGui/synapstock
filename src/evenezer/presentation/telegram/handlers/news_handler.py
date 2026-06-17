@@ -23,7 +23,15 @@ WAITING_FOR_NEWS_URL = 3
 
 
 async def start_news_workflow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """사용자가 '📰 뉴스 추가 시작' 버튼을 누를 때 호출됩니다."""
+    """사용자가 '📰 뉴스 추가 시작' 버튼을 누르거나 /add 명령을 보낼 때 뉴스 추가 워크플로우를 시작합니다.
+
+    Args:
+        update: 텔레그램 업데이트 객체.
+        context: 텔레그램 컨텍스트 객체.
+
+    Returns:
+        다음 대화 상태 상수 (WAITING_FOR_SEARCH_QUERY).
+    """
     if update.message:
         await update.message.reply_text(
             "뉴스를 추가할 종목명을 검색해주세요. (예: 삼성전자)", reply_markup=get_main_keyboard()
@@ -32,7 +40,17 @@ async def start_news_workflow(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def process_search_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """입력된 검색어로 시스템의 모든 Board(섹터)를 전수조사하여 찾고, 상태를 전환합니다."""
+    """사용자가 입력한 검색어로 시스템 내 모든 보드에서 해당하는 종목 정보를 조회합니다.
+
+    조회 결과가 단일 종목일 경우 즉시 선택하고, 복수 종목일 경우 인라인 선택 키보드를 출력합니다.
+
+    Args:
+        update: 텔레그램 업데이트 객체.
+        context: 텔레그램 컨텍스트 객체.
+
+    Returns:
+        다음 대화 상태 상수 (WAITING_FOR_NEWS_URL 또는 WAITING_FOR_STOCK_SELECTION).
+    """
     if not update.message or not update.message.text:
         return WAITING_FOR_SEARCH_QUERY
 
@@ -93,7 +111,15 @@ async def process_search_query(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def process_stock_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """사용자가 인라인 키보드에서 종목을 선택했을 때(CallbackQuery) 호출됩니다."""
+    """사용자가 인라인 버튼을 통해 다중 검색 결과 중 특정 종목을 선택했을 때 정보를 사용자 데이터에 저장합니다.
+
+    Args:
+        update: 텔레그램 업데이트 객체.
+        context: 텔레그램 컨텍스트 객체.
+
+    Returns:
+        다음 대화 상태 상수 (WAITING_FOR_NEWS_URL 또는 WAITING_FOR_STOCK_SELECTION).
+    """
     query = update.callback_query
     if not query or not query.data:
         return WAITING_FOR_STOCK_SELECTION
@@ -126,7 +152,15 @@ async def process_stock_selection(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """사용자가 보낸 뉴스 링크를 스크래핑한 뒤 실제 BoardService를 통해 저장합니다."""
+    """사용자가 채팅으로 입력한 뉴스 링크에서 제목 및 날짜를 파싱하여 도메인 모델 및 클라우드 저장소에 반영합니다.
+
+    Args:
+        update: 텔레그램 업데이트 객체.
+        context: 텔레그램 컨텍스트 객체.
+
+    Returns:
+        다음 대화 상태 혹은 대화 완료 상태 상수 (WAITING_FOR_NEWS_URL 또는 ConversationHandler.END).
+    """
     if not update.message or not update.message.text:
         return WAITING_FOR_NEWS_URL
 
@@ -215,7 +249,15 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def cancel_workflow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """명령어나 예기치 않은 종료 시 호출됩니다."""
+    """사용자 상태를 만료시키고 뉴스 추가 워크플로우를 취소합니다.
+
+    Args:
+        update: 텔레그램 업데이트 객체.
+        context: 텔레그램 컨텍스트 객체.
+
+    Returns:
+        대화 종료 상태 상수 (ConversationHandler.END).
+    """
     if context.user_data is not None:
         context.user_data.clear()
     if update.message:

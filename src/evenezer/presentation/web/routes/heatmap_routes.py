@@ -10,9 +10,18 @@ async def get_heatmap_plotly_data(
     show_stocks: bool = Query(True, description="개별 종목(주식) 상세 표시 여부"),
     force_refresh: bool = Query(False, description="캐시 강제 초기화 여부")
 ):
-    """
-    KRX 실시간 시세와 로컬 테마 분류 데이터를 결합하여
-    Plotly.js Treemap 시각화에 최적화된 Flat JSON Array 구조를 반환합니다.
+    """KRX 실시간 시세와 로컬 테마 분류 데이터를 결합하여 Plotly.js Treemap 시각화에 최적화된 Flat JSON Array 구조를 반환합니다.
+
+    Args:
+        show_categories: 하위 카테고리(섹터) 표시 여부.
+        show_stocks: 개별 종목(주식) 상세 표시 여부.
+        force_refresh: 캐시 강제 초기화 여부.
+
+    Returns:
+        Plotly.js Treemap 시각화용 데이터 (ids, labels, parents, values, colors, tickers 등).
+
+    Raises:
+        HTTPException: 테마 빌드 실패 시 503, 내부 분석 에러 시 500 응답 코드를 반환합니다.
     """
     try:
         # 1. 서비스 로드
