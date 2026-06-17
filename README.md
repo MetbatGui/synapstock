@@ -81,13 +81,53 @@ tests/
 
 - **외부 API 차단**: 외부 API(KRX, Google Drive 등) 호출이 포함된 테스트는 반드시 mock 또는 별도 sandbox 환경에서 실행합니다.
 
+#### 정적 분석 파이프라인 (Static Analysis Pipeline)
+
+작업한 변경사항이 DoD를 충족하는지 검증하기 위해, 변경된 Python 파일들을 대상으로 Ruff, ty, Radon 검사를 수행하는 로컬 파이프라인을 실행합니다.
+
+##### Linux / macOS (Bash)
+```bash
+# origin/master 대비 변경된 Python 파일 목록 추출
+CHANGED_FILES=$(git diff --name-only origin/master...HEAD | grep '\.py$')
+
+if [ -n "$CHANGED_FILES" ]; then
+    echo "🔍 Running static analysis on changed files..."
+    uv run ruff check $CHANGED_FILES
+    uv run ruff format --check $CHANGED_FILES
+    uv run ty check $CHANGED_FILES
+    # C 등급 이상(복잡도 11 이상)이 검출되면 안 됨 (A, B 등급만 허용)
+    uv run radon cc -n C $CHANGED_FILES
+else
+    echo "✅ No changed Python files to analyze."
+fi
+```
+
+##### Windows (PowerShell)
+```powershell
+# origin/master 대비 변경된 Python 파일 목록 추출
+$changedFiles = git diff --name-only origin/master...HEAD | Select-String '\.py$' | ForEach-Object { $_.Line }
+
+if ($changedFiles) {
+    Write-Host "🔍 Running static analysis on changed files..."
+    uv run ruff check $changedFiles
+    uv run ruff format --check $changedFiles
+    uv run ty check $changedFiles
+    # C 등급 이상(복잡도 11 이상)이 검출되면 안 됨 (A, B 등급만 허용)
+    uv run radon cc -n C $changedFiles
+} else {
+    Write-Host "✅ No changed Python files to analyze."
+}
+```
+
 #### 완료 기준 (Definition of Done - DoD)
 
 브랜치를 `master`에 병합하기 전 아래 항목을 모두 충족해야 합니다.
 - [ ] 관련 단위 테스트 작성 및 통과
 - [ ] 통합 테스트 통과 (기존 테스트 회귀 없음)
-- [ ] Ruff 린트/포맷 통과 (`uv run ruff check src/`)
-- [ ] 타입 검사 통과 (`uv run ty check src`)
+- [ ] 정적 분석 파이프라인 검사 통과
+  - 변경된 Python 파일에 대한 Ruff 린트/포맷팅 통과
+  - 변경된 Python 파일에 대한 타입 검사 (`uv run ty check`) 통과
+  - 변경된 Python 파일의 Radon 순환 복잡도(Cyclomatic Complexity)가 C 등급 미만 (즉, A 또는 B 등급만 허용)
 - [ ] 병합 커밋 메시지 작성 완료
 
 ---
