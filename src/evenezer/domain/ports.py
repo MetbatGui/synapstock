@@ -111,7 +111,7 @@ class DisclosurePort(ABC):
     """공시 정보 조회를 위한 추상 포트."""
 
     @abstractmethod
-    def get_recent_disclosures(self, ticker: str) -> list[dict]:
+    async def get_recent_disclosures(self, ticker: str) -> list[dict]:
         """특정 종목의 최근 공시 목록을 가져온다.
 
         Args:

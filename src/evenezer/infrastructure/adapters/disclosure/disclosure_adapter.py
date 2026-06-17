@@ -33,7 +33,7 @@ class DartDisclosureAdapter(DisclosurePort):
         # 캐시 유지 시간 (15분)
         self.cache_ttl = timedelta(minutes=15)
 
-    def get_recent_disclosures(self, ticker: str) -> list[dict]:
+    async def get_recent_disclosures(self, ticker: str) -> list[dict]:
         """DART 상세검색 POST 요청을 통해 최근 1년치 공시를 가져옵니다.
 
         Args:
@@ -74,11 +74,16 @@ class DartDisclosureAdapter(DisclosurePort):
             "option": "corp",
         }
 
-        try:
+        def _fetch():
             response = requests.post(self.search_url, data=payload, headers=self.headers, timeout=10)
             response.raise_for_status()
+            return response.text
 
-            soup = BeautifulSoup(response.text, "html.parser")
+        try:
+            import asyncio
+            response_text = await asyncio.to_thread(_fetch)
+
+            soup = BeautifulSoup(response_text, "html.parser")
             rows = soup.select("table tbody tr")
 
             results = []

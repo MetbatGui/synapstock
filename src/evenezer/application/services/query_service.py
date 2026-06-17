@@ -52,11 +52,11 @@ class BoardQueryService:
         """종목 명칭으로 티커를 검색합니다."""
         return self._ticker_search.search(query)
 
-    def get_disclosures(self, ticker: str) -> list[dict]:
+    async def get_disclosures(self, ticker: str) -> list[dict]:
         """특정 종목의 최근 공시 정보를 조회합니다."""
         if not self._disclosure:
             return []
-        return cast(list[dict], self._disclosure.get_recent_disclosures(ticker))
+        return cast(list[dict], await self._disclosure.get_recent_disclosures(ticker))
 
     def get_financial_data(self, company_name: str, metric: str = "매출액", period: str = "분기별") -> list[dict]:
         """특정 기업의 재무 데이터를 조회합니다."""
