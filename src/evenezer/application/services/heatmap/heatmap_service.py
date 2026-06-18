@@ -4,10 +4,11 @@ from typing import Any
 import pandas as pd
 
 from evenezer.domain.heatmap.models import Heatmap, Stock, Theme, ThemeGroup
-from evenezer.domain.heatmap.ports import KrxDataPort, ThemeDataLoaderPort
+from evenezer.domain.heatmap.ports import ThemeDataLoaderPort
 from evenezer.domain.heatmap.services import StockValidator, ThemeStatisticsService
 from evenezer.domain.heatmap.theme_config import THEME_HIERARCHY, THEME_RENAME
 from evenezer.domain.heatmap.value_objects import ChangeRatio, MarketCap
+from evenezer.domain.ports import KrxDataPort
 
 
 class HeatmapService:
@@ -55,7 +56,9 @@ class HeatmapService:
     async def sync_from_drive(self) -> None:
         """구글 드라이브로부터 히트맵 테마 JSON 데이터들을 로컬로 동기화합니다."""
         if hasattr(self.file_repo, "sync_with_drive"):
-            await self.file_repo.sync_with_drive()
+            sync_func = getattr(self.file_repo, "sync_with_drive")
+            if sync_func:
+                await sync_func()
 
     def get_heatmap_data(self) -> pd.DataFrame:
         """히트맵 생성을 위한 최종 데이터를 반환합니다.
@@ -137,9 +140,17 @@ class HeatmapService:
             return []
 
         # 2. KRX 데이터로 enrichment
-        df_krx = self.krx_repo.fetch_listing()
-        if df_krx.empty:
+        raw_krx = self.krx_repo.fetch_listing()
+        if raw_krx is None:
             return []
+        if isinstance(raw_krx, pd.DataFrame):
+            if raw_krx.empty:
+                return []
+            df_krx = raw_krx
+        else:
+            if not raw_krx:
+                return []
+            df_krx = pd.DataFrame(raw_krx)
 
         self._enrich_heatmap_with_krx_data(heatmap, df_krx)
 

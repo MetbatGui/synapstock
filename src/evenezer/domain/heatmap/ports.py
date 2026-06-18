@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
 from typing import Protocol
-
-import pandas as pd
 
 from evenezer.domain.heatmap.models import Heatmap, Theme
 
@@ -38,18 +35,3 @@ class ThemeExcelExporter(Protocol):
         """
         ...
 
-
-class KrxDataPort(ABC):
-    """KRX 상장 종목 데이터 조회를 담당하는 포트 인터페이스"""
-
-    @abstractmethod
-    def fetch_listing(self, date: datetime | None = None) -> pd.DataFrame:
-        """KRX 전체 상장 종목 데이터를 조회하여 DataFrame으로 반환합니다.
-
-        Args:
-            date: 조회할 기준일. None이면 최신 데이터를 조회합니다.
-
-        Returns:
-            pd.DataFrame: Code, Name, Marcap, ChagesRatio 컬럼이 포함된 데이터프레임
-        """
-        pass

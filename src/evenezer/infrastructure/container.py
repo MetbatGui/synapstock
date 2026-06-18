@@ -46,10 +46,7 @@ from evenezer.infrastructure.adapters.financial.excel_adapter import (
     ExcelFinancialDataAdapter,
 )
 from evenezer.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
-from evenezer.infrastructure.adapters.heatmap.caching_krx_repository import (
-    CachingKrxRepository,
-    CachingNativeKrxAdapter,
-)
+from evenezer.infrastructure.adapters.heatmap.caching_krx_repository import CachingKrxRepository
 from evenezer.infrastructure.adapters.heatmap.krx_repository import KrxRepository
 from evenezer.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
@@ -112,7 +109,7 @@ class Container:
         self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "재무제표.xlsx")
         self._ticker_search_adapter = NaverTickerSearchAdapter(cache_path=str(self.config.stock_cache_path))
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
-        self._krx_adapter = CachingNativeKrxAdapter(NativeKrxAdapter())
+        self._krx_adapter = CachingKrxRepository(NativeKrxAdapter())
 
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)

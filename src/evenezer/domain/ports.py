@@ -281,8 +281,8 @@ class KrxDataPort(ABC):
         """
 
     @abstractmethod
-    def fetch_listing(self, date: datetime | None = None) -> Any:
-        """직접 KRX JSON API를 호출하여 특정 기준일의 전종목 데이터를 수집합니다.
+    def fetch_listing(self, date: datetime | None = None) -> list[dict]:
+        """직접 KRX JSON API를 호출하여 특정 기준일의 전종목 데이터를 수집하고 list[dict]로 반환합니다.
 
         지정된 날짜가 영업일이 아닐 경우, 최대 10일 전까지 역순으로 탐색하며 영업일 데이터를 수집합니다.
         """
