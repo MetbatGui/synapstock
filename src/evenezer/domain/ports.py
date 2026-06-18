@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -279,6 +280,13 @@ class KrxDataPort(ABC):
             각 종목별 시세 및 거래 대금 정보 딕셔너리 리스트.
         """
 
+    @abstractmethod
+    def fetch_listing(self, date: datetime | None = None) -> Any:
+        """직접 KRX JSON API를 호출하여 특정 기준일의 전종목 데이터를 수집합니다.
+
+        지정된 날짜가 영업일이 아닐 경우, 최대 10일 전까지 역순으로 탐색하며 영업일 데이터를 수집합니다.
+        """
+
 
 class PriceDataPort(ABC):
     """가격 및 신고가 지표 조회를 위한 추상 포트."""
@@ -460,6 +468,3 @@ class EventOutboxPort(ABC):
             error_msg: 최종 에러 메시지.
         """
         pass
-
-
-

@@ -94,7 +94,6 @@ class Container:
         self.config.heatmap_dir.mkdir(parents=True, exist_ok=True)
         self.config.outbox_dir.mkdir(parents=True, exist_ok=True)
 
-
         # 3. 인프라 어댑터 싱글톤
         self._event_bus = InMemoryEventBusAdapter()
         self._outbox = LocalFileEventOutboxAdapter(self.config.outbox_dir)
@@ -115,13 +114,12 @@ class Container:
         self._pdf_storage = LocalFileStorageAdapter(self.config.pdf_dir)
         self._statistics_repo = LocalStatisticsRepository(str(self.config.netbuy_dir))
         self._ceiling_repo = LocalCeilingRepository(str(self.config.ceiling_dir))
-        self._capital_increase_repo = None # LocalCapitalIncreaseRepository(str(self.config.capital_increase_dir))
+        self._capital_increase_repo = None  # LocalCapitalIncreaseRepository(str(self.config.capital_increase_dir))
         self._bonus_issue_repo = LocalBonusIssueRepository(str(self.config.bonus_issue_dir))
-        self._convertible_bond_repo = None # LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
-        self._bw_repo = None # LocalBondWithWarrantsRepository(str(self.config.bw_dir))
+        self._convertible_bond_repo = None  # LocalConvertibleBondRepository(str(self.config.convertible_bond_dir))
+        self._bw_repo = None  # LocalBondWithWarrantsRepository(str(self.config.bw_dir))
         self._weekly_change_repo = LocalWeeklyChangeRepository(str(self.config.weekly_change_dir))
         self._stock_split_repo = LocalStockSplitRepository(str(self.config.stock_split_dir))
-
 
         from evenezer.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
@@ -133,7 +131,6 @@ class Container:
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
-
 
         # 5. 도메인 서비스 싱글톤
         self._board_file_sync_service = BoardFileSyncService(
@@ -149,27 +146,20 @@ class Container:
             disclosure=self._disclosure_adapter,
             financial=cast("FinancialDataPort", self._financial_adapter),
         )
-        self._command_service = BoardCommandService(
-            repository=self._repo,
-            event_bus=self._event_bus
-        )
+        self._command_service = BoardCommandService(repository=self._repo, event_bus=self._event_bus)
 
         # 도메인 이벤트 핸들러 바인딩 (동기 매니페스트 업데이트 즉시 실행)
         self._event_bus.subscribe(
-            BoardCreated,
-            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+            BoardCreated, lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
         )
         self._event_bus.subscribe(
-            BoardDeleted,
-            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=True)
+            BoardDeleted, lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=True)
         )
         self._event_bus.subscribe(
-            NodeAdded,
-            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+            NodeAdded, lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
         )
         self._event_bus.subscribe(
-            NodeDeleted,
-            lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
+            NodeDeleted, lambda ev: self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
         )
 
         # 무거운 비동기 동기화 이벤트는 아웃박스에 PENDING 상태로 적재
@@ -213,7 +203,9 @@ class Container:
         async def handle_batch_stocks_deleted(ev: BatchStocksDeletedFromBoard):
             manifest = self._board_file_sync_service.load_local_manifest()
             if manifest.is_event_processed(ev.event_id):
-                logger.info(f"[Container] 이미 처리된 BatchStocksDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}")
+                logger.info(
+                    f"[Container] 이미 처리된 BatchStocksDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}"
+                )
                 return
 
             self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
@@ -261,21 +253,20 @@ class Container:
             manifest_repository=self._board_sync_manifest_repo,
             board_file_sync_service=self._board_file_sync_service,
             board_repository=self._repo,
+            krx_repo=self._krx_adapter,
         )
-
 
         self._financial_service = FinancialService(repository=self._financial_repo)
         self._weekly_change_service = WeeklyChangeService(
             drive_adapter=self._drive_adapter,
             folder_id=self.config.weekly_change_folder_id,
-            repository=self._weekly_change_repo
+            repository=self._weekly_change_repo,
         )
         self._stock_split_sync_service = StockSplitSyncService(
             repository=self._stock_split_repo,
             drive_adapter=self._drive_adapter,
-            stock_split_folder_id=self.config.stock_split_folder_id
+            stock_split_folder_id=self.config.stock_split_folder_id,
         )
-
 
         self._report_service = None
         self._init_report_service()
@@ -297,7 +288,6 @@ class Container:
         if hasattr(self, "_news_scraper_adapter") and self._news_scraper_adapter:
             await self._news_scraper_adapter.close()
         logger.info("[Container] 서비스 종료 완료.")
-
 
     def _init_google_drive(self):
         """환경 변수 및 로컬 secrets 디렉토리의 자격 증명 파일(token.json, client_secret.json) 정보를 확인하고
@@ -357,6 +347,7 @@ class Container:
 
         def run_sync_in_background():
             import asyncio
+
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
@@ -374,13 +365,16 @@ class Container:
     def sync_boards_from_drive_in_background(self):
         """로컬 가상/테마 보드 데이터와 Google Drive 내 파일을 양방향 동기화하는 백그라운드 데몬 스레드를 실행합니다."""
         if not self._drive_adapter or not self.config.theme_folder_id:
-            logger.info("[Container] 가상/테마 보드 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
+            logger.info(
+                "[Container] 가상/테마 보드 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다."
+            )
             return
 
         import threading
 
         def run_sync_in_background():
             import asyncio
+
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
@@ -398,13 +392,16 @@ class Container:
     def sync_stock_splits_from_drive_in_background(self):
         """Google Drive로부터 액면분할/합병 데이터를 주기적으로 조회해 로컬 저장소에 반영하는 백그라운드 동기화 스레드를 기동합니다."""
         if not self._drive_adapter or not self.config.stock_split_folder_id:
-            logger.info("[Container] 주식 분할 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
+            logger.info(
+                "[Container] 주식 분할 구글 드라이브 폴더 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다."
+            )
             return
 
         import threading
 
         def run_sync_in_background():
             import asyncio
+
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
@@ -431,6 +428,7 @@ class Container:
             import asyncio
 
             from evenezer.application.services.heatmap.heatmap_service import HeatmapService
+
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
@@ -445,7 +443,6 @@ class Container:
         t = threading.Thread(target=run_sync_in_background, name="HeatmapSyncThread", daemon=True)
         t.start()
         logger.info("[Container] 백그라운드 히트맵 동기화 스레드를 성공적으로 시작했습니다.")
-
 
     async def _sync_financial_statements_async(self):
         """Google Drive에 있는 최신 재무제표 파일을 비동기적으로 다운로드하고 로컬 파일 변경 시점을 업데이트합니다."""
@@ -488,17 +485,18 @@ class Container:
                         f"(mimeType = 'application/vnd.google-apps.spreadsheet' or "
                         f"mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')"
                     )
-                    results = adapter.service.files().list(
-                        q=query,
-                        fields="files(id, name, modifiedTime, mimeType)",
-                        orderBy="modifiedTime desc"
-                    ).execute()
+                    results = (
+                        adapter.service.files()
+                        .list(q=query, fields="files(id, name, modifiedTime, mimeType)", orderBy="modifiedTime desc")
+                        .execute()
+                    )
                     return results.get("files", [])
                 except Exception as e:
                     logger.error(f"[Container] 폴더 내 파일 검색 실패: {e}")
                     return []
 
             import asyncio
+
             files = await asyncio.to_thread(_find_file_in_folder)
             if not files:
                 logger.error("[Container] 폴더 내에서 재무제표 엑셀 또는 스프레드시트 파일을 찾지 못했습니다.")
@@ -517,7 +515,9 @@ class Container:
             target_file_id = selected_file["id"]
             target_modified_time_str = selected_file.get("modifiedTime")
             target_mime_type = selected_file.get("mimeType")
-            logger.info(f"[Container] 동기화 대상 파일 발견: {selected_file.get('name')} (ID: {target_file_id}, MimeType: {target_mime_type})")
+            logger.info(
+                f"[Container] 동기화 대상 파일 발견: {selected_file.get('name')} (ID: {target_file_id}, MimeType: {target_mime_type})"
+            )
 
         if not target_modified_time_str:
             logger.error("[Container] 대상 파일의 modifiedTime 정보가 없습니다.")
