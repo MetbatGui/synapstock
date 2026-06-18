@@ -98,12 +98,7 @@ class StatisticsService:
                     clean_ticker = clean_ticker[1:]
 
                 if clean_ticker in prices_map:
-                    item.current_price = prices_map[clean_ticker]
-                    if item.offer_price > 0:
-                        diff = item.current_price - item.offer_price
-                        item.current_change_pct = round((diff / item.offer_price) * 100, 2)
-                    else:
-                        item.current_change_pct = 0.0
+                    item.update_market_price(prices_map[clean_ticker])
         except Exception as e:
             logger.error(f"[StatisticsService] 현재가 보강 중 오류 발생: {e}")
         return items
