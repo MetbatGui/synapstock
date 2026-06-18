@@ -470,8 +470,8 @@ class NewListing(BaseModel):
     listing_day_low: int = 0
     listing_day_close: int = 0
     listing_day_change_pct: float = 0.0
-    current_price: int = 0
-    current_change_pct: float = 0.0
+    current_price: int = Field(default=0, exclude=True)
+    current_change_pct: float = Field(default=0.0, exclude=True)
     note: str | None = None
     status: str = "PENDING"
     current_board: str = "virtual_신규상장주"
