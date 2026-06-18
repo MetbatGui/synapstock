@@ -478,6 +478,15 @@ class NewListing(BaseModel):
     current_path: list[str] = Field(default_factory=list)
     updated_at: str | None = None
 
+    def update_market_price(self, price: int) -> None:
+        """최신 현재가 및 공모가 대비 수익률을 계산하여 상태를 보강합니다."""
+        self.current_price = price
+        if self.offer_price > 0:
+            diff = price - self.offer_price
+            self.current_change_pct = round((diff / self.offer_price) * 100, 2)
+        else:
+            self.current_change_pct = 0.0
+
     def merge_with(self, other: "NewListing") -> "NewListing":
         """비즈니스 우선순위 규칙에 근거하여 다른 IPO 정보와 병합한 최종 버전을 반환합니다.
 
