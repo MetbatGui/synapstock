@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -77,10 +78,19 @@ class StatisticsService:
         try:
             import asyncio
 
-            df_krx = await asyncio.to_thread(self.krx_repo.fetch_listing, None)
-            if df_krx.empty:
-                logger.warning("[StatisticsService] KRX 전종목 시세를 가져오지 못했습니다. (빈 데이터)")
+            raw_krx = await asyncio.to_thread(self.krx_repo.fetch_listing, None)
+            if raw_krx is None:
                 return items
+            if isinstance(raw_krx, pd.DataFrame):
+                if raw_krx.empty:
+                    logger.warning("[StatisticsService] KRX 전종목 시세를 가져오지 못했습니다. (빈 데이터)")
+                    return items
+                df_krx = raw_krx
+            else:
+                if not raw_krx:
+                    logger.warning("[StatisticsService] KRX 전종목 시세를 가져오지 못했습니다. (빈 데이터)")
+                    return items
+                df_krx = pd.DataFrame(raw_krx)
 
             prices_map = {}
             for _, row in df_krx.iterrows():

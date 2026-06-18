@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 
-from evenezer.domain.heatmap.ports import KrxDataPort
+from evenezer.domain.ports import KrxDataPort
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +92,8 @@ class KrxRepository(KrxDataPort):
             logger.error(f"KRX 로그인 요청 중 에러: {e}")
             self.is_logged_in = False
 
-    def fetch_listing(self, date: datetime | None = None) -> pd.DataFrame:
-        """직접 KRX JSON API(MDCSTAT01501)를 호출하여 특정 기준일의 전종목 데이터를 수집합니다.
+    def fetch_listing(self, date: datetime | None = None) -> list[dict]:
+        """직접 KRX JSON API(MDCSTAT01501)를 호출하여 특정 기준일의 전종목 데이터를 수집하고 list[dict]로 반환합니다.
 
         지정된 날짜가 영업일이 아닐 경우, 최대 10일 전까지 역순으로 탐색하며 영업일 데이터를 수집합니다.
 
@@ -101,10 +101,13 @@ class KrxRepository(KrxDataPort):
             date: 조회할 기준일. None일 경우 오늘 날짜를 기준으로 수집을 시작합니다.
 
         Returns:
-            KRX 전종목 주가 정보 데이터프레임. ['Code', 'Name', 'Marcap', 'ChagesRatio', 'Close'] 컬럼이 포함됩니다.
+            list[dict]: Code, Name, Marcap, ChagesRatio, Close 키가 포함된 딕셔너리 리스트.
         """
         target_base = date or datetime.now()
-        return self._fetch_listing_from_krx(target_base)
+        df_result = self._fetch_listing_from_krx(target_base)
+        if df_result.empty:
+            return []
+        return df_result.to_dict(orient="records")
 
     def _fetch_listing_from_krx(self, target_base: datetime) -> pd.DataFrame:
         """실제 KRX API를 호출하여 시세 데이터를 탐색 및 수집합니다."""
@@ -174,3 +177,9 @@ class KrxRepository(KrxDataPort):
                 continue
 
         return pd.DataFrame()
+
+    def fetch_net_purchase_data(self, market: str, investor: str, date_str: str) -> bytes:
+        raise NotImplementedError("KrxRepository does not support fetch_net_purchase_data")
+
+    def fetch_market_prices(self, market: str, date_str: str) -> list[dict]:
+        raise NotImplementedError("KrxRepository does not support fetch_market_prices")
