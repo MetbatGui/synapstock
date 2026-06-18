@@ -19,6 +19,7 @@ from evenezer.application.events.worker import OutboxWorker
 from evenezer.application.services.board_file_sync_service import BoardFileSyncService
 from evenezer.application.services.command_service import BoardCommandService
 from evenezer.application.services.financial_service import FinancialService
+from evenezer.application.services.heatmap.heatmap_service import HeatmapService
 from evenezer.application.services.media_service import StockMediaService
 from evenezer.application.services.query_service import BoardQueryService
 from evenezer.application.services.report_service import ReportService
@@ -35,6 +36,7 @@ from evenezer.domain.events import (
     StockAddedToBoard,
     StockDeletedFromBoard,
 )
+from evenezer.domain.ports import KrxDataPort as DomainKrxDataPort
 from evenezer.infrastructure.adapters.disclosure.disclosure_adapter import (
     DartDisclosureAdapter,
 )
@@ -43,9 +45,12 @@ from evenezer.infrastructure.adapters.events.in_memory_bus import InMemoryEventB
 from evenezer.infrastructure.adapters.financial.excel_adapter import (
     ExcelFinancialDataAdapter,
 )
-from evenezer.infrastructure.adapters.google.google_drive_adapter import (
-    GoogleDriveAdapter,
+from evenezer.infrastructure.adapters.google.google_drive_adapter import GoogleDriveAdapter
+from evenezer.infrastructure.adapters.heatmap.caching_krx_repository import (
+    CachingKrxRepository,
+    CachingNativeKrxAdapter,
 )
+from evenezer.infrastructure.adapters.heatmap.krx_repository import KrxRepository
 from evenezer.infrastructure.adapters.krx.native_krx_adapter import NativeKrxAdapter
 from evenezer.infrastructure.adapters.local.board_repo import LocalBoardRepository, LocalBoardSyncManifestRepository
 from evenezer.infrastructure.adapters.local.file_storage import (
@@ -107,7 +112,7 @@ class Container:
         self._financial_adapter = ExcelFinancialDataAdapter(self.config.financial_dir / "재무제표.xlsx")
         self._ticker_search_adapter = NaverTickerSearchAdapter(cache_path=str(self.config.stock_cache_path))
         self._news_scraper_adapter = HttpxNewsScraperAdapter()
-        self._krx_adapter = NativeKrxAdapter()
+        self._krx_adapter = CachingNativeKrxAdapter(NativeKrxAdapter())
 
         # 저장소 어댑터 (기존 로컬 파일 시스템 작업 추상화)
         self._report_storage = LocalFileStorageAdapter(self.config.report_dir)
@@ -266,6 +271,19 @@ class Container:
             repository=self._stock_split_repo,
             drive_adapter=self._drive_adapter,
             stock_split_folder_id=self.config.stock_split_folder_id,
+        )
+
+        from evenezer.infrastructure.adapters.heatmap.file_repository import JsonThemeDataLoader
+
+        self._heatmap_loader = JsonThemeDataLoader(
+            json_dir=str(self.config.heatmap_dir),
+            drive_adapter=self._drive_adapter,
+            folder_id=self.config.heatmap_folder_id,
+        )
+        self._heatmap_krx_repository = CachingKrxRepository(KrxRepository())
+        self._heatmap_service = HeatmapService(
+            loader=self._heatmap_loader,
+            krx_repo=self._heatmap_krx_repository,
         )
 
         self._report_service = None
@@ -427,12 +445,10 @@ class Container:
         def run_sync_in_background():
             import asyncio
 
-            from evenezer.application.services.heatmap.heatmap_service import HeatmapService
-
             new_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(new_loop)
             try:
-                svc = HeatmapService()
+                svc = self._heatmap_service
                 new_loop.run_until_complete(svc.sync_from_drive())
             except Exception as e:
                 logger.error(f"[Container] 백그라운드 히트맵 동기화 실패: {e}")
@@ -598,8 +614,12 @@ class Container:
         return self._statistics_service
 
     @property
-    def krx_adapter(self) -> NativeKrxAdapter:
+    def krx_adapter(self) -> DomainKrxDataPort:
         return self._krx_adapter
+
+    @property
+    def heatmap_service(self) -> HeatmapService:
+        return self._heatmap_service
 
     @property
     def news_service(self) -> NewsService:

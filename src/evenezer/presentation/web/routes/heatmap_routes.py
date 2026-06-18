@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from evenezer.application.services.heatmap.heatmap_service import HeatmapService
 from evenezer.application.services.heatmap.view_model_builder import HeatmapViewModelBuilder
+from evenezer.infrastructure.container import container
 
 router = APIRouter(prefix="/api/heatmap", tags=["heatmap"])
 
@@ -27,7 +28,7 @@ async def get_heatmap_plotly_data(
     """
     try:
         # 1. 서비스 로드
-        service = HeatmapService()
+        service = container.heatmap_service
         await service.sync_from_drive()
         themes = service.get_themes(force_refresh=force_refresh)
 
@@ -45,6 +46,7 @@ async def get_heatmap_plotly_data(
         )
 
         # 3. Plotly.js 최적화 DTO 형식 응답
+        expired_at = HeatmapService.get_expired_at()
         return {
             "ids": view_model.get_ids(),
             "labels": view_model.get_labels(),
@@ -54,7 +56,7 @@ async def get_heatmap_plotly_data(
             "customdata": view_model.get_colors(),  # 툴팁이나 호버용으로 등락률을 customdata에 직접 연동
             "tickers": view_model.get_tickers(),
             "title": view_model.title,
-            "expired_at": HeatmapService.get_expired_at().isoformat() if HeatmapService.get_expired_at() else None
+            "expired_at": expired_at.isoformat() if expired_at else None
         }
 
     except Exception as e:
