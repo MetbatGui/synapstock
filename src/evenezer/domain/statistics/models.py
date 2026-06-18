@@ -110,12 +110,7 @@ class MonthlyMarketStats(BaseModel):
 
         items = []
         for i, (name, data) in enumerate(sorted_items, 1):
-            items.append(RankingItem(
-                rank=i,
-                name=name,
-                amount=data["amount"],
-                ticker=data["ticker"]
-            ))
+            items.append(RankingItem(rank=i, name=name, amount=data["amount"], ticker=data["ticker"]))
 
         return cls(month=month, market=market, subject=subject, items=items)
 
@@ -444,6 +439,8 @@ class NewListing(BaseModel):
         listing_day_low (int): 상장 당일 저가.
         listing_day_close (int): 상장 당일 종가.
         listing_day_change_pct (float): 상장 당일 등락률 (%).
+        current_price (int): 최신 현재가.
+        current_change_pct (float): 최신 현재 수익률 (%).
         note (str | None): 비고/참고사항.
     """
 
@@ -473,6 +470,8 @@ class NewListing(BaseModel):
     listing_day_low: int = 0
     listing_day_close: int = 0
     listing_day_change_pct: float = 0.0
+    current_price: int = 0
+    current_change_pct: float = 0.0
     note: str | None = None
     status: str = "PENDING"
     current_board: str = "virtual_신규상장주"
@@ -638,4 +637,3 @@ class StockSplitManifest(BaseModel):
     total_records: int
     supported_years: list[str]
     years_index: dict[str, list[str]]
-

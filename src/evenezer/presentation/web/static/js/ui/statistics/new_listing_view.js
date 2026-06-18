@@ -39,7 +39,7 @@ export const newListingView = {
                                 <th>종목명 (시장/업종)</th>
                                 <th style="width: 100px; text-align:right;">공모가</th>
                                 <th style="width: 200px;" class="col-competition">기관 경쟁률</th>
-                                <th style="width: 140px; text-align:right;">수익률(종가)</th>
+                                <th style="width: 140px; text-align:right;">수익률(현재)</th>
                                 <th style="width: 60px; text-align:center;">상세</th>
                             </tr>
                         </thead>
@@ -150,7 +150,7 @@ export const newListingView = {
         }
 
         const avgComp = filtered.reduce((acc, it) => acc + (it.institutional_competition || 0), 0) / filtered.length;
-        const avgReturn = filtered.reduce((acc, it) => acc + (it.listing_day_change_pct || 0), 0) / filtered.length;
+        const avgReturn = filtered.reduce((acc, it) => acc + (it.current_change_pct || 0), 0) / filtered.length;
         const totalIPOs = filtered.length;
 
         container.innerHTML = `
@@ -163,7 +163,7 @@ export const newListingView = {
                 <span class="value" style="color: #f97316;">${avgComp.toFixed(1)} <small>: 1</small></span>
             </div>
             <div class="card stats-summary-box animate-slide-up" style="animation-delay: 0.3s">
-                <span class="label">평균 종가 수익률</span>
+                <span class="label">평균 현재 수익률</span>
                 <span class="value" style="color: #ef4444;">${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(1)} <small>%</small></span>
             </div>
         `;
@@ -196,7 +196,7 @@ export const newListingView = {
             if (comp >= 1500) compClass = 'comp-hot';
             else if (comp >= 800) compClass = 'comp-warm';
 
-            const ret = it.listing_day_change_pct || 0;
+            const ret = it.current_change_pct || 0;
             const noteHtml = it.note ? `<i class="fas fa-info-circle ipo-note-icon" title="${it.note}"></i>` : '';
 
             // 상태 뱃지 생성
@@ -282,9 +282,6 @@ export const newListingView = {
      * 상세 정보 HTML 생성
      */
     generateDetailHtml: function (it) {
-        const openRet = it.offer_price > 0 ? ((it.listing_day_open - it.offer_price) / it.offer_price * 100) : 0;
-        const highRet = it.offer_price > 0 ? ((it.listing_day_high - it.offer_price) / it.offer_price * 100) : 0;
-
         let actionButtons = '';
         if (it.status === 'ASSIGNED') {
             const displayBoardName = (it.current_board || '').replace('theme_', '').replace('virtual_', '');
@@ -302,7 +299,7 @@ export const newListingView = {
                 <button class="stats-btn-action btn-ignore" data-ticker="${it.ticker}" style="background:#475569; border:none; color:white; cursor:pointer;"><i class="fas fa-eye-slash"></i> 제외</button>
             `;
         }
-
+ 
         return `
             <div class="ipo-detail-grid animate-fade-in">
                 <!-- 카드 1: 재무 요약 -->
@@ -325,7 +322,7 @@ export const newListingView = {
                         <span class="financial-value">${(it.capital || 0).toLocaleString()}</span>
                     </div>
                 </div>
-
+ 
                 <!-- 카드 2: 공모 및 배정 정보 -->
                 <div class="ipo-card">
                     <h4><i class="fas fa-coins"></i> 공모 및 배정</h4>
@@ -346,7 +343,7 @@ export const newListingView = {
                         <span class="financial-value">${(it.retail_shares || 0).toLocaleString()} <small>주</small></span>
                     </div>
                 </div>
-
+ 
                 <!-- 카드 3: 발행 조건 및 수급 -->
                 <div class="ipo-card">
                     <h4><i class="fas fa-chart-pie"></i> 발행 조건 및 수급</h4>
@@ -367,22 +364,18 @@ export const newListingView = {
                         <span class="financial-value" style="font-size:0.8rem;">${(it.float_shares_vol || 0).toLocaleString()} <small>주</small></span>
                     </div>
                 </div>
-
-                <!-- 카드 4: 상장 당일 성과 -->
+ 
+                <!-- 카드 4: 현재 성과 -->
                 <div class="ipo-card">
-                    <h4><i class="fas fa-history"></i> 상장 당일 성과</h4>
+                    <h4><i class="fas fa-history"></i> 현재 성과</h4>
                     <div class="price-detail-group">
                         <div class="price-row">
-                            <span class="price-label">시가 (수익률)</span>
-                            <span class="price-val ${openRet >= 0 ? 'up' : 'down'}">${(it.listing_day_open || 0).toLocaleString()} <small>(${openRet >= 0 ? '+' : ''}${openRet.toFixed(1)}%)</small></span>
-                        </div>
-                        <div class="price-row">
-                            <span class="price-label">고가 (수익률)</span>
-                            <span class="price-val up">${(it.listing_day_high || 0).toLocaleString()} <small>(+${highRet.toFixed(1)}%)</small></span>
+                            <span class="price-label">공모가</span>
+                            <span class="price-val" style="color:#e2e8f0;">${(it.offer_price || 0).toLocaleString()}</span>
                         </div>
                         <div class="price-row" style="margin-top:5px; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px;">
-                            <span class="price-label">종가 (최종)</span>
-                            <span class="price-val ${it.listing_day_change_pct >= 0 ? 'up' : 'down'}" style="font-size:1rem;">${(it.listing_day_close || 0).toLocaleString()} <small>(${it.listing_day_change_pct >= 0 ? '+' : ''}${(it.listing_day_change_pct || 0).toFixed(1)}%)</small></span>
+                            <span class="price-label">현재가 (최종)</span>
+                            <span class="price-val ${it.current_change_pct >= 0 ? 'up' : 'down'}" style="font-size:1rem;">${(it.current_price || 0).toLocaleString()} <small>(${it.current_change_pct >= 0 ? '+' : ''}${(it.current_change_pct || 0).toFixed(1)}%)</small></span>
                         </div>
                     </div>
                 </div>

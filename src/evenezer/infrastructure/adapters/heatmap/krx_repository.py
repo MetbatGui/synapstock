@@ -9,25 +9,36 @@ from evenezer.domain.heatmap.ports import KrxDataPort
 
 logger = logging.getLogger(__name__)
 
+
 class KrxRepository(KrxDataPort):
     """KRX 정보데이터시스템 JSON API 직접 호출 기반의 주식 정보 수집 리포지토리입니다."""
+
+    # 10분 인메모리 캐싱을 위한 클래스 변수
+    _cache_df: pd.DataFrame | None = None
+    _cache_expired_at: datetime | None = None
 
     BASE_URL = "https://data.krx.co.kr"
 
     def __init__(self):
         """KrxRepository를 초기화하고 HTTP 세션 헤더 및 환경 변수 기반 로그인 자격 증명을 로드합니다."""
         self.session = requests.Session()
-        self.user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-        self.session.headers.update({
-            'User-Agent': self.user_agent,
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Origin': self.BASE_URL,
-            'Referer': f'{self.BASE_URL}/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201',
-            'X-Requested-With': 'XMLHttpRequest'
-        })
+        self.user_agent = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        )
+        self.session.headers.update(
+            {
+                "User-Agent": self.user_agent,
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": self.BASE_URL,
+                "Referer": f"{self.BASE_URL}/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201",
+                "X-Requested-With": "XMLHttpRequest",
+            }
+        )
 
         from dotenv import load_dotenv
+
         load_dotenv()
 
         self.username = os.getenv("KRX_USERNAME")
@@ -44,16 +55,20 @@ class KrxRepository(KrxDataPort):
             return
 
         _LOGIN_PAGE = f"{self.BASE_URL}/contents/MDC/COMS/client/MDCCOMS001.cmd"
-        _LOGIN_JSP  = f"{self.BASE_URL}/contents/MDC/COMS/client/view/login.jsp?site=mdc"
-        _LOGIN_URL  = f"{self.BASE_URL}/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
+        _LOGIN_JSP = f"{self.BASE_URL}/contents/MDC/COMS/client/view/login.jsp?site=mdc"
+        _LOGIN_URL = f"{self.BASE_URL}/contents/MDC/COMS/client/MDCCOMS001D1.cmd"
 
         try:
             self.session.get(_LOGIN_PAGE, timeout=15)
             self.session.get(_LOGIN_JSP, headers={"Referer": _LOGIN_PAGE}, timeout=15)
 
             payload = {
-                "mbrNm": "", "telNo": "", "di": "", "certType": "",
-                "mbrId": self.username, "pw": self.password,
+                "mbrNm": "",
+                "telNo": "",
+                "di": "",
+                "certType": "",
+                "mbrId": self.username,
+                "pw": self.password,
             }
             headers = {"Referer": _LOGIN_PAGE}
 
@@ -74,8 +89,8 @@ class KrxRepository(KrxDataPort):
                 logger.error(f"KRX 로그인 실패: {data}")
                 self.is_logged_in = False
 
-            self.session.cookies.set('mdc.client_session', 'true', domain='data.krx.co.kr')
-            self.session.cookies.set('lang', 'ko_KR', domain='data.krx.co.kr')
+            self.session.cookies.set("mdc.client_session", "true", domain="data.krx.co.kr")
+            self.session.cookies.set("lang", "ko_KR", domain="data.krx.co.kr")
         except Exception as e:
             logger.error(f"KRX 로그인 요청 중 에러: {e}")
             self.is_logged_in = False
@@ -89,14 +104,32 @@ class KrxRepository(KrxDataPort):
             date: 조회할 기준일. None일 경우 오늘 날짜를 기준으로 수집을 시작합니다.
 
         Returns:
-            KRX 전종목 주가 정보 데이터프레임. ['Code', 'Name', 'Marcap', 'ChagesRatio'] 컬럼이 포함됩니다.
+            KRX 전종목 주가 정보 데이터프레임. ['Code', 'Name', 'Marcap', 'ChagesRatio', 'Close'] 컬럼이 포함됩니다.
         """
-        target_base = date or datetime.now()
+        now = datetime.now()
+        if date is None:
+            if KrxRepository._cache_df is not None and KrxRepository._cache_expired_at is not None:
+                if now < KrxRepository._cache_expired_at:
+                    logger.info("KRX 전종목 시세 10분 캐시 히트 (유효)")
+                    return KrxRepository._cache_df
 
+        target_base = date or now
+        df_result = self._fetch_listing_from_krx(target_base)
+
+        # 오늘 실시간 수집인 경우 10분 캐시 적재
+        if date is None and not df_result.empty:
+            KrxRepository._cache_df = df_result
+            KrxRepository._cache_expired_at = now + timedelta(minutes=10)
+            logger.info("KRX 전종목 시세 신규 수집 및 10분 캐싱 완료")
+
+        return df_result
+
+    def _fetch_listing_from_krx(self, target_base: datetime) -> pd.DataFrame:
+        """실제 KRX API를 호출하여 시세 데이터를 탐색 및 수집합니다."""
         for i in range(10):
             attempt_date = target_base - timedelta(days=i)
-            target_date_str = attempt_date.strftime('%Y%m%d')
-            display_date = attempt_date.strftime('%Y-%m-%d')
+            target_date_str = attempt_date.strftime("%Y%m%d")
+            display_date = attempt_date.strftime("%Y-%m-%d")
 
             logger.info(f"KRX API 직접 호출 시도 중... (기준일: {display_date})")
 
@@ -105,44 +138,48 @@ class KrxRepository(KrxDataPort):
 
             url = f"{self.BASE_URL}/comm/bldAttendant/getJsonData.cmd"
             payload = {
-                'bld': 'dbms/MDC/STAT/standard/MDCSTAT01501',
-                'locale': 'ko_KR',
-                'mktId': 'ALL',
-                'trdDd': target_date_str,
-                'share': '1',
-                'money': '1',
-                'csvxls_isNo': 'false',
+                "bld": "dbms/MDC/STAT/standard/MDCSTAT01501",
+                "locale": "ko_KR",
+                "mktId": "ALL",
+                "trdDd": target_date_str,
+                "share": "1",
+                "money": "1",
+                "csvxls_isNo": "false",
             }
 
             try:
                 res = self.session.post(url, data=payload, timeout=60)
-                if 'LOGOUT' in res.text:
+                if "LOGOUT" in res.text:
                     logger.debug("세션 만료 감지, 재로그인 수행 중...")
                     self._login()
                     res = self.session.post(url, data=payload, timeout=60)
 
                 data = res.json()
-                output = data.get('OutBlock_1', []) or data.get('output', [])
+                output = data.get("OutBlock_1", []) or data.get("output", [])
 
                 if not output:
-                    logger.debug(f"{display_date}은(는) 영업일이 아니거나 데이터가 존재하지 않습니다. 이전 날짜로 재시도합니다.")
+                    logger.debug(f"{display_date}은(는) 영업일이 아니거나 데이터가 없습니다. 이전 날짜 재시도.")
                     if i == 9:
                         logger.error("최근 10일 이내의 영업일 데이터를 찾을 수 없습니다.")
                     continue
 
                 rows = []
                 for row in output:
-                    code = row.get('ISU_SRT_CD')
-                    name = row.get('ISU_ABBRV')
-                    marcap_str = row.get('MKTCAP', '0').replace(',', '')
-                    change_ratio_str = row.get('FLUC_RT', '0').replace(',', '')
+                    code = row.get("ISU_SRT_CD")
+                    name = row.get("ISU_ABBRV")
+                    marcap_str = row.get("MKTCAP", "0").replace(",", "")
+                    change_ratio_str = row.get("FLUC_RT", "0").replace(",", "")
+                    close_price_str = row.get("TDD_CLSPRC", "0").replace(",", "")
 
-                    rows.append({
-                        'Code': code,
-                        'Name': name,
-                        'Marcap': float(marcap_str) if marcap_str else 0.0,
-                        'ChagesRatio': float(change_ratio_str) if change_ratio_str else 0.0
-                    })
+                    rows.append(
+                        {
+                            "Code": code,
+                            "Name": name,
+                            "Marcap": float(marcap_str) if marcap_str else 0.0,
+                            "ChagesRatio": float(change_ratio_str) if change_ratio_str else 0.0,
+                            "Close": int(close_price_str) if close_price_str else 0,
+                        }
+                    )
 
                 df_result = pd.DataFrame(rows)
                 logger.info(f"네이티브 KRX API 호출 완료 (정상 영업일: {display_date}, 수집 종목 수: {len(df_result)})")

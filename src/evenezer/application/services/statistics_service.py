@@ -14,6 +14,7 @@ from evenezer.domain.statistics.models import (
     DailyMarketRankingAnalysis,
     NewListing,
 )
+from evenezer.infrastructure.adapters.heatmap.krx_repository import KrxRepository
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,6 @@ class StatisticsService:
         self._board_file_sync_service = board_file_sync_service
         self._board_repository = board_repository
 
-
         # 도메인 서비스 초기화 및 의존성 주입
         self.ranking_svc = RankingService(storage, "", repository)
         self.ceiling_svc = CeilingAnalysisService(storage, "", ceiling_repository)
@@ -66,6 +66,43 @@ class StatisticsService:
             capital_increase_repository, bonus_issue_repository, convertible_bond_repository, bw_repository
         )
         self.disclosure_svc = DisclosureAnalysisService(storage, "", disclosure_repo)
+        self.krx_repo = KrxRepository()
+
+    async def _enrich_current_prices(self, items: list[NewListing]) -> list[NewListing]:
+        """최근 영업일 기준의 전종목 시세를 조회하여 신규상장주 객체들의 현재가 및 현재 수익률을 보강합니다."""
+        try:
+            import asyncio
+
+            df_krx = await asyncio.to_thread(self.krx_repo.fetch_listing, None)
+            if df_krx.empty:
+                logger.warning("[StatisticsService] KRX 전종목 시세를 가져오지 못했습니다. (빈 데이터)")
+                return items
+
+            prices_map = {}
+            for _, row in df_krx.iterrows():
+                ticker = str(row.get("Code", ""))
+                if ticker.startswith("A"):
+                    ticker = ticker[1:]
+                prices_map[ticker] = int(row.get("Close", 0))
+
+            for item in items:
+                if not item.ticker or item.ticker == "none":
+                    continue
+
+                clean_ticker = item.ticker
+                if clean_ticker.startswith("A"):
+                    clean_ticker = clean_ticker[1:]
+
+                if clean_ticker in prices_map:
+                    item.current_price = prices_map[clean_ticker]
+                    if item.offer_price > 0:
+                        diff = item.current_price - item.offer_price
+                        item.current_change_pct = round((diff / item.offer_price) * 100, 2)
+                    else:
+                        item.current_change_pct = 0.0
+        except Exception as e:
+            logger.error(f"[StatisticsService] 현재가 보강 중 오류 발생: {e}")
+        return items
 
     def _build_local_ticker_map(self) -> dict[str, str]:
         """마인드맵 보드의 모든 종목-티커 매핑을 가져옵니다."""
@@ -106,9 +143,8 @@ class StatisticsService:
                     # 매니페스트의 new_listings 캐시에서 이름 대조하여 티커 매핑 시도
                     found_in_manifest = False
                     for ticker, meta in new_listings_meta.items():
-                        meta_name = (
-                            getattr(meta, "name", "")
-                            or (meta.get("name", "") if isinstance(meta, dict) else "")
+                        meta_name = getattr(meta, "name", "") or (
+                            meta.get("name", "") if isinstance(meta, dict) else ""
                         )
                         if meta_name == item.name:
                             item.ticker = ticker
@@ -137,7 +173,6 @@ class StatisticsService:
                     item.current_board = "virtual_신규상장주"
                     item.current_path = []
 
-
         return items
 
     async def get_daily_ranking(
@@ -164,7 +199,6 @@ class StatisticsService:
                 if item.ticker == "none":
                     item.ticker = None
         return result
-
 
     # --- 상한가 분석 (Price Stats) ---
     async def get_ceiling_analysis(self, date: str, force_sync: bool = False) -> CeilingAnalysisReport | None:
@@ -205,6 +239,7 @@ class StatisticsService:
                 try:
                     items = await self.ipo_svc.get_data(y, force_sync=force_sync)
                     enriched = self._enrich_tickers(items)
+                    await self._enrich_current_prices(enriched)
                     try:
                         self.ipo_svc.repository.save_new_listings(enriched, year=y)
                     except Exception as ex:
@@ -219,6 +254,7 @@ class StatisticsService:
         else:
             items = await self.ipo_svc.get_data(year, force_sync=force_sync)
             enriched_items = self._enrich_tickers(items)
+            await self._enrich_current_prices(enriched_items)
             try:
                 self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
             except Exception as ex:
@@ -232,6 +268,7 @@ class StatisticsService:
     async def sync_new_listing_data(self, year: str = "2026") -> list[NewListing]:
         items = await self.ipo_svc.sync_data(year)
         enriched_items = self._enrich_tickers(items)
+        await self._enrich_current_prices(enriched_items)
         try:
             self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
         except Exception as ex:
@@ -252,6 +289,7 @@ class StatisticsService:
                 # sync_data 내부에 추가된 스마트 캐싱 조건에 따라 구글 드라이브 파일과 조건부 다운로드 수행함
                 items = await self.ipo_svc.get_data(year, force_sync=force_sync)
                 enriched = self._enrich_tickers(items)
+                await self._enrich_current_prices(enriched)
                 try:
                     self.ipo_svc.repository.save_new_listings(enriched, year=year)
                 except Exception as ex:
@@ -290,9 +328,9 @@ class StatisticsService:
                 logger.error(f"[StatisticsService] 가상보드 로드 실패: {e}")
 
         if not virtual_board:
-            from evenezer.domain.models import Board, Node
-            root_node = Node(name="신규상장주", depth=0)
-            virtual_board = Board(id="virtual_신규상장주", name="신규상장주", root=root_node)
+            from evenezer.domain.models import Board
+
+            virtual_board = Board(id="virtual_신규상장주", name="신규상장주")
 
         # 3. 마인드맵의 일반 테마 보드들에 기등록된 종목 맵 캐싱
         assigned_stocks_map = {}
@@ -310,15 +348,13 @@ class StatisticsService:
 
         # 4. 도메인 서비스를 통한 비즈니스 로직 수행
         now_str = datetime.now(UTC).isoformat()
-        listings_meta_dict = {
-            ticker: model.model_dump() for ticker, model in manifest.new_listings.items()
-        }
+        listings_meta_dict = {ticker: model.model_dump() for ticker, model in manifest.new_listings.items()}
         virtual_board, updated_listings_dict, changed = NewListingSyncDomainService.sync_listings_to_virtual_board(
             virtual_board=virtual_board,
             new_listings_meta=listings_meta_dict,
             listings=listings,
             assigned_stocks_map=assigned_stocks_map,
-            now_str=now_str
+            now_str=now_str,
         )
 
         # 5. 변경사항이 있으면 저장
@@ -347,7 +383,6 @@ class StatisticsService:
                 logger.error(f"[StatisticsService] 가상보드 및 매니페스트 갱신 저장 실패: {e}")
                 return False
         return False
-
 
     async def sync_capital_increase_data(self, year: str = "2026") -> list:
         items = await self.disclosure_svc.sync_data("capital_increase", year)
