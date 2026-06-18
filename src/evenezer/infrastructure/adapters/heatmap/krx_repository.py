@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -142,6 +143,7 @@ class KrxRepository(KrxDataPort):
                     logger.debug(f"{display_date}은(는) 영업일이 아니거나 데이터가 없습니다. 이전 날짜 재시도.")
                     if i == 9:
                         logger.error("최근 10일 이내의 영업일 데이터를 찾을 수 없습니다.")
+                    time.sleep(0.5)
                     continue
 
                 rows = []
@@ -168,6 +170,7 @@ class KrxRepository(KrxDataPort):
 
             except Exception as e:
                 logger.error(f"{display_date} 기준 데이터 수집 중 오류: {e}")
+                time.sleep(0.5)
                 continue
 
         return pd.DataFrame()
