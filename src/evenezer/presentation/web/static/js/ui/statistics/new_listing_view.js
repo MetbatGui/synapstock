@@ -39,12 +39,13 @@ export const newListingView = {
                                 <th>종목명 (시장/업종)</th>
                                 <th style="width: 100px; text-align:right;">공모가</th>
                                 <th style="width: 200px;" class="col-competition">기관 경쟁률</th>
+                                <th style="width: 100px; text-align:right;">현재가</th>
                                 <th style="width: 140px; text-align:right;">수익률(현재)</th>
                                 <th style="width: 60px; text-align:center;">상세</th>
                             </tr>
                         </thead>
                         <tbody id="new-listing-tbody">
-                            <tr><td colspan="6" class="stats-loader">데이터를 분석 중...</td></tr>
+                            <tr><td colspan="7" class="stats-loader">데이터를 분석 중...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -104,7 +105,7 @@ export const newListingView = {
         } catch (err) {
             console.error('Failed to load IPO data:', err);
             const tbody = document.getElementById('new-listing-tbody');
-            if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="stats-error">로드 실패: ${err.message}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="stats-error">로드 실패: ${err.message}</td></tr>`;
         }
     },
 
@@ -179,7 +180,7 @@ export const newListingView = {
         const filtered = selectedYear === 'all' ? items : items.filter(it => it.listing_date.startsWith(selectedYear));
 
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="stats-empty">상장 데이터가 없습니다.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="stats-empty">상장 데이터가 없습니다.</td></tr>';
             return;
         }
 
@@ -234,6 +235,7 @@ export const newListingView = {
                         </div>
                     </div>
                 </td>
+                <td style="text-align:right; font-weight:600; color:#e2e8f0;">${(it.current_price || 0).toLocaleString()}</td>
                 <td style="text-align:right;">
                     <span style="font-weight:800; font-size:1.1rem; color:${ret >= 0 ? '#f87171' : '#60a5fa'};">
                         ${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%
@@ -247,7 +249,7 @@ export const newListingView = {
             const detailTr = document.createElement('tr');
             detailTr.className = 'detail-row';
             detailTr.style.display = 'none';
-            detailTr.innerHTML = `<td colspan="6" class="detail-container"></td>`;
+            detailTr.innerHTML = `<td colspan="7" class="detail-container"></td>`;
 
             tbody.appendChild(tr);
             tbody.appendChild(detailTr);
