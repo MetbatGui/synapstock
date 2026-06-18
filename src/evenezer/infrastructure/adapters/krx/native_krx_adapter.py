@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 import requests
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -266,3 +267,15 @@ class NativeKrxAdapter(KrxDataPort, PriceDataPort):
         """
         # ISO 종목 풀코드 조회를 위한 임시 맵 필요
         pass
+
+    def fetch_listing(self, date: datetime | None = None) -> list[dict]:
+        """추상 메서드 구현. 코스피와 코스닥의 시세를 수집하여 병합 반환합니다."""
+        target_date = date or datetime.now()
+        date_str = target_date.strftime("%Y%m%d")
+
+        try:
+            stk = self.fetch_market_prices("STK", date_str)
+            ksq = self.fetch_market_prices("KSQ", date_str)
+            return (stk or []) + (ksq or [])
+        except Exception:
+            return []

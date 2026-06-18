@@ -1,7 +1,10 @@
 """로컬 JSON 파일 기반 Board 저장소 어댑터."""
 
 import json
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from evenezer.domain.models import Board, BoardSyncManifest, Node, Stock
 from evenezer.domain.ports import BoardRepositoryPort, BoardSyncManifestRepositoryPort

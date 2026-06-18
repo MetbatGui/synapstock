@@ -6,7 +6,7 @@ from evenezer.application.services.ceiling_analysis_service import CeilingAnalys
 from evenezer.application.services.disclosure_analysis_service import DisclosureAnalysisService
 from evenezer.application.services.new_listing_service import NewListingService
 from evenezer.application.services.ranking_service import RankingService
-from evenezer.domain.ports import BoardSyncManifestRepositoryPort
+from evenezer.domain.ports import BoardSyncManifestRepositoryPort, KrxDataPort
 from evenezer.domain.statistics.domain_service import NewListingSyncDomainService
 from evenezer.domain.statistics.models import (
     CeilingAnalysisReport,
@@ -37,6 +37,7 @@ class StatisticsService:
         manifest_repository: BoardSyncManifestRepositoryPort | None = None,
         board_file_sync_service: Any = None,
         board_repository: Any = None,
+        krx_repo: KrxDataPort | None = None,
     ):
         self._storage = storage
         self._query_service = query_service
@@ -66,7 +67,10 @@ class StatisticsService:
             capital_increase_repository, bonus_issue_repository, convertible_bond_repository, bw_repository
         )
         self.disclosure_svc = DisclosureAnalysisService(storage, "", disclosure_repo)
-        self.krx_repo = KrxRepository()
+        if krx_repo:
+            self.krx_repo = krx_repo
+        else:
+            self.krx_repo = KrxRepository()
 
     async def _enrich_current_prices(self, items: list[NewListing]) -> list[NewListing]:
         """최근 영업일 기준의 전종목 시세를 조회하여 신규상장주 객체들의 현재가 및 현재 수익률을 보강합니다."""
