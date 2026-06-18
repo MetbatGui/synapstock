@@ -13,10 +13,6 @@ logger = logging.getLogger(__name__)
 class KrxRepository(KrxDataPort):
     """KRX 정보데이터시스템 JSON API 직접 호출 기반의 주식 정보 수집 리포지토리입니다."""
 
-    # 10분 인메모리 캐싱을 위한 클래스 변수
-    _cache_df: pd.DataFrame | None = None
-    _cache_expired_at: datetime | None = None
-
     BASE_URL = "https://data.krx.co.kr"
 
     def __init__(self):
@@ -106,23 +102,8 @@ class KrxRepository(KrxDataPort):
         Returns:
             KRX 전종목 주가 정보 데이터프레임. ['Code', 'Name', 'Marcap', 'ChagesRatio', 'Close'] 컬럼이 포함됩니다.
         """
-        now = datetime.now()
-        if date is None:
-            if KrxRepository._cache_df is not None and KrxRepository._cache_expired_at is not None:
-                if now < KrxRepository._cache_expired_at:
-                    logger.info("KRX 전종목 시세 10분 캐시 히트 (유효)")
-                    return KrxRepository._cache_df
-
-        target_base = date or now
-        df_result = self._fetch_listing_from_krx(target_base)
-
-        # 오늘 실시간 수집인 경우 10분 캐시 적재
-        if date is None and not df_result.empty:
-            KrxRepository._cache_df = df_result
-            KrxRepository._cache_expired_at = now + timedelta(minutes=10)
-            logger.info("KRX 전종목 시세 신규 수집 및 10분 캐싱 완료")
-
-        return df_result
+        target_base = date or datetime.now()
+        return self._fetch_listing_from_krx(target_base)
 
     def _fetch_listing_from_krx(self, target_base: datetime) -> pd.DataFrame:
         """실제 KRX API를 호출하여 시세 데이터를 탐색 및 수집합니다."""
