@@ -77,3 +77,50 @@ def test_heatmap_cache_hit_and_expiry_refresh():
     # 호출 횟수가 3회로 증가했음을 검증 (캐시 우회 작동 확인)
     assert mock_file_repo.load_heatmap.call_count == 3
     assert mock_krx_repo.fetch_listing.call_count == 3
+
+
+def test_heatmap_cache_with_list_of_dict():
+    """통합 테스트: krx_repo가 list[dict] 표준 형식을 반환할 때의 캐싱 및 데이터 enrichment 검증"""
+    from evenezer.domain.heatmap.models import Category, Stock
+    from evenezer.domain.heatmap.value_objects import MarketCap, ChangeRatio
+
+    # 0. 초기화: 이전 잔존 캐시 클리어
+    HeatmapService._cache_data = None
+    HeatmapService._expired_at = None
+    
+    # 1. 의존성 Mocking 세팅
+    mock_file_repo = MagicMock()
+    mock_krx_repo = MagicMock()
+    
+    mock_heatmap = Heatmap()
+    theme = Theme(name="반도체")
+    category = Category(name="기본")
+    stock = Stock(name="삼성전자", code="005930", market_cap=MarketCap.zero(), change_ratio=ChangeRatio.zero())
+    category.add_stock(stock)
+    theme.add_category(category)
+    mock_heatmap.add_theme(theme)
+    
+    mock_file_repo.load_heatmap.return_value = mock_heatmap
+    
+    # 표준 list[dict] 형태 반환
+    mock_krx_repo.fetch_listing.return_value = [
+        {"Name": "삼성전자", "Code": "005930", "Marcap": 400000000000000.0, "ChagesRatio": 1.5, "테마": "반도체"}
+    ]
+    
+    service = HeatmapService(loader=mock_file_repo, krx_repo=mock_krx_repo)
+    
+    # 2. 첫 번째 호출 (Cache Miss) 및 데이터 결합 확인
+    themes = service.get_themes()
+    assert len(themes) > 0
+    assert themes[0].name == "반도체"
+    assert len(themes[0].stocks) == 1
+    assert themes[0].stocks[0].name == "삼성전자"
+    assert themes[0].stocks[0].code == "005930"
+    assert themes[0].stocks[0].market_cap.value_in_won == 400000000000000.0
+    assert themes[0].stocks[0].change_ratio.value == 1.5
+    
+    # 3. 캐시가 채워졌는지 확인
+    assert HeatmapService._cache_data is not None
+
+
+
