@@ -22,9 +22,9 @@ class Stock(BaseModel):
 
     name: str
     ticker: str
-    aliases: list[str] = []
-    reports: list[str] = []
-    news: list[dict] = []
+    aliases: list[str] = Field(default_factory=list)
+    reports: list[str] = Field(default_factory=list)
+    news: list[dict] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_ticker(self) -> Stock:
@@ -73,6 +73,9 @@ class Stock(BaseModel):
             self.name = new_name
 
     def __repr__(self) -> str:
+        return f"Stock(name={self.name!r}, ticker={self.ticker!r})"
+
+    def __str__(self) -> str:
         return f"- {self.name} ({self.ticker})"
 
 
@@ -91,7 +94,13 @@ class Node(BaseModel):
     name: str
     depth: int
     parent_path: str | None = None
-    stocks: list[Stock] = []
+    stocks: list[Stock] = Field(default_factory=list)
+
+    def __repr__(self) -> str:
+        return f"Node(name={self.name!r}, depth={self.depth}, stock_count={len(self.stocks)})"
+
+    def __str__(self) -> str:
+        return f"Node '{self.name}' (depth {self.depth})"
 
     def add_stock(self, stock: Stock) -> bool:
         """중복 체크 후 종목을 추가합니다. 이미 존재하면 추가하지 않고 True를 반환합니다.
@@ -356,6 +365,9 @@ class Board(BaseModel):
         return False
 
     def __repr__(self) -> str:
+        return f"Board(id={self.id!r}, name={self.name!r}, node_count={len(self.nodes)})"
+
+    def __str__(self) -> str:
         # 기존 트리 형태로 덤프하여 가독성 및 호환을 유지한다.
         root_path = next((path for path, n in self.nodes.items() if n.parent_path is None), None)
         if not root_path:
@@ -367,7 +379,7 @@ class Board(BaseModel):
             prefix = "  " * indent
             lines.append(f"{prefix}[D{node.depth}] {node.name}")
             for stock in node.stocks:
-                lines.append(f"{prefix}  {stock!r}")
+                lines.append(f"{prefix}  {stock!s}")
 
             # 직계 자식 노드 탐색 및 정렬
             children = [p for p, n in self.nodes.items() if n.parent_path == path]
@@ -377,9 +389,6 @@ class Board(BaseModel):
 
         _render_tree(root_path, 0)
         return f"Board({self.name!r})\n" + "\n".join(lines)
-
-    def __str__(self) -> str:
-        return self.__repr__()
 
 
 @dataclass
