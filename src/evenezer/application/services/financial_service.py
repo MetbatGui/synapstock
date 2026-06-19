@@ -1,3 +1,5 @@
+from typing import Any
+
 from ...domain.financials.models import FinancialAnalysisItem, FinancialMetric
 from ...domain.financials.repository import FinancialRepository
 
@@ -157,44 +159,10 @@ class FinancialService:
         turnaround_results = []
 
         for s in statements:
-            # 해당 기간 데이터가 모두 있는지 확인
-            vals_with_none = [s.values.get(q) for q in quarters]
-            if any(v is None for v in vals_with_none):
-                continue
-
-            # 타입 체커를 위한 명시적 타입 변환 (None이 없음을 확인한 후)
-            vals: list[float] = [v for v in vals_with_none if v is not None]
-
-            is_consecutive = True
-            for i in range(2, len(vals)):
-                if vals[i] <= vals[i - 1]:
-                    is_consecutive = False
-                    break
-
-            if is_consecutive:
-                if any(v < 0 for v in vals[2:]):
-                    continue
-                if abs(vals[-1]) < min_value:
-                    continue
-                if vals[1] == 0.0:  # 분모가 0인 종목은 제외 (division by zero 방지)
-                    continue
-
+            vals = self._extract_valid_values(s, quarters)
+            if vals is not None and self._check_grower_eligibility(vals, min_value):
                 change_rate = self._calculate_change_rate(vals[-1], vals[1])
-                history = {q: s.values.get(q, 0.0) for q in quarters}
-
-                item = FinancialAnalysisItem(
-                    stock_name=s.stock_name,
-                    current_value=vals[-1],
-                    prev_value=vals[1],
-                    pre_prev_value=vals[0],
-                    change_rate=change_rate,
-                    history=history,
-                )
-
-                if vals[1] <= 0 and vals[-1] > 0:
-                    turnaround_results.append(item)
-                elif vals[1] > 0:
-                    normal_results.append(item)
+                self._process_grower_statement(s, quarters, vals, change_rate, turnaround_results, normal_results)
 
         # 최신 실적 규모 순으로 정렬
         normal_results.sort(key=lambda x: x.current_value, reverse=True)
@@ -203,6 +171,56 @@ class FinancialService:
         result = {"normal": normal_results[:500], "turnaround": turnaround_results[:500]}
         self._cache[cache_key] = result
         return result
+
+    def _extract_valid_values(self, s, quarters: list[str]) -> list[float] | None:
+        """해당 분기들의 데이터가 모두 존재하는지 확인하고 float 리스트를 반환합니다."""
+        vals_with_none = [s.values.get(q) for q in quarters]
+        if any(v is None for v in vals_with_none):
+            return None
+        return [v for v in vals_with_none if v is not None]
+
+    def _check_grower_eligibility(self, vals: list[float], min_value: float) -> bool:
+        """연속 성장 및 가격 제외 조건 등 성장주로서의 적합성 여부를 판단합니다."""
+        is_consecutive = True
+        for i in range(2, len(vals)):
+            if vals[i] <= vals[i - 1]:
+                is_consecutive = False
+                break
+
+        if is_consecutive:
+            if any(v < 0 for v in vals[2:]):
+                return False
+            if abs(vals[-1]) < min_value:
+                return False
+            if vals[1] == 0.0:  # 분모가 0인 종목은 제외 (division by zero 방지)
+                return False
+            return True
+        return False
+
+    def _process_grower_statement(
+        self,
+        s: Any,
+        quarters: list[str],
+        vals: list[float],
+        change_rate: float,
+        turnaround_results: list[FinancialAnalysisItem],
+        normal_results: list[FinancialAnalysisItem]
+    ) -> None:
+        """성장 종목 데이터를 분석하여 turnaround 또는 normal 결과 목록에 저장합니다."""
+        history = {q: s.values.get(q, 0.0) for q in quarters}
+        item = FinancialAnalysisItem(
+            stock_name=s.stock_name,
+            current_value=vals[-1],
+            prev_value=vals[1],
+            pre_prev_value=vals[0],
+            change_rate=change_rate,
+            history=history,
+        )
+
+        if vals[1] <= 0 and vals[-1] > 0:
+            turnaround_results.append(item)
+        elif vals[1] > 0:
+            normal_results.append(item)
 
     def _get_prev_quarter(self, quarter_str: str) -> str:
         """'2024.1Q' 형식에서 직전 분기 문자열을 반환합니다.
