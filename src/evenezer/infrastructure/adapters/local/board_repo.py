@@ -23,6 +23,8 @@ class LocalBoardRepository(BoardRepositoryPort):
         """
         self.root_dir = root_dir
         self.root_dir.mkdir(parents=True, exist_ok=True)
+        self._boards_cache = {}  # name -> Board
+        self._last_mtimes = {}  # name -> float
 
     def _path(self, name: str) -> Path:
         """보드 명칭에 대응하는 로컬 JSON 파일 경로를 생성하고 검증합니다.
@@ -65,16 +67,22 @@ class LocalBoardRepository(BoardRepositoryPort):
         if not path.exists():
             raise FileNotFoundError(f"Board '{name}' not found: {path}")
 
+        current_mtime = path.stat().st_mtime
+        cached_mtime = self._last_mtimes.get(name, 0.0)
+
+        if name in self._boards_cache and current_mtime == cached_mtime:
+            return self._boards_cache[name]
+
         raw = json.loads(path.read_text(encoding="utf-8"))
 
+        board = None
         # 1. 정석 JSON 형식 (Board 모델 구조) 확인
         if "nodes" in raw:
             board = Board.model_validate(raw)
             board.id = name  # 파일명을 ID로 고정
-            return board
 
         # 1-2. 구형 트리 JSON 형식 (Board 내에 "root" 노드가 존재하는 경우)
-        if "root" in raw:
+        elif "root" in raw:
             board_name = raw.get("name", name)
             root_raw = raw["root"]
             nodes_dict = {}
@@ -105,35 +113,43 @@ class LocalBoardRepository(BoardRepositoryPort):
                     _migrate_node(child_raw, current_path)
 
             _migrate_node(root_raw, None)
-            return Board(id=name, name=board_name, nodes=nodes_dict)
+            board = Board(id=name, name=board_name, nodes=nodes_dict)
 
         # 2. 레거시 형식 (theme_*.json) 처리
-        b_name = raw.get("theme", name)
-        nodes_dict = {}
-        nodes_dict[b_name] = Node(name=b_name, depth=0, parent_path=None)
+        else:
+            b_name = raw.get("theme", name)
+            nodes_dict = {}
+            nodes_dict[b_name] = Node(name=b_name, depth=0, parent_path=None)
 
-        def _walk(items, parent_path: str, parent_depth: int):
-            for item in items:
-                n_name = item.get("sector_name") or item.get("sub_category_1") or item.get("name")
-                if not n_name:
-                    continue
+            def _walk(items, parent_path: str, parent_depth: int):
+                for item in items:
+                    n_name = item.get("sector_name") or item.get("sub_category_1") or item.get("name")
+                    if not n_name:
+                        continue
 
-                current_path = f"{parent_path}/{n_name}"
-                child = Node(name=n_name, depth=parent_depth + 1, parent_path=parent_path, stocks=[])
+                    current_path = f"{parent_path}/{n_name}"
+                    child = Node(name=n_name, depth=parent_depth + 1, parent_path=parent_path, stocks=[])
 
-                for co in item.get("companies", []):
-                    child.stocks.append(Stock(name=co, ticker=""))
+                    for co in item.get("companies", []):
+                        child.stocks.append(Stock(name=co, ticker=""))
 
-                nodes_dict[current_path] = child
+                    nodes_dict[current_path] = child
 
-                sub = item.get("sectors") or item.get("categories") or item.get("sub_categories_2")
-                if sub:
-                    _walk(sub, current_path, parent_depth + 1)
+                    sub = item.get("sectors") or item.get("categories") or item.get("sub_categories_2")
+                    if sub:
+                        _walk(sub, current_path, parent_depth + 1)
 
-        if "sectors" in raw:
-            _walk(raw["sectors"], b_name, 0)
+            if "sectors" in raw:
+                _walk(raw["sectors"], b_name, 0)
 
-        return Board(id=name, name=b_name, nodes=nodes_dict)
+            board = Board(id=name, name=b_name, nodes=nodes_dict)
+
+        if board:
+            self._boards_cache[name] = board
+            self._last_mtimes[name] = current_mtime
+            return board
+        else:
+            raise ValueError(f"Failed to parse board data for '{name}'")
 
     def save(self, board: Board) -> None:
         """Board 인스턴스를 지정된 JSON 파일 경로에 직렬화하여 저장합니다.
@@ -142,9 +158,14 @@ class LocalBoardRepository(BoardRepositoryPort):
             board: 저장할 Board 도메인 인스턴스.
         """
         filename = board.id or board.name
-        self._path(filename).write_text(
+        path = self._path(filename)
+        path.write_text(
             board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True), encoding="utf-8"
         )
+        
+        # 캐시 갱신 (Write-through)
+        self._boards_cache[filename] = board
+        self._last_mtimes[filename] = path.stat().st_mtime
 
     def list_boards(self) -> list[str]:
         """저장소 디렉터리 내에 저장된 theme_* 또는 virtual_* 형태의 보드 파일 이름 목록을 반환합니다.
@@ -169,6 +190,11 @@ class LocalBoardRepository(BoardRepositoryPort):
         path = self._path(name)
         if path.exists():
             path.unlink()
+            # 캐시 제거
+            if name in self._boards_cache:
+                del self._boards_cache[name]
+            if name in self._last_mtimes:
+                del self._last_mtimes[name]
         else:
             raise FileNotFoundError(f"Board '{name}' not found: {path}")
 

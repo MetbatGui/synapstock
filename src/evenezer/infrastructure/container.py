@@ -568,6 +568,18 @@ class Container:
         else:
             logger.info("[Container] 로컬 재무제표 파일이 최신 상태입니다. 동기화를 건너뜁니다.")
 
+        # 5. 재무제표 데이터를 메모리에 사전 적재 (Eager 로드 웜업)
+        if local_path.exists() and self._financial_repo:
+            try:
+                from evenezer.domain.financials.models import FinancialMetric
+                logger.info("[Container] 재무제표 데이터를 메모리에 사전 적재(Warm-up)합니다...")
+                self._financial_repo.load_all(FinancialMetric.REVENUE)
+                self._financial_repo.load_all(FinancialMetric.OPERATING_PROFIT)
+                self._financial_repo.load_all(FinancialMetric.NET_INCOME)
+                logger.info("[Container] 재무제표 데이터 사전 적재 완료!")
+            except Exception as e:
+                logger.error(f"[Container] 재무제표 데이터 사전 적재 중 오류 발생: {e}")
+
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
 
     @property

@@ -120,6 +120,9 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.manifest_path = self.root / "stock_splits_manifest.json"
+        self._cache = {}  # year -> list[StockSplit]
+        self._all_cache = None  # list[StockSplit] | None
+        self._last_mtimes = {}  # filename -> float
 
     def load_manifest(self) -> StockSplitManifest | None:
         """로컬 저장소로부터 주식 분할 데이터 연도별 매니페스트 정보를 로드합니다.
@@ -157,6 +160,11 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
         file_path = self.root / filename
         with open(file_path, "wb") as f:
             f.write(content)
+        # 엑셀 파일이 명시적으로 저장되면 해당 엑셀 캐시와 전체 캐시를 무효화
+        self._all_cache = None
+        year_part = filename.split("액면분할(")[1].split("년)")[0] if "액면분할(" in filename else None
+        if year_part and year_part in self._cache:
+            del self._cache[year_part]
 
     def save_manifest_file(self, content: bytes) -> None:
         """매니페스트 JSON 원본 바이트 데이터를 로컬에 즉시 파일로 영속화합니다.
@@ -167,6 +175,8 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
         self.root.mkdir(parents=True, exist_ok=True)
         with open(self.manifest_path, "wb") as f:
             f.write(content)
+        # 매니페스트 변경 시 전체 캐시 무효화
+        self._all_cache = None
 
     def get_file_mtime(self, filename: str) -> float | None:
         """로컬 저장소 내의 주식 분할 데이터 파일의 마지막 수정 시각(timestamp)을 조회합니다.
@@ -199,6 +209,12 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
         if not file_path.exists():
             return []
 
+        current_mtime = self.get_file_mtime(filename) or 0.0
+        cached_mtime = self._last_mtimes.get(filename, 0.0)
+
+        if year in self._cache and current_mtime == cached_mtime:
+            return self._cache[year]
+
         try:
             # 엑셀을 Pandas DataFrame으로 로드
             # 시트명은 "주식분할_YYYY년"
@@ -226,6 +242,10 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
                 except Exception:
                     # 파싱 에러 엣지 케이스는 조용히 로그만 남기거나 스킵하여 전체 데이터를 보존함
                     continue
+
+            self._cache[year] = splits
+            self._last_mtimes[filename] = current_mtime
+            self._all_cache = None
             return splits
         except Exception:
             return []
@@ -253,10 +273,23 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
                     continue
             years = sorted(list(set(years)))
 
+        any_changed = False
+        for year in years:
+            filename = f"액면분할({year}년).xlsx"
+            current_mtime = self.get_file_mtime(filename) or 0.0
+            cached_mtime = self._last_mtimes.get(filename, 0.0)
+            if current_mtime != cached_mtime:
+                any_changed = True
+                break
+
+        if self._all_cache is not None and not any_changed:
+            return self._all_cache
+
         all_splits = []
         for year in years:
             all_splits.extend(self.load_by_year(year))
 
         # 정렬: 배정기준일(base_date) 최신순으로 정렬
         all_splits.sort(key=lambda x: x.base_date or "", reverse=True)
+        self._all_cache = all_splits
         return all_splits
