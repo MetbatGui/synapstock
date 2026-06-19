@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -28,7 +29,7 @@ class StockSplitExcelDTO(BaseModel):
     @field_validator("market", "disclosure_type", mode="before")
     @classmethod
     def normalize_strings(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
+        if pd.isna(v):
             return None
         s = str(v).strip()
         if s.lower() in ("nan", ""):
@@ -38,7 +39,7 @@ class StockSplitExcelDTO(BaseModel):
     @field_validator("base_date", "board_resolution_date", "listing_date", "general_meeting_date", "first_disclosure_date", mode="before")
     @classmethod
     def normalize_date(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)): # NaN check
+        if pd.isna(v):
             return None
         s = str(v).strip()
         if s.lower() in ("nan", ""):
@@ -51,7 +52,7 @@ class StockSplitExcelDTO(BaseModel):
     @field_validator("split_ratio", mode="before")
     @classmethod
     def normalize_split_ratio(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
+        if pd.isna(v):
             return None
         s = str(v).strip().lower()
         if s in ("nan", ""):
@@ -64,7 +65,7 @@ class StockSplitExcelDTO(BaseModel):
     @field_validator("prev_shares", "post_shares", mode="before")
     @classmethod
     def normalize_shares(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
+        if pd.isna(v):
             return None
         s = str(v).strip().lower()
         if s in ("nan", ""):
@@ -77,7 +78,7 @@ class StockSplitExcelDTO(BaseModel):
     @field_validator("receipt_no", "original_receipt_no", mode="before")
     @classmethod
     def normalize_receipt_no(cls, v):
-        if not v or (isinstance(v, float) and (v != v or v is None)):
+        if pd.isna(v):
             return None
         s = str(v).strip().lower()
         if s in ("nan", ""):
@@ -162,7 +163,8 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
             f.write(content)
         # 엑셀 파일이 명시적으로 저장되면 해당 엑셀 캐시와 전체 캐시를 무효화
         self._all_cache = None
-        year_part = filename.split("액면분할(")[1].split("년)")[0] if "액면분할(" in filename else None
+        match = re.search(r"액면분할\((\d{4})년\)", filename)
+        year_part = match.group(1) if match else None
         if year_part and year_part in self._cache:
             del self._cache[year_part]
 
@@ -265,9 +267,11 @@ class LocalStockSplitRepository(StockSplitRepositoryPort):
         else:
             # 매니페스트가 없는 경우 디렉토리 내의 파일 이름 매칭 시도
             for file_path in self.root.glob("액면분할(*년).xlsx"):
-                # '액면분할(' (5자) 이후 '년' 전까지 추출
                 try:
-                    year_part = file_path.name.split("액면분할(")[1].split("년)")[0]
+                    match = re.search(r"액면분할\((\d{4})년\)", file_path.name)
+                    year_part = match.group(1) if match else None
+                    if not year_part:
+                        continue
                     years.append(year_part)
                 except Exception:
                     continue

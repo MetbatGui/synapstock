@@ -352,30 +352,32 @@ class Container:
                 report_dir=str(self.config.report_dir),
             )
 
+    def _run_in_background_thread(self, coro_func, thread_name: str):
+        """비동기 코루틴 함수를 백그라운드 데몬 스레드에서 기동하는 헬퍼"""
+        import threading
+        import asyncio
+
+        def run():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(coro_func())
+            except Exception as e:
+                logger.error(f"[Container] 백그라운드 {thread_name} 중 예외 발생: {e}")
+            finally:
+                loop.close()
+
+        t = threading.Thread(target=run, name=thread_name, daemon=True)
+        t.start()
+        logger.info(f"[Container] 백그라운드 {thread_name} 스레드를 성공적으로 시작했습니다.")
+
     def sync_financial_statements_from_drive(self):
         """Google Drive에 업로드된 최신 재무제표 엑셀 파일을 로컬에 동기화하기 위한 백그라운드 데몬 스레드를 실행합니다."""
         if not self._drive_adapter or not self.config.financial_statements_id:
             logger.info("[Container] 재무제표 구글 드라이브 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
             return
 
-        import threading
-
-        def run_sync_in_background():
-            import asyncio
-
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                new_loop.run_until_complete(self._sync_financial_statements_async())
-            except Exception as e:
-                logger.error(f"[Container] 백그라운드 재무제표 동기화 실패: {e}")
-            finally:
-                new_loop.close()
-
-        # 완전한 논블로킹(Non-blocking) 백그라운드 데몬 스레드로 실행
-        t = threading.Thread(target=run_sync_in_background, name="FinancialSyncThread", daemon=True)
-        t.start()
-        logger.info("[Container] 백그라운드 재무제표 동기화 스레드를 성공적으로 시작했습니다.")
+        self._run_in_background_thread(self._sync_financial_statements_async, "FinancialSyncThread")
 
     def sync_boards_from_drive_in_background(self):
         """로컬 가상/테마 보드 데이터와 Google Drive 내 파일을 양방향 동기화하는 백그라운드 데몬 스레드를 실행합니다."""
@@ -385,24 +387,7 @@ class Container:
             )
             return
 
-        import threading
-
-        def run_sync_in_background():
-            import asyncio
-
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                new_loop.run_until_complete(self._board_file_sync_service.sync_with_drive())
-            except Exception as e:
-                logger.error(f"[Container] 백그라운드 가상/테마 보드 동기화 실패: {e}")
-            finally:
-                new_loop.close()
-
-        # 완전한 논블로킹(Non-blocking) 백그라운드 데몬 스레드로 실행
-        t = threading.Thread(target=run_sync_in_background, name="BoardSyncThread", daemon=True)
-        t.start()
-        logger.info("[Container] 백그라운드 가상/테마 보드 동기화 스레드를 성공적으로 시작했습니다.")
+        self._run_in_background_thread(self._board_file_sync_service.sync_with_drive, "BoardSyncThread")
 
     def sync_stock_splits_from_drive_in_background(self):
         """Google Drive로부터 액면분할/합병 데이터를 주기적으로 조회해 로컬 저장소에 반영하는 백그라운드 동기화 스레드를 기동합니다."""
@@ -412,24 +397,7 @@ class Container:
             )
             return
 
-        import threading
-
-        def run_sync_in_background():
-            import asyncio
-
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                new_loop.run_until_complete(self._stock_split_sync_service.sync())
-            except Exception as e:
-                logger.error(f"[Container] 백그라운드 주식 분할 동기화 실패: {e}")
-            finally:
-                new_loop.close()
-
-        # 완전한 논블로킹(Non-blocking) 백그라운드 데몬 스레드로 실행
-        t = threading.Thread(target=run_sync_in_background, name="StockSplitSyncThread", daemon=True)
-        t.start()
-        logger.info("[Container] 백그라운드 주식 분할 동기화 스레드를 성공적으로 시작했습니다.")
+        self._run_in_background_thread(self._stock_split_sync_service.sync, "StockSplitSyncThread")
 
     def sync_heatmap_from_drive_in_background(self):
         """Google Drive에 업로드된 히트맵용 테마 JSON 파일군을 로컬 캐시 폴더와 동기화하는 백그라운드 스레드를 기동합니다."""
@@ -437,25 +405,7 @@ class Container:
             logger.info("[Container] 어댑터가 활성화되지 않아 히트맵 동기화를 건너뜁니다.")
             return
 
-        import threading
-
-        def run_sync_in_background():
-            import asyncio
-
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            try:
-                svc = self._heatmap_service
-                new_loop.run_until_complete(svc.sync_from_drive())
-            except Exception as e:
-                logger.error(f"[Container] 백그라운드 히트맵 동기화 실패: {e}")
-            finally:
-                new_loop.close()
-
-        # 완전한 논블로킹(Non-blocking) 백그라운드 데몬 스레드로 실행
-        t = threading.Thread(target=run_sync_in_background, name="HeatmapSyncThread", daemon=True)
-        t.start()
-        logger.info("[Container] 백그라운드 히트맵 동기화 스레드를 성공적으로 시작했습니다.")
+        self._run_in_background_thread(self._heatmap_service.sync_from_drive, "HeatmapSyncThread")
 
     async def _sync_financial_statements_async(self):
         """Google Drive에 있는 최신 재무제표 파일을 비동기적으로 다운로드하고 로컬 파일 변경 시점을 업데이트합니다."""
@@ -516,14 +466,10 @@ class Container:
                 return
 
             # 이름에 '재무제표'가 포함된 파일 우선 탐색
-            selected_file = None
-            for f in files:
-                if "재무제표" in f.get("name", ""):
-                    selected_file = f
-                    break
-
-            if not selected_file:
-                selected_file = files[0]  # 검색된 최신 파일 선택
+            selected_file = next(
+                (f for f in files if "재무제표" in f.get("name", "")),
+                files[0] if files else None
+            )
 
             target_file_id = selected_file["id"]
             target_modified_time_str = selected_file.get("modifiedTime")
