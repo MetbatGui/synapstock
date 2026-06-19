@@ -179,6 +179,17 @@ class TestBoard:
         assert success_remove is True
         assert report_path not in target_stock.reports
 
+    def test_node_path_parts(self):
+        """Node의 path_parts 프로퍼티가 경로를 바르게 분할하여 리스트로 반환하는지 테스트합니다."""
+        # 1. parent_path가 없는 경우
+        node_root = Node(name="IT", depth=0)
+        assert node_root.path_parts == ["IT"]
+
+        # 2. parent_path가 있는 경우
+        node_sub = Node(name="정보보안", depth=2, parent_path="IT/보안")
+        assert node_sub.path_parts == ["IT", "보안", "정보보안"]
+
+
 
 # ── IT 보드 트리 테스트 ───────────────────────────────────────────────────────
 

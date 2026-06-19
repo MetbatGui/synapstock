@@ -104,7 +104,6 @@ class BoardFileSyncService:
         import asyncio
         completed_count = 0
         success_count = 0
-        lock = asyncio.Lock()
         sem = asyncio.Semaphore(8)  # 동시 구글 API 요청을 8개로 제한하여 SSL 끊김 방지 및 최적화
 
         async def _sync_single_board(b_id: str, info: BoardManifestItem):
@@ -124,8 +123,7 @@ class BoardFileSyncService:
                             pass
                         except Exception as e:
                             logger.error(f"[BoardFileSync] 보드 삭제 중 예외 ({b_id}): {e}")
-                        async with lock:
-                            success_count += 1
+                        success_count += 1
                     else:
                         l_info = local_manifest.boards.get(b_id)
                         r_info = remote_manifest.boards.get(b_id)
@@ -141,8 +139,7 @@ class BoardFileSyncService:
                                 board = Board.model_validate(board_json)
                                 board.id = b_id
                                 self._repository.save(board)
-                                async with lock:
-                                    success_count += 1
+                                success_count += 1
                                 logger.info(f"[BoardFileSync] 신규 다운로드 성공: {board_filename}")
 
                         elif local_exists and r_modified > l_modified:
@@ -153,8 +150,7 @@ class BoardFileSyncService:
                                 board = Board.model_validate(board_json)
                                 board.id = b_id
                                 self._repository.save(board)
-                                async with lock:
-                                    success_count += 1
+                                success_count += 1
                                 logger.info(f"[BoardFileSync] 덮어쓰기 업데이트 성공: {board_filename}")
 
                         elif local_exists and (not r_info or l_modified > r_modified):
@@ -165,23 +161,20 @@ class BoardFileSyncService:
                                 board_filename, board_bytes, root_id=self._theme_folder_id
                             )
                             if up_success:
-                                async with lock:
-                                    success_count += 1
+                                success_count += 1
                                 logger.info(f"[BoardFileSync] 파일 업로드 완료: {board_filename}")
                         else:
-                            async with lock:
-                                success_count += 1
+                            success_count += 1
                 except Exception as e:
                     logger.error(f"[BoardFileSync] 보드 동기화 실패 ({b_id}): {e}", exc_info=True)
                 finally:
-                    async with lock:
-                        completed_count += 1
-                        progress_ratio = 0.1 + (float(completed_count) / total_items) * 0.8
-                        if progress_callback:
-                            progress_callback(
-                                f"동기화 진행 중: {display_name} ({completed_count}/{total_items})",
-                                progress_ratio
-                            )
+                    completed_count += 1
+                    progress_ratio = 0.1 + (float(completed_count) / total_items) * 0.8
+                    if progress_callback:
+                        progress_callback(
+                            f"동기화 진행 중: {display_name} ({completed_count}/{total_items})",
+                            progress_ratio
+                        )
 
         # asyncio.gather를 통한 병렬 동기화 집행!
         tasks = [_sync_single_board(b_id, info) for b_id, info in merged_manifest.boards.items()]

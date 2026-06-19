@@ -96,6 +96,15 @@ class Node(BaseModel):
     parent_path: str | None = None
     stocks: list[Stock] = Field(default_factory=list)
 
+    @property
+    def path_parts(self) -> list[str]:
+        """노드의 절대 경로를 구성하는 세그먼트 목록을 반환합니다.
+
+        예: parent_path='조선/재료', name='철강' -> ['조선', '재료', '철강']
+        """
+        full_path = f"{self.parent_path}/{self.name}" if self.parent_path else self.name
+        return full_path.split("/")
+
     def __repr__(self) -> str:
         return f"Node(name={self.name!r}, depth={self.depth}, stock_count={len(self.stocks)})"
 

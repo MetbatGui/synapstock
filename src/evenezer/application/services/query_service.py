@@ -78,12 +78,11 @@ class BoardQueryService:
         boards = self.list_boards()
         for b_name in boards:
             board = self.load_board(b_name)
-            for path, node in board.nodes.items():
+            for node in board.nodes.values():
                 for s in node.stocks:
                     if s.ticker == ticker:
                         # [보드이름]을 경로의 시작으로 설정하여 대략적인 위치 파악 용이하게 함
-                        path_parts = path.split("/")
-                        return s, b_name, [board.name] + path_parts
+                        return s, b_name, [board.name] + node.path_parts
         return None
 
     def get_all_stocks_flat(self) -> list[dict]:
@@ -92,7 +91,7 @@ class BoardQueryService:
         all_stocks = []
         for b_name in boards:
             board = self.load_board(b_name)
-            for path, node in board.nodes.items():
+            for node in board.nodes.values():
                 for s in node.stocks:
                     all_stocks.append(
                         {
@@ -101,28 +100,24 @@ class BoardQueryService:
                             "aliases": s.aliases,
                             "board": b_name,
                             "board_name": board.name,
-                            "path": path.split("/"),
+                            "path": node.path_parts,
                         }
                     )
         return all_stocks
 
     def find_stocks_by_name(self, query: str) -> list[dict]:
         """모든 보드에서 종목명에 query가 포함된 종목들을 검색합니다 (텔레그램용)."""
-        boards = self.list_boards()
-        results = []
-        for b_name in boards:
-            board = self.load_board(b_name)
-            for path, node in board.nodes.items():
-                for s in node.stocks:
-                    if s.matches(query):
-                        path_parts = path.split("/")
-                        results.append(
-                            {
-                                "board": b_name,
-                                "board_name": board.name,
-                                "name": s.name,
-                                "ticker": s.ticker,
-                                "path": f"[{board.name}] " + " > ".join(path_parts + [s.name]),
-                            }
-                        )
-        return results
+        query_normalized = query.strip().lower()
+        flat_stocks = self.get_all_stocks_flat()
+
+        return [
+            {
+                "board": s["board"],
+                "board_name": s["board_name"],
+                "name": s["name"],
+                "ticker": s["ticker"],
+                "path": f"[{s['board_name']}] " + " > ".join(s["path"] + [s["name"]]),
+            }
+            for s in flat_stocks
+            if query_normalized in s["name"].lower() or any(query_normalized in alias.lower() for alias in s["aliases"])
+        ]

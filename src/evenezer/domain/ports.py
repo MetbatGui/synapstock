@@ -309,35 +309,78 @@ class NewsRepositoryPort(ABC):
 
     @abstractmethod
     def save_batch(self, batch: NewsBatch) -> bool:
-        """뉴스 배치를 저장합니다."""
+        """뉴스 배치를 영속 저장소에 저장합니다.
+
+        Args:
+            batch: 저장할 뉴스 배치 객체.
+
+        Returns:
+            저장에 성공하면 True, 실패 시 False.
+        """
 
     @abstractmethod
     def load_batch(self, date_str: str) -> NewsBatch | None:
-        """특정 날짜의 뉴스 배치를 로드합니다."""
+        """특정 날짜의 뉴스 배치를 로드합니다.
+
+        Args:
+            date_str: 조회 대상 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            해당 날짜의 뉴스 배치 객체. 존재하지 않거나 로드 실패 시 None.
+        """
 
     @abstractmethod
     def list_available_dates(self) -> list[str]:
-        """데이터가 존재하는 모든 날짜 목록을 반환합니다."""
+        """데이터가 존재하는 모든 날짜 목록을 반환합니다.
+
+        Returns:
+            YYYY-MM-DD 형식의 날짜 문자열 목록.
+        """
 
     @abstractmethod
     def get_file_mtime(self, date_str: str) -> float:
-        """특정 날짜 파일의 수정 시각을 반환합니다."""
+        """특정 날짜 파일의 수정 시각을 반환합니다.
+
+        Args:
+            date_str: 대상 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            에포크 시간 단위의 파일 최종 수정 시각 (float).
+        """
 
     @abstractmethod
     def get_all_batch_files(self) -> list[Path]:
-        """모든 뉴스 배치 파일 경로 목록을 반환합니다."""
+        """모든 뉴스 배치 파일 경로 목록을 반환합니다.
+
+        Returns:
+            로컬 저장소의 뉴스 배치 파일 경로(Path) 목록.
+        """
 
     @abstractmethod
     def save_raw_file(self, filename: str, content: bytes, mtime: float | None = None) -> None:
-        """파일 내용을 저장하고 선택적으로 수정 시각을 설정합니다."""
+        """원시 파일 내용을 저장하고 선택적으로 수정 시각을 설정합니다.
+
+        Args:
+            filename: 저장할 파일 이름.
+            content: 저장할 바이너리 바이트 데이터.
+            mtime: 설정할 최종 수정 시각 (에포크 초). None인 경우 설정하지 않음.
+        """
 
     @abstractmethod
     def load_sync_metadata(self) -> dict:
-        """동기화 메타데이터를 로드합니다."""
+        """동기화 메타데이터를 로드합니다.
+
+        Returns:
+            동기화 관련 상태 정보를 담은 메타데이터 딕셔너리.
+        """
 
     @abstractmethod
     def save_sync_metadata(self, metadata: dict) -> None:
-        """동기화 메타데이터를 저장합니다."""
+        """동기화 메타데이터를 저장합니다.
+
+        Args:
+            metadata: 영속 저장소에 기록할 동기화 메타데이터 딕셔너리.
+        """
 
 
 class StockSplitRepositoryPort(ABC):
@@ -345,31 +388,66 @@ class StockSplitRepositoryPort(ABC):
 
     @abstractmethod
     def load_all(self) -> list[StockSplit]:
-        """모든 주식 분할 이력을 불러옵니다."""
+        """모든 주식 분할 이력을 불러옵니다.
+
+        Returns:
+            주식 분할(StockSplit) 객체 목록.
+        """
 
     @abstractmethod
     def load_by_year(self, year: str) -> list[StockSplit]:
-        """특정 연도의 주식 분할 이력을 불러옵니다."""
+        """특정 연도의 주식 분할 이력을 불러옵니다.
+
+        Args:
+            year: 조회할 연도 (예: '2026').
+
+        Returns:
+            해당 연도에 발생한 주식 분할 객체 목록.
+        """
 
     @abstractmethod
     def load_manifest(self) -> StockSplitManifest | None:
-        """로컬 매니페스트 정보를 불러옵니다."""
+        """로컬 매니페스트 정보를 불러옵니다.
+
+        Returns:
+            주식 분할 매니페스트 객체. 존재하지 않으면 None.
+        """
 
     @abstractmethod
     def save_manifest(self, manifest: StockSplitManifest) -> None:
-        """로컬 매니페스트 정보를 저장합니다."""
+        """로컬 매니페스트 정보를 저장합니다.
+
+        Args:
+            manifest: 저장할 주식 분할 매니페스트 객체.
+        """
 
     @abstractmethod
     def save_excel_file(self, filename: str, content: bytes) -> None:
-        """엑셀 파일 데이터를 로컬 저장소에 저장합니다."""
+        """엑셀 파일 데이터를 로컬 저장소에 저장합니다.
+
+        Args:
+            filename: 저장할 파일명.
+            content: 엑셀 파일 바이너리 데이터.
+        """
 
     @abstractmethod
     def save_manifest_file(self, content: bytes) -> None:
-        """매니페스트 JSON 데이터를 로컬 저장소에 저장합니다."""
+        """매니페스트 JSON 데이터를 로컬 저장소에 저장합니다.
+
+        Args:
+            content: JSON 파일 바이너리 데이터.
+        """
 
     @abstractmethod
     def get_file_mtime(self, filename: str) -> float | None:
-        """로컬에 다운로드된 파일의 최종 수정 시간(mtime)을 구합니다."""
+        """로컬에 다운로드된 파일의 최종 수정 시간(mtime)을 구합니다.
+
+        Args:
+            filename: 최종 수정 시간을 조회할 대상 파일명.
+
+        Returns:
+            에포크 초 단위의 수정 시간(mtime). 파일이 존재하지 않는 경우 None.
+        """
 
 
 class BoardSyncManifestRepositoryPort(ABC):
@@ -377,11 +455,19 @@ class BoardSyncManifestRepositoryPort(ABC):
 
     @abstractmethod
     def load(self) -> BoardSyncManifest:
-        """매니페스트 정보를 불러옵니다. 존재하지 않으면 기본 매니페스트 객체를 생성하여 반환합니다."""
+        """매니페스트 정보를 불러옵니다. 존재하지 않으면 기본 매니페스트 객체를 생성하여 반환합니다.
+
+        Returns:
+            로드되거나 생성된 BoardSyncManifest 객체.
+        """
 
     @abstractmethod
     def save(self, manifest: BoardSyncManifest) -> None:
-        """매니페스트 정보를 영속성 저장소에 저장합니다."""
+        """매니페스트 정보를 영속성 저장소에 저장합니다.
+
+        Args:
+            manifest: 저장할 BoardSyncManifest 객체.
+        """
 
 
 class EventBusPort(ABC):
