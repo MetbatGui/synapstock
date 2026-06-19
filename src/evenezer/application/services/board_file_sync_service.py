@@ -65,7 +65,9 @@ class BoardFileSyncService:
 
     async def sync_with_drive(self, progress_callback: Callable[[str, float], None] | None = None) -> bool:
         """구글 드라이브와 로컬 저장소 간의 모든 보드 파일에 대해 병렬 양방향 동기화를 집행합니다."""
-        if not self._drive_adapter or not self._theme_folder_id:
+        drive_adapter = self._drive_adapter
+        theme_folder_id = self._theme_folder_id
+        if not drive_adapter or not theme_folder_id:
             msg = "Google Drive 어댑터 또는 테마 폴더 ID(theme_folder_id)가 지정되지 않아 동기화를 생략합니다."
             logger.warning(msg)
             if progress_callback:
@@ -80,7 +82,7 @@ class BoardFileSyncService:
         # 1. 드라이브에서 원격 매니페스트 다운로드 시도
         remote_manifest = BoardSyncManifest()
         try:
-            remote_data = await self._drive_adapter.get_file(manifest_filename, root_id=self._theme_folder_id)
+            remote_data = await drive_adapter.get_file(manifest_filename, root_id=theme_folder_id)
             if remote_data:
                 remote_raw = json.loads(remote_data.decode("utf-8"))
                 remote_manifest = BoardSyncManifest.model_validate(remote_raw)
@@ -133,7 +135,7 @@ class BoardFileSyncService:
 
                         if not local_exists and r_info:
                             # [CASE B] 로컬에는 없는데 드라이브에 존재함 👉 다운로드 후 로컬 생성
-                            data = await self._drive_adapter.get_file(board_filename, root_id=self._theme_folder_id)
+                            data = await drive_adapter.get_file(board_filename, root_id=theme_folder_id)
                             if data:
                                 board_json = json.loads(data.decode("utf-8"))
                                 board = Board.model_validate(board_json)
@@ -144,7 +146,7 @@ class BoardFileSyncService:
 
                         elif local_exists and r_modified > l_modified:
                             # [CASE C] 원격 버전이 더 최신임 👉 다운로드 후 로컬 덮어쓰기
-                            data = await self._drive_adapter.get_file(board_filename, root_id=self._theme_folder_id)
+                            data = await drive_adapter.get_file(board_filename, root_id=theme_folder_id)
                             if data:
                                 board_json = json.loads(data.decode("utf-8"))
                                 board = Board.model_validate(board_json)
@@ -157,8 +159,8 @@ class BoardFileSyncService:
                             # [CASE D] 로컬 버전이 더 최신이거나 로컬에만 있음 👉 구글 드라이브로 업로드
                             board = self._repository.load(b_id)
                             board_bytes = board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True).encode("utf-8")
-                            up_success = await self._drive_adapter.put_file(
-                                board_filename, board_bytes, root_id=self._theme_folder_id
+                            up_success = await drive_adapter.put_file(
+                                board_filename, board_bytes, root_id=theme_folder_id
                             )
                             if up_success:
                                 success_count += 1
@@ -184,7 +186,7 @@ class BoardFileSyncService:
         self.save_local_manifest(merged_manifest)
         try:
             manifest_bytes = merged_manifest.model_dump_json(indent=2, ensure_ascii=False).encode("utf-8")
-            await self._drive_adapter.put_file(manifest_filename, manifest_bytes, root_id=self._theme_folder_id)
+            await drive_adapter.put_file(manifest_filename, manifest_bytes, root_id=theme_folder_id)
             logger.info("[BoardFileSync] 원격 상태 매니페스트 최종 갱신 업로드 완료.")
         except Exception as e:
             logger.error(f"[BoardFileSync] 원격 매니페스트 최종 업로드 실패: {e}")

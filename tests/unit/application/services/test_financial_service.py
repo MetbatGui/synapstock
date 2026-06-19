@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 from evenezer.application.services.financial_service import FinancialService
 from evenezer.domain.statistics.models import MarketType
+from evenezer.domain.financials.models import FinancialMetric
 
 
 class MockStatement:
@@ -45,7 +46,7 @@ def test_consecutive_growers_zero_division_skip():
     
     # Act
     # count=2 (2분기 연속 성장 조회)
-    result = service.get_consecutive_growers(metric="OPERATING_PROFIT", target_quarter="2026.1Q", count=2)
+    result = service.get_consecutive_growers(metric=FinancialMetric.OPERATING_PROFIT, target_quarter="2026.1Q", count=2)
     
     # Assert
     # 에러 없이 정상 실행되어야 하며, "제로나누기기업"은 스킵되고 "정상성장기업"만 통과해야 함

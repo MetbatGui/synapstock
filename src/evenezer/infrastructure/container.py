@@ -468,7 +468,7 @@ class Container:
             # 이름에 '재무제표'가 포함된 파일 우선 탐색
             selected_file = next(
                 (f for f in files if "재무제표" in f.get("name", "")),
-                files[0] if files else None
+                files[0]
             )
 
             target_file_id = selected_file["id"]

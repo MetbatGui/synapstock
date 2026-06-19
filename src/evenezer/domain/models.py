@@ -308,6 +308,7 @@ class Board(BaseModel):
             if child.parent_path == node_name:
                 child.parent_path = parent_path
             else:
+                assert child.parent_path is not None
                 child_rel_parent = child.parent_path[len(node_name):]
                 child.parent_path = parent_path + child_rel_parent
 
