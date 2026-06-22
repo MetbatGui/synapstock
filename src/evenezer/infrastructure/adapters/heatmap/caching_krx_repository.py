@@ -1,3 +1,4 @@
+import copy
 import logging
 import threading
 from datetime import datetime, timedelta
@@ -20,7 +21,8 @@ def get_shared_cache(now: datetime) -> list[dict] | None:
     global _global_cache_list, _global_cache_expired_at
     if _global_cache_list is not None and _global_cache_expired_at is not None:
         if now < _global_cache_expired_at:
-            return _global_cache_list
+            # 외부 객체 변형으로 인한 캐시 히트 데이터 오염을 예방하기 위해 deepcopy를 수행합니다.
+            return copy.deepcopy(_global_cache_list)
         else:
             # 캐시 만료 시 자원 명시 해제
             _global_cache_list = None
@@ -73,7 +75,7 @@ class CachingKrxRepository(KrxDataPort):
 
             if date is None and raw_list_not_empty:
                 global _global_cache_list, _global_cache_expired_at
-                _global_cache_list = raw_list
+                _global_cache_list = copy.deepcopy(raw_list)
                 _global_cache_expired_at = now + timedelta(minutes=10)
                 logger.info("KRX 전종목 시세 신규 수집 및 10분 캐싱 완료 (CachingKrxRepository)")
 

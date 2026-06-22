@@ -1,7 +1,8 @@
 import logging
-import pandas as pd
 from datetime import UTC, datetime
 from typing import Any, cast
+
+import pandas as pd
 
 from evenezer.application.services.ceiling_analysis_service import CeilingAnalysisService
 from evenezer.application.services.disclosure_analysis_service import DisclosureAnalysisService
