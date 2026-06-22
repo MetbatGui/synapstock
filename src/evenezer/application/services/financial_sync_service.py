@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from evenezer.domain.ports import StoragePort
+
     from evenezer.domain.financials.repository import FinancialRepository
+    from evenezer.domain.ports import StoragePort
 
 from evenezer.domain.financials.models import FinancialMetric
 

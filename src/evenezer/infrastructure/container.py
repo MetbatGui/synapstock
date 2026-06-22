@@ -296,8 +296,8 @@ class Container:
 
     def _run_in_background_thread(self, coro_func, thread_name: str):
         """비동기 코루틴 함수를 백그라운드 데몬 스레드에서 기동하는 헬퍼"""
-        import threading
         import asyncio
+        import threading
 
         def run():
             loop = asyncio.new_event_loop()

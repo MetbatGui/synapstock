@@ -158,7 +158,7 @@ def test_fetch_net_purchase_data_otp_fail():
 
     with pytest.raises(RuntimeError):
         adapter.fetch_net_purchase_data(market="STK", investor="7050", date_str="20260610")
-    assert adapter.session.post.call_count == 1  # 다운로드 요청은 보내지 않음
+    assert adapter.session.post.call_count == 3  # retry로 인해 최대 3번 시도하게 됨
 
 
 def test_fetch_net_purchase_data_exception():

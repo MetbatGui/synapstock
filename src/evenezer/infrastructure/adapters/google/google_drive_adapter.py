@@ -74,8 +74,8 @@ class GoogleDriveAdapter(StoragePort):
                     with open(self.token_file, "w") as token:
                         token.write(creds.to_json())
 
-            import httplib2
             import google_auth_httplib2
+            import httplib2
             authorized_http = google_auth_httplib2.AuthorizedHttp(creds, http=httplib2.Http())
             self._thread_local_services.service = build("drive", "v3", http=authorized_http, cache_discovery=False)
 

@@ -131,7 +131,11 @@ class LocalBoardRepository(BoardRepositoryPort):
                     child = Node(name=n_name, depth=parent_depth + 1, parent_path=parent_path, stocks=[])
 
                     for co in item.get("companies", []):
-                        child.stocks.append(Stock(name=co, ticker=""))
+                        if ":" in co:
+                            co_name, co_ticker = co.split(":", 1)
+                        else:
+                            co_name, co_ticker = co, ""
+                        child.stocks.append(Stock(name=co_name.strip(), ticker=co_ticker.strip()))
 
                     nodes_dict[current_path] = child
 
@@ -162,7 +166,7 @@ class LocalBoardRepository(BoardRepositoryPort):
         path.write_text(
             board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True), encoding="utf-8"
         )
-        
+
         # 캐시 갱신 (Write-through)
         self._boards_cache[filename] = board
         self._last_mtimes[filename] = path.stat().st_mtime
