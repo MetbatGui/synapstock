@@ -32,6 +32,18 @@ class BoardRepositoryPort(ABC):
         """
 
     @abstractmethod
+    def parse_raw_data(self, name: str, raw: dict) -> Board:
+        """원시 JSON 딕셔너리를 마이그레이션하여 Board 도메인 객체로 역직렬화합니다.
+
+        Args:
+            name: Board의 식별 명칭.
+            raw: 구형, 레거시 또는 정형 보드 데이터 딕셔너리.
+
+        Returns:
+            마이그레이션된 Board 도메인 인스턴스.
+        """
+
+    @abstractmethod
     def save(self, board: Board) -> None:
         """Board를 저장한다.
 

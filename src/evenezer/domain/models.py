@@ -28,19 +28,19 @@ class Stock(BaseModel):
 
     @model_validator(mode="after")
     def validate_ticker(self) -> Stock:
-        """티커 규격(예: 6자리 숫자/영문 구조)을 자율 검증합니다.
+        """티커 규격(예: 1~12자리 숫자/영문 구조)을 자율 검증합니다.
 
         Returns:
             검증 및 공백 제거 처리가 완료된 자기 자신(Stock) 인스턴스.
 
         Raises:
-            ValueError: 티커가 6자리 숫자가 아니거나 영문/숫자 구조가 아닐 경우.
+            ValueError: 티커가 영문/숫자 구조가 아니거나 길이가 범위를 벗어날 경우.
         """
         self.ticker = self.ticker.strip()
         if self.ticker == "":
             return self
-        if not self.ticker.isalnum() or len(self.ticker) != 6:
-            raise ValueError(f"유효하지 않은 주식 티커 심볼입니다 (6자리 숫자 혹은 영문이어야 함): {self.ticker}")
+        if not self.ticker.isalnum() or not (1 <= len(self.ticker) <= 12):
+            raise ValueError(f"유효하지 않은 주식 티커 심볼입니다 (1~12자리 알파뉴메릭 구조여야 함): {self.ticker}")
         return self
 
     def matches(self, query: str) -> bool:

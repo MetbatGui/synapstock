@@ -104,6 +104,25 @@ class BoardFileSyncService:
             local_manifest = self.load_local_manifest()
             merged_manifest = local_manifest.merge_with(remote_manifest)
 
+            # [스마트 자가 치유/부트스트랩]
+            # 원격/로컬 매니페스트가 소실되었더라도 구글 드라이브 내에 보드 파일들이 실존한다면
+            # 매니페스트에 자동으로 등록(last_modified=0.0)하여 누락 없이 로컬로 다운로드되도록 보장합니다.
+            try:
+                drive_files = await drive_adapter.list_files_in_folder("", root_id=theme_folder_id)
+                for df in drive_files:
+                    df_name = df.get("name", "")
+                    if (df_name.startswith("theme_") or df_name.startswith("virtual_")) and df_name.endswith(".json"):
+                        stem = df_name[:-5]
+                        if stem not in merged_manifest.boards or merged_manifest.boards[stem].deleted:
+                            display_name = stem.replace("theme_", "").replace("virtual_", "")
+                            merged_manifest.boards[stem] = BoardManifestItem(
+                                name=display_name,
+                                last_modified=0.0,
+                                deleted=False
+                            )
+                            logger.info(f"[BoardFileSync] 드라이브 상의 누락 보드 감지 및 자가 치유 등록: {df_name}")
+            except Exception as e:
+                logger.error(f"[BoardFileSync] 드라이브 물리 파일 자가 치유 스캔 실패: {e}")
 
             # 3. 병합된 최신 매니페스트를 기준으로 개별 보드 파일 병렬 동기화 집행
             total_items = len(merged_manifest.boards)
@@ -148,7 +167,7 @@ class BoardFileSyncService:
                                 data = await drive_adapter.get_file(board_filename, root_id=theme_folder_id)
                                 if data:
                                     board_json = json.loads(data.decode("utf-8"))
-                                    board = Board.model_validate(board_json)
+                                    board = self._repository.parse_raw_data(b_id, board_json)
                                     board.id = b_id
                                     self._repository.save(board)
                                     success_count += 1
@@ -159,7 +178,7 @@ class BoardFileSyncService:
                                 data = await drive_adapter.get_file(board_filename, root_id=theme_folder_id)
                                 if data:
                                     board_json = json.loads(data.decode("utf-8"))
-                                    board = Board.model_validate(board_json)
+                                    board = self._repository.parse_raw_data(b_id, board_json)
                                     board.id = b_id
                                     self._repository.save(board)
                                     success_count += 1

@@ -74,7 +74,14 @@ class LocalBoardRepository(BoardRepositoryPort):
             return self._boards_cache[name]
 
         raw = json.loads(path.read_text(encoding="utf-8"))
+        board = self.parse_raw_data(name, raw)
 
+        self._boards_cache[name] = board
+        self._last_mtimes[name] = current_mtime
+        return board
+
+    def parse_raw_data(self, name: str, raw: dict) -> Board:
+        """원시 JSON 딕셔너리를 마이그레이션하여 Board 도메인 객체로 역직렬화합니다."""
         board = None
         # 1. 정석 JSON 형식 (Board 모델 구조) 확인
         if "nodes" in raw:
@@ -149,8 +156,6 @@ class LocalBoardRepository(BoardRepositoryPort):
             board = Board(id=name, name=b_name, nodes=nodes_dict)
 
         if board:
-            self._boards_cache[name] = board
-            self._last_mtimes[name] = current_mtime
             return board
         else:
             raise ValueError(f"Failed to parse board data for '{name}'")
