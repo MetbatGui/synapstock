@@ -150,26 +150,26 @@ def test_fetch_net_purchase_data_not_logged_in():
 
 
 def test_fetch_net_purchase_data_otp_fail():
-    """OTP 발급 응답이 10자 미만일 때 빈 바이트(b"")를 반환하는지 검증합니다."""
+    """OTP 발급 응답이 10자 미만일 때 RuntimeError를 던지는지 검증합니다."""
     adapter = NativeKrxAdapter()
     adapter.is_logged_in = True
     
     adapter.session.post = MagicMock(return_value=MockResponse(text="FAIL"))
 
-    result = adapter.fetch_net_purchase_data(market="STK", investor="7050", date_str="20260610")
-    assert result == b""
+    with pytest.raises(RuntimeError):
+        adapter.fetch_net_purchase_data(market="STK", investor="7050", date_str="20260610")
     assert adapter.session.post.call_count == 1  # 다운로드 요청은 보내지 않음
 
 
 def test_fetch_net_purchase_data_exception():
-    """요청 중 예외 발생 시 안전하게 빈 바이트(b"")를 리턴하는지 검증합니다."""
+    """요청 중 예외 발생 시 RuntimeError를 던지는지 검증합니다."""
     adapter = NativeKrxAdapter()
     adapter.is_logged_in = True
     
     adapter.session.post = MagicMock(side_effect=Exception("Connection error"))
 
-    result = adapter.fetch_net_purchase_data(market="STK", investor="7050", date_str="20260610")
-    assert result == b""
+    with pytest.raises(RuntimeError):
+        adapter.fetch_net_purchase_data(market="STK", investor="7050", date_str="20260610")
 
 
 def test_fetch_investor_trading_data_success():
@@ -209,25 +209,25 @@ def test_fetch_investor_trading_data_not_logged_in():
 
 
 def test_fetch_investor_trading_data_otp_fail():
-    """투자자 거래실적 OTP 발급 실패 시 시나리오를 테스트합니다."""
+    """투자자 거래실적 OTP 발급 실패 시 RuntimeError를 던지는지 테스트합니다."""
     adapter = NativeKrxAdapter()
     adapter.is_logged_in = True
     
     adapter.session.post = MagicMock(return_value=MockResponse(text="ERROR"))
 
-    result = adapter.fetch_investor_trading_data(market="STK", date_str="20260610")
-    assert result == b""
+    with pytest.raises(RuntimeError):
+        adapter.fetch_investor_trading_data(market="STK", date_str="20260610")
 
 
 def test_fetch_investor_trading_data_exception():
-    """투자자 거래실적 수집 도중 예외 발생 시 시나리오를 테스트합니다."""
+    """투자자 거래실적 수집 도중 예외 발생 시 RuntimeError를 던지는지 테스트합니다."""
     adapter = NativeKrxAdapter()
     adapter.is_logged_in = True
     
     adapter.session.post = MagicMock(side_effect=Exception("Timeout"))
 
-    result = adapter.fetch_investor_trading_data(market="STK", date_str="20260610")
-    assert result == b""
+    with pytest.raises(RuntimeError):
+        adapter.fetch_investor_trading_data(market="STK", date_str="20260610")
 
 
 def test_fetch_market_prices_success_outblock():
@@ -269,14 +269,14 @@ def test_fetch_market_prices_not_logged_in():
 
 
 def test_fetch_market_prices_exception():
-    """전종목 시세 데이터 조회 중 예외 발생 시 빈 리스트를 반환하는지 테스트합니다."""
+    """전종목 시세 데이터 조회 중 예외 발생 시 RuntimeError를 던지는지 테스트합니다."""
     adapter = NativeKrxAdapter()
     adapter.is_logged_in = True
     
     adapter.session.post = MagicMock(side_effect=Exception("JSON decode error"))
 
-    result = adapter.fetch_market_prices(market="STK", date_str="20260610")
-    assert result == []
+    with pytest.raises(RuntimeError):
+        adapter.fetch_market_prices(market="STK", date_str="20260610")
 
 
 def test_native_krx_adapter_get_price_info():
@@ -380,7 +380,7 @@ def test_krx_repository_login_exception():
 
 
 def test_krx_repository_fetch_listing_success():
-    """전종목 데이터를 조회하여 Pandas DataFrame으로의 변환이 정상 수행되는지 검증합니다."""
+    """전종목 데이터를 조회하여 list[dict]로의 변환이 정상 수행되는지 검증합니다."""
     repo = KrxRepository()
     repo.is_logged_in = True
 
@@ -390,17 +390,17 @@ def test_krx_repository_fetch_listing_success():
     ]
     repo.session.post = MagicMock(return_value=MockResponse(json_data={"OutBlock_1": mock_output}))
 
-    df = repo.fetch_listing(date=datetime(2026, 6, 10))
+    result = repo.fetch_listing(date=datetime(2026, 6, 10))
     
-    assert isinstance(df, pd.DataFrame)
-    assert len(df) == 2
-    assert list(df.columns) == ["Code", "Name", "Marcap", "ChagesRatio"]
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert set(result[0].keys()).issubset({"Code", "Name", "Marcap", "ChagesRatio", "Close"})
     
     # 첫번째 행 값 검증 (콤마가 제거되어 float로 변환되었는지 체크)
-    assert df.loc[0, "Code"] == "005930"
-    assert df.loc[0, "Name"] == "삼성전자"
-    assert df.loc[0, "Marcap"] == 350000000.0
-    assert df.loc[0, "ChagesRatio"] == 1.5
+    assert result[0]["Code"] == "005930"
+    assert result[0]["Name"] == "삼성전자"
+    assert result[0]["Marcap"] == 350000000.0
+    assert result[0]["ChagesRatio"] == 1.5
 
 
 def test_krx_repository_fetch_listing_no_date():
@@ -410,9 +410,9 @@ def test_krx_repository_fetch_listing_no_date():
 
     repo.session.post = MagicMock(return_value=MockResponse(json_data={"OutBlock_1": []}))
 
-    # 10일 루프 실패하여 빈 df 반환되겠지만 호출 날짜 파라미터는 오늘 기준일 것
-    df = repo.fetch_listing(date=None)
-    assert df.empty
+    # 10일 루프 실패하여 빈 리스트 반환되겠지만 호출 날짜 파라미터는 오늘 기준일 것
+    result = repo.fetch_listing(date=None)
+    assert len(result) == 0
     
     # 최초 호출된 데이터 파라미터의 trdDd 형태 검증 (%Y%m%d)
     first_call_data = repo.session.post.call_args_list[0][1]["data"]
@@ -432,8 +432,8 @@ def test_krx_repository_fetch_listing_auto_login():
         repo.is_logged_in = True
 
     with patch.object(repo, "_login", side_effect=set_logged_in) as mock_login:
-        df = repo.fetch_listing(date=datetime(2026, 6, 10))
-        assert df.empty
+        result = repo.fetch_listing(date=datetime(2026, 6, 10))
+        assert len(result) == 0
         mock_login.assert_called_once()
 
 
@@ -451,24 +451,24 @@ def test_krx_repository_fetch_listing_retry_on_non_business_day():
         ]})
     ])
 
-    df = repo.fetch_listing(date=datetime(2026, 6, 10))
+    result = repo.fetch_listing(date=datetime(2026, 6, 10))
     
-    assert len(df) == 1
-    assert df.loc[0, "Code"] == "005930"
+    assert len(result) == 1
+    assert result[0]["Code"] == "005930"
     # 총 3번의 POST 호출이 이루어졌는지 확인
     assert repo.session.post.call_count == 3
 
 
 def test_krx_repository_fetch_listing_10days_all_failure():
-    """10일 영업일 탐색 재시도가 모두 실패할 경우 빈 DataFrame을 반환하는지 테스트합니다."""
+    """10일 영업일 탐색 재시도가 모두 실패할 경우 빈 리스트를 반환하는지 테스트합니다."""
     repo = KrxRepository()
     repo.is_logged_in = True
 
     repo.session.post = MagicMock(return_value=MockResponse(json_data={"OutBlock_1": []}))
 
-    df = repo.fetch_listing(date=datetime(2026, 6, 10))
+    result = repo.fetch_listing(date=datetime(2026, 6, 10))
     
-    assert df.empty
+    assert len(result) == 0
     # 정확히 10번 재시도 하였는지 검증
     assert repo.session.post.call_count == 10
 
@@ -489,10 +489,10 @@ def test_krx_repository_fetch_listing_session_expired_relogin():
     ])
 
     with patch.object(repo, "_login") as mock_login:
-        df = repo.fetch_listing(date=datetime(2026, 6, 10))
+        result = repo.fetch_listing(date=datetime(2026, 6, 10))
         
-        assert len(df) == 1
-        assert df.loc[0, "Code"] == "005930"
+        assert len(result) == 1
+        assert result[0]["Code"] == "005930"
         # LOGOUT 감지 후 재로그인 함수가 호출되었는지 확인
         mock_login.assert_called_once()
         # post가 총 2번 호출됨 (만료 시 1회, 재로그인 후 재전송 1회)
@@ -512,15 +512,15 @@ def test_krx_repository_fetch_listing_exception_loop():
         ]})
     ])
 
-    df = repo.fetch_listing(date=datetime(2026, 6, 10))
+    result = repo.fetch_listing(date=datetime(2026, 6, 10))
     
-    assert len(df) == 1
-    assert df.loc[0, "Code"] == "005930"
+    assert len(result) == 1
+    assert result[0]["Code"] == "005930"
     assert repo.session.post.call_count == 2
 
 
 def test_krx_repository_fetch_listing_last_attempt_exception():
-    """10번째(마지막) 루프에서 예외 발생 시 바로 빈 DataFrame을 반환하고 중지하는지 검증합니다."""
+    """10번째(마지막) 루프에서 예외 발생 시 바로 빈 리스트를 반환하고 중지하는지 검증합니다."""
     repo = KrxRepository()
     repo.is_logged_in = True
 
@@ -528,7 +528,7 @@ def test_krx_repository_fetch_listing_last_attempt_exception():
     side_effects = [MockResponse(json_data={"OutBlock_1": []})] * 9 + [Exception("Last attempt failed")]
     repo.session.post = MagicMock(side_effect=side_effects)
 
-    df = repo.fetch_listing(date=datetime(2026, 6, 10))
+    result = repo.fetch_listing(date=datetime(2026, 6, 10))
     
-    assert df.empty
+    assert len(result) == 0
     assert repo.session.post.call_count == 10

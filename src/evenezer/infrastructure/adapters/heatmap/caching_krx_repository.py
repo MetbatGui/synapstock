@@ -63,7 +63,15 @@ class CachingKrxRepository(KrxDataPort):
 
             raw_list = self._delegate.fetch_listing(date)
 
-            if date is None and raw_list:
+            # raw_list가 DataFrame 혹은 일반 list 등일 때 비어있지 않은지 안전하게 검사
+            raw_list_not_empty = False
+            if raw_list is not None:
+                if hasattr(raw_list, "empty"):
+                    raw_list_not_empty = not raw_list.empty
+                else:
+                    raw_list_not_empty = bool(raw_list)
+
+            if date is None and raw_list_not_empty:
                 global _global_cache_list, _global_cache_expired_at
                 _global_cache_list = raw_list
                 _global_cache_expired_at = now + timedelta(minutes=10)
