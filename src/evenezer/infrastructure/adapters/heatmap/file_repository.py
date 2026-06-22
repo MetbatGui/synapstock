@@ -45,13 +45,7 @@ class JsonThemeDataLoader(ThemeDataLoaderPort):
                 logger.warning("[JsonThemeDataLoader] 구글 드라이브 히트맵 폴더에 파일이 없습니다.")
                 return
 
-            import unicodedata
-            drive_files_map = {}
-            for f in files:
-                name_nfc = unicodedata.normalize("NFC", f["name"])
-                if name_nfc.startswith("theme_") and name_nfc.endswith(".json"):
-                    drive_files_map[name_nfc] = f
-
+            drive_files_map = self._build_drive_files_map(files)
             if not drive_files_map:
                 logger.info("[JsonThemeDataLoader] 동기화할 theme_*.json 파일이 드라이브에 없습니다.")
                 return
@@ -59,50 +53,70 @@ class JsonThemeDataLoader(ThemeDataLoaderPort):
             # 로컬 파일과 대조하여 최신본 동기화
             for name, drive_file in drive_files_map.items():
                 local_file_path = local_dir / name
-
-                # 드라이브 수정 시간 파싱
-                drive_mtime = 0.0
-                if "modifiedTime" in drive_file:
-                    try:
-                        from datetime import datetime
-                        drive_dt = datetime.fromisoformat(drive_file["modifiedTime"].replace("Z", "+00:00"))
-                        drive_mtime = drive_dt.timestamp()
-                    except Exception as ex:
-                        logger.warning(f"[JsonThemeDataLoader] 수정 시간 파싱 실패 ({name}): {ex}")
-
-                # 스마트 캐싱 판단
-                need_download = True
-                if local_file_path.exists() and drive_mtime > 0:
-                    local_mtime = os.path.getmtime(local_file_path)
-                    if (local_mtime - drive_mtime) >= -1.0:
-                        need_download = False
-
-                if need_download:
-                    logger.info(f"[JsonThemeDataLoader] 히트맵 파일 다운로드 시작: {name}")
-                    data = await self.drive_adapter.get_file_by_id(drive_file["id"])
-                    if data:
-                        local_file_path.write_bytes(data)
-                        if drive_mtime > 0:
-                            os.utime(local_file_path, (drive_mtime, drive_mtime))
-                        logger.info(f"[JsonThemeDataLoader] 히트맵 파일 동기화 성공: {name}")
-                    else:
-                        logger.error(f"[JsonThemeDataLoader] 히트맵 파일 다운로드 실패: {name}")
-                else:
-                    logger.debug(f"[JsonThemeDataLoader] 로컬 파일이 최신 상태입니다: {name}")
+                drive_mtime = self._parse_drive_mtime(drive_file, name)
+                await self._sync_single_file(name, drive_file, local_file_path, drive_mtime)
 
             # cleanup: 드라이브에 존재하지 않는 로컬 theme_*.json 파일 삭제
-            local_files = glob.glob(os.path.join(self.json_dir, "theme_*.json"))
-            for lf in local_files:
-                lf_name = Path(lf).name
-                if lf_name not in drive_files_map:
-                    try:
-                        os.remove(lf)
-                        logger.info(f"[JsonThemeDataLoader] 드라이브에 존재하지 않는 로컬 파일 삭제: {lf_name}")
-                    except Exception as ex:
-                        logger.warning(f"[JsonThemeDataLoader] 로컬 파일 삭제 실패 ({lf_name}): {ex}")
+            self._cleanup_local_orphans(drive_files_map)
 
         except Exception as e:
             logger.error(f"[JsonThemeDataLoader] 히트맵 구글 드라이브 동기화 실패: {e}")
+
+    def _build_drive_files_map(self, files: list[dict]) -> dict[str, dict]:
+        """드라이브 파일 목록에서 유효한 theme_*.json 파일들의 맵을 정규화된 이름으로 구축합니다."""
+        import unicodedata
+        drive_files_map = {}
+        for f in files:
+            name_nfc = unicodedata.normalize("NFC", f["name"])
+            if name_nfc.startswith("theme_") and name_nfc.endswith(".json"):
+                drive_files_map[name_nfc] = f
+        return drive_files_map
+
+    def _parse_drive_mtime(self, drive_file: dict, name: str) -> float:
+        """드라이브 파일 정보에서 수정 시각을 파싱하여 타임스탬프를 반환합니다."""
+        drive_mtime = 0.0
+        if "modifiedTime" in drive_file:
+            try:
+                from datetime import datetime
+                drive_dt = datetime.fromisoformat(drive_file["modifiedTime"].replace("Z", "+00:00"))
+                drive_mtime = drive_dt.timestamp()
+            except Exception as ex:
+                logger.warning(f"[JsonThemeDataLoader] 수정 시간 파싱 실패 ({name}): {ex}")
+        return drive_mtime
+
+    async def _sync_single_file(self, name: str, drive_file: dict, local_file_path: Any, drive_mtime: float) -> None:
+        """단일 파일에 대해 필요 시 다운로드하고 동기화를 수행합니다."""
+        need_download = True
+        if local_file_path.exists() and drive_mtime > 0:
+            local_mtime = os.path.getmtime(local_file_path)
+            if (local_mtime - drive_mtime) >= -1.0:
+                need_download = False
+
+        if need_download:
+            logger.info(f"[JsonThemeDataLoader] 히트맵 파일 다운로드 시작: {name}")
+            data = await self.drive_adapter.get_file_by_id(drive_file["id"])
+            if data:
+                local_file_path.write_bytes(data)
+                if drive_mtime > 0:
+                    os.utime(local_file_path, (drive_mtime, drive_mtime))
+                logger.info(f"[JsonThemeDataLoader] 히트맵 파일 동기화 성공: {name}")
+            else:
+                logger.error(f"[JsonThemeDataLoader] 히트맵 파일 다운로드 실패: {name}")
+        else:
+            logger.debug(f"[JsonThemeDataLoader] 로컬 파일이 최신 상태입니다: {name}")
+
+    def _cleanup_local_orphans(self, drive_files_map: dict[str, dict]) -> None:
+        """드라이브에 없는 로컬 theme_*.json 파일을 정리합니다."""
+        from pathlib import Path
+        local_files = glob.glob(os.path.join(self.json_dir, "theme_*.json"))
+        for lf in local_files:
+            lf_name = Path(lf).name
+            if lf_name not in drive_files_map:
+                try:
+                    os.remove(lf)
+                    logger.info(f"[JsonThemeDataLoader] 드라이브에 존재하지 않는 로컬 파일 삭제: {lf_name}")
+                except Exception as ex:
+                    logger.warning(f"[JsonThemeDataLoader] 로컬 파일 삭제 실패 ({lf_name}): {ex}")
 
     def load_heatmap(self) -> Heatmap:
         """지정된 로컬 디렉토리 내의 모든 theme_*.json 파일들을 파싱하여 계층형 Heatmap 도메인 모델을 반환합니다.

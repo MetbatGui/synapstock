@@ -44,7 +44,7 @@ class GoogleDriveAdapter(StoragePort):
         self.folders = folders or {}
         self.client_secret_file = client_secret_file
         import threading
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
         if not self.token_file:
             raise ValueError("token_file must be provided.")
@@ -74,7 +74,10 @@ class GoogleDriveAdapter(StoragePort):
                     with open(self.token_file, "w") as token:
                         token.write(creds.to_json())
 
-            self._thread_local_services.service = build("drive", "v3", credentials=creds, static_discovery=False)
+            import httplib2
+            import google_auth_httplib2
+            authorized_http = google_auth_httplib2.AuthorizedHttp(creds, http=httplib2.Http())
+            self._thread_local_services.service = build("drive", "v3", http=authorized_http, cache_discovery=False)
 
         return self._thread_local_services.service
 
