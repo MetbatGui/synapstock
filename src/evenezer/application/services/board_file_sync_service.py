@@ -113,7 +113,7 @@ class BoardFileSyncService:
                     df_name = df.get("name", "")
                     if (df_name.startswith("theme_") or df_name.startswith("virtual_")) and df_name.endswith(".json"):
                         stem = df_name[:-5]
-                        if stem not in merged_manifest.boards or merged_manifest.boards[stem].deleted:
+                        if stem not in merged_manifest.boards:
                             display_name = stem.replace("theme_", "").replace("virtual_", "")
                             merged_manifest.boards[stem] = BoardManifestItem(
                                 name=display_name,

@@ -67,14 +67,14 @@ class TestStock:
         assert data_with_alias["aliases"] == ["LIG넥스원"]
 
     def test_validate_ticker_fail(self):
-        """유효하지 않은 티커 형식(6자리가 아니거나 알파벳/숫자가 아닌 경우)이면 ValidationError가 발생해야 한다."""
+        """유효하지 않은 티커 형식(알파벳/숫자가 아니거나 길이가 1~12자리가 아닌 경우)이면 ValidationError가 발생해야 한다."""
         with pytest.raises(ValidationError) as exc_info:
-            Stock(name="삼성전자", ticker="00593")  # 5자리
-        assert "6자리 숫자 혹은 영문이어야 함" in str(exc_info.value)
+            Stock(name="삼성전자", ticker="A" * 13)  # 13자리
+        assert "1~12자리 알파뉴메릭 구조여야 함" in str(exc_info.value)
 
         with pytest.raises(ValidationError) as exc_info:
             Stock(name="삼성전자", ticker="00593#")  # 특수문자 포함
-        assert "6자리 숫자 혹은 영문이어야 함" in str(exc_info.value)
+        assert "1~12자리 알파뉴메릭 구조여야 함" in str(exc_info.value)
 
     def test_matches_query(self):
         """matches()가 종목명 및 별칭 매칭을 대소문자 무관하게 잘 수행하는지 확인한다."""

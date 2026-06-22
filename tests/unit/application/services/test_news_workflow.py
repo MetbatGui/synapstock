@@ -17,6 +17,9 @@ class MockBoardRepository(BoardRepositoryPort):
             raise FileNotFoundError()
         return self._store[name]
 
+    def parse_raw_data(self, name: str, raw: dict) -> Board:
+        return Board.model_validate(raw)
+
     def save(self, board: Board) -> None:
         self._store[board.name] = board
 
