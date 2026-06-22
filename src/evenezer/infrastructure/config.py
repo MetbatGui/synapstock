@@ -115,3 +115,26 @@ class AppConfig(BaseModel):
             stock_split_folder_id=os.getenv("GOOGLE_DRIVE_STOCK_SPLIT_ID"),
             heatmap_folder_id=os.getenv("GOOGLE_DRIVE_HEATMAP_FOLDER_ID"),
         )
+
+    def ensure_directories(self) -> None:
+        """설정된 모든 로컬 디렉터리가 존재하는지 확인하고, 없는 경우 생성합니다."""
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.secrets_dir.mkdir(parents=True, exist_ok=True)
+        self.board_dir.mkdir(parents=True, exist_ok=True)
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
+        self.heatmap_dir.mkdir(parents=True, exist_ok=True)
+        self.financial_dir.mkdir(parents=True, exist_ok=True)
+        self.statistics_dir.mkdir(parents=True, exist_ok=True)
+        self.netbuy_dir.mkdir(parents=True, exist_ok=True)
+        self.ceiling_dir.mkdir(parents=True, exist_ok=True)
+        self.capital_increase_dir.mkdir(parents=True, exist_ok=True)
+        self.bonus_issue_dir.mkdir(parents=True, exist_ok=True)
+        self.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
+        self.bw_dir.mkdir(parents=True, exist_ok=True)
+        self.new_listing_dir.mkdir(parents=True, exist_ok=True)
+        self.weekly_change_dir.mkdir(parents=True, exist_ok=True)
+        self.stock_split_dir.mkdir(parents=True, exist_ok=True)
+        self.news_dir.mkdir(parents=True, exist_ok=True)
+        self.outbox_dir.mkdir(parents=True, exist_ok=True)
+

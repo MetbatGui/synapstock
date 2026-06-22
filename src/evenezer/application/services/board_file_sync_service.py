@@ -3,6 +3,11 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from evenezer.domain.events import (
+    BatchStocksDeletedFromBoard,
+    StockAddedToBoard,
+    StockDeletedFromBoard,
+)
 from evenezer.domain.models import Board, BoardManifestItem, BoardSyncManifest
 from evenezer.domain.ports import BoardRepositoryPort, BoardSyncManifestRepositoryPort, StoragePort
 
@@ -266,4 +271,57 @@ class BoardFileSyncService:
         if changed:
             self.save_local_manifest(manifest)
             logger.info(f"[BoardFileSync] 가상보드 일괄 삭제 감지 (종목 {len(tickers)}개 중 대기 중인 항목 IGNORED 전환)")
+
+    async def handle_stock_added_event(self, ev: StockAddedToBoard) -> None:
+        """주식이 보드에 추가된 이벤트를 처리하고 매니페스트 및 구글 드라이브와 동기화합니다."""
+        manifest = self.load_local_manifest()
+        if manifest.is_event_processed(ev.event_id):
+            logger.info(f"[BoardFileSync] 이미 처리된 StockAddedToBoard 이벤트이므로 스킵합니다: {ev.event_id}")
+            return
+
+        self.update_local_manifest(ev.board_id, deleted=False)
+        await self.handle_stock_addition_trigger(
+            ev.ticker, ev.board_id, ev.parent_path.split("/")
+        )
+        await self.sync_with_drive()
+
+        # 처리 완료 상태 기록
+        manifest = self.load_local_manifest()
+        manifest.mark_event_processed(ev.event_id)
+        self.save_local_manifest(manifest)
+
+    async def handle_stock_deleted_event(self, ev: StockDeletedFromBoard) -> None:
+        """주식이 보드에서 제거된 이벤트를 처리하고 매니페스트 및 구글 드라이브와 동기화합니다."""
+        manifest = self.load_local_manifest()
+        if manifest.is_event_processed(ev.event_id):
+            logger.info(f"[BoardFileSync] 이미 처리된 StockDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}")
+            return
+
+        self.update_local_manifest(ev.board_id, deleted=False)
+        await self.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
+        await self.sync_with_drive()
+
+        # 처리 완료 상태 기록
+        manifest = self.load_local_manifest()
+        manifest.mark_event_processed(ev.event_id)
+        self.save_local_manifest(manifest)
+
+    async def handle_batch_stocks_deleted_event(self, ev: BatchStocksDeletedFromBoard) -> None:
+        """여러 주식이 일괄 제거된 이벤트를 처리하고 매니페스트 및 구글 드라이브와 동기화합니다."""
+        manifest = self.load_local_manifest()
+        if manifest.is_event_processed(ev.event_id):
+            logger.info(
+                f"[BoardFileSync] 이미 처리된 BatchStocksDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}"
+            )
+            return
+
+        self.update_local_manifest(ev.board_id, deleted=False)
+        await self.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
+        await self.sync_with_drive()
+
+        # 처리 완료 상태 기록
+        manifest = self.load_local_manifest()
+        manifest.mark_event_processed(ev.event_id)
+        self.save_local_manifest(manifest)
+
 

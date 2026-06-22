@@ -19,6 +19,7 @@ from evenezer.application.events.worker import OutboxWorker
 from evenezer.application.services.board_file_sync_service import BoardFileSyncService
 from evenezer.application.services.command_service import BoardCommandService
 from evenezer.application.services.financial_service import FinancialService
+from evenezer.application.services.financial_sync_service import FinancialSyncService
 from evenezer.application.services.heatmap.heatmap_service import HeatmapService
 from evenezer.application.services.media_service import StockMediaService
 from evenezer.application.services.query_service import BoardQueryService
@@ -76,25 +77,9 @@ class Container:
 
     def __init__(self):
         """Container를 초기화하고 전역 애플리케이션 의존성(어댑터, 서비스, 포트)을 조립합니다."""
-        # 1. 설정 로드 (환경 변수 및 기본 경로)
+        # 1. 설정 로드 및 필수 디렉토리 보장
         self.config = AppConfig.load()
-
-        # 2. 로컬 디렉토리 보장 (필수 경로들 자동 생성)
-        self.config.data_dir.mkdir(parents=True, exist_ok=True)
-        self.config.secrets_dir.mkdir(parents=True, exist_ok=True)
-        self.config.statistics_dir.mkdir(parents=True, exist_ok=True)
-        self.config.netbuy_dir.mkdir(parents=True, exist_ok=True)
-        self.config.ceiling_dir.mkdir(parents=True, exist_ok=True)
-        # self.config.capital_increase_dir.mkdir(parents=True, exist_ok=True)
-        self.config.bonus_issue_dir.mkdir(parents=True, exist_ok=True)
-        # self.config.convertible_bond_dir.mkdir(parents=True, exist_ok=True)
-        # self.config.bw_dir.mkdir(parents=True, exist_ok=True)
-        self.config.new_listing_dir.mkdir(parents=True, exist_ok=True)
-        self.config.weekly_change_dir.mkdir(parents=True, exist_ok=True)
-        self.config.stock_split_dir.mkdir(parents=True, exist_ok=True)
-        self.config.news_dir.mkdir(parents=True, exist_ok=True)
-        self.config.heatmap_dir.mkdir(parents=True, exist_ok=True)
-        self.config.outbox_dir.mkdir(parents=True, exist_ok=True)
+        self.config.ensure_directories()
 
         # 3. 인프라 어댑터 싱글톤
         self._event_bus = InMemoryEventBusAdapter()
@@ -169,60 +154,11 @@ class Container:
         self._event_bus.subscribe(StockDeletedFromBoard, lambda ev: self._outbox.save(ev))
         self._event_bus.subscribe(BatchStocksDeletedFromBoard, lambda ev: self._outbox.save(ev))
 
-        # OutboxWorker 전선 조립
-        async def handle_stock_added(ev: StockAddedToBoard):
-            manifest = self._board_file_sync_service.load_local_manifest()
-            if manifest.is_event_processed(ev.event_id):
-                logger.info(f"[Container] 이미 처리된 StockAddedToBoard 이벤트이므로 스킵합니다: {ev.event_id}")
-                return
-
-            self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
-            await self._board_file_sync_service.handle_stock_addition_trigger(
-                ev.ticker, ev.board_id, ev.parent_path.split("/")
-            )
-            await self._board_file_sync_service.sync_with_drive()
-
-            # 처리 완료 상태 기록
-            manifest = self._board_file_sync_service.load_local_manifest()
-            manifest.mark_event_processed(ev.event_id)
-            self._board_file_sync_service.save_local_manifest(manifest)
-
-        async def handle_stock_deleted(ev: StockDeletedFromBoard):
-            manifest = self._board_file_sync_service.load_local_manifest()
-            if manifest.is_event_processed(ev.event_id):
-                logger.info(f"[Container] 이미 처리된 StockDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}")
-                return
-
-            self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
-            await self._board_file_sync_service.handle_stock_deletion_trigger(ev.ticker, ev.board_id)
-            await self._board_file_sync_service.sync_with_drive()
-
-            # 처리 완료 상태 기록
-            manifest = self._board_file_sync_service.load_local_manifest()
-            manifest.mark_event_processed(ev.event_id)
-            self._board_file_sync_service.save_local_manifest(manifest)
-
-        async def handle_batch_stocks_deleted(ev: BatchStocksDeletedFromBoard):
-            manifest = self._board_file_sync_service.load_local_manifest()
-            if manifest.is_event_processed(ev.event_id):
-                logger.info(
-                    f"[Container] 이미 처리된 BatchStocksDeletedFromBoard 이벤트이므로 스킵합니다: {ev.event_id}"
-                )
-                return
-
-            self._board_file_sync_service.update_local_manifest(ev.board_id, deleted=False)
-            await self._board_file_sync_service.handle_batch_stock_deletion_trigger(ev.tickers, ev.board_id)
-            await self._board_file_sync_service.sync_with_drive()
-
-            # 처리 완료 상태 기록
-            manifest = self._board_file_sync_service.load_local_manifest()
-            manifest.mark_event_processed(ev.event_id)
-            self._board_file_sync_service.save_local_manifest(manifest)
-
+        # OutboxWorker 전선 조립 (BoardFileSyncService의 핸들러 메소드들을 직접 바인딩)
         board_handlers = {
-            "StockAddedToBoard": handle_stock_added,
-            "StockDeletedFromBoard": handle_stock_deleted,
-            "BatchStocksDeletedFromBoard": handle_batch_stocks_deleted,
+            "StockAddedToBoard": self._board_file_sync_service.handle_stock_added_event,
+            "StockDeletedFromBoard": self._board_file_sync_service.handle_stock_deleted_event,
+            "BatchStocksDeletedFromBoard": self._board_file_sync_service.handle_batch_stocks_deleted_event,
         }
         self._outbox_worker = OutboxWorker(outbox=self._outbox, handlers=board_handlers)
 
@@ -259,6 +195,12 @@ class Container:
         )
 
         self._financial_service = FinancialService(repository=self._financial_repo)
+        self._financial_sync_service = FinancialSyncService(
+            drive_adapter=self._drive_adapter,
+            financial_statements_id=self.config.financial_statements_id,
+            financial_dir=self.config.financial_dir,
+            financial_repo=self._financial_repo,
+        )
         self._weekly_change_service = WeeklyChangeService(
             drive_adapter=self._drive_adapter,
             folder_id=self.config.weekly_change_folder_id,
@@ -373,11 +315,7 @@ class Container:
 
     def sync_financial_statements_from_drive(self):
         """Google Drive에 업로드된 최신 재무제표 엑셀 파일을 로컬에 동기화하기 위한 백그라운드 데몬 스레드를 실행합니다."""
-        if not self._drive_adapter or not self.config.financial_statements_id:
-            logger.info("[Container] 재무제표 구글 드라이브 ID가 없거나 어댑터가 활성화되지 않아 동기화를 건너뜁니다.")
-            return
-
-        self._run_in_background_thread(self._sync_financial_statements_async, "FinancialSyncThread")
+        self._run_in_background_thread(self._financial_sync_service.sync, "FinancialSyncThread")
 
     def sync_boards_from_drive_in_background(self):
         """로컬 가상/테마 보드 데이터와 Google Drive 내 파일을 양방향 동기화하는 백그라운드 데몬 스레드를 실행합니다."""
@@ -407,124 +345,7 @@ class Container:
 
         self._run_in_background_thread(self._heatmap_service.sync_from_drive, "HeatmapSyncThread")
 
-    async def _sync_financial_statements_async(self):
-        """Google Drive에 있는 최신 재무제표 파일을 비동기적으로 다운로드하고 로컬 파일 변경 시점을 업데이트합니다."""
-        import os
-        from datetime import datetime
 
-        if not self._drive_adapter:
-            logger.warning("[Container] 구글 드라이브 어댑터가 활성화되지 않아 동기화를 중단합니다.")
-            return
-
-        adapter = self._drive_adapter
-        file_id = self.config.financial_statements_id
-        if not file_id:
-            logger.warning("[Container] 재무제표 구글 드라이브 ID가 설정되지 않아 동기화를 중단합니다.")
-            return
-
-        local_path = self.config.financial_dir / "재무제표.xlsx"
-
-        logger.info(f"[Container] 재무제표 구글 드라이브 동기화 검사 시작 (ID: {file_id})")
-
-        # 1. 구글 드라이브 ID 메타데이터 조회
-        meta = await adapter.get_file_metadata(file_id)
-        if not meta:
-            logger.error("[Container] 구글 드라이브에서 재무제표 메타데이터를 가져오지 못했습니다.")
-            return
-
-        mime_type = meta.get("mimeType", "")
-        target_file_id = file_id
-        target_modified_time_str = meta.get("modifiedTime")
-        target_mime_type = mime_type
-
-        # 2. 만약 폴더 ID인 경우, 폴더 내부에서 '재무제표' 이름을 포함한 최신 엑셀/스프레드시트 파일을 검색
-        if mime_type == "application/vnd.google-apps.folder":
-            logger.info("[Container] 제공된 ID가 폴더이므로 폴더 내부를 검색합니다.")
-
-            def _find_file_in_folder():
-                try:
-                    query = (
-                        f"'{file_id}' in parents and trashed = false and "
-                        f"(mimeType = 'application/vnd.google-apps.spreadsheet' or "
-                        f"mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')"
-                    )
-                    results = (
-                        adapter.service.files()
-                        .list(q=query, fields="files(id, name, modifiedTime, mimeType)", orderBy="modifiedTime desc")
-                        .execute()
-                    )
-                    return results.get("files", [])
-                except Exception as e:
-                    logger.error(f"[Container] 폴더 내 파일 검색 실패: {e}")
-                    return []
-
-            import asyncio
-
-            files = await asyncio.to_thread(_find_file_in_folder)
-            if not files:
-                logger.error("[Container] 폴더 내에서 재무제표 엑셀 또는 스프레드시트 파일을 찾지 못했습니다.")
-                return
-
-            # 이름에 '재무제표'가 포함된 파일 우선 탐색
-            selected_file = next(
-                (f for f in files if "재무제표" in f.get("name", "")),
-                files[0]
-            )
-
-            target_file_id = selected_file["id"]
-            target_modified_time_str = selected_file.get("modifiedTime")
-            target_mime_type = selected_file.get("mimeType")
-            logger.info(
-                f"[Container] 동기화 대상 파일 발견: {selected_file.get('name')} (ID: {target_file_id}, MimeType: {target_mime_type})"
-            )
-
-        if not target_modified_time_str:
-            logger.error("[Container] 대상 파일의 modifiedTime 정보가 없습니다.")
-            return
-
-        # Drive 시간 파싱 (UTC -> datetime -> timestamp)
-        drive_dt = datetime.fromisoformat(target_modified_time_str.replace("Z", "+00:00"))
-        drive_mtime = drive_dt.timestamp()
-
-        # 3. 로컬 파일 시간 조회
-        local_mtime = 0.0
-        if local_path.exists():
-            local_mtime = os.path.getmtime(local_path)
-
-        # 4. 변경 날짜 대조 후 가져오기
-        if not local_path.exists() or (drive_mtime - local_mtime) > 1.0:
-            logger.info(
-                f"[Container] 구글 드라이브 재무제표 파일이 더 최신입니다. 다운로드를 시작합니다. "
-                f"(Drive: {drive_dt}, Local Mtime: {datetime.fromtimestamp(local_mtime) if local_mtime else '없음'})"
-            )
-
-            # 다운로드 실행
-            data = await adapter.get_file_by_id(target_file_id)
-            if data:
-                # 폴더가 없으면 생성
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(local_path, "wb") as f:
-                    f.write(data)
-
-                # 로컬 파일 수정 시간을 드라이브와 완벽하게 일치시킴
-                os.utime(local_path, (drive_mtime, drive_mtime))
-                logger.info("[Container] 재무제표 파일 다운로드 및 시간 동기화 성공!")
-            else:
-                logger.error("[Container] 구글 드라이브에서 재무제표 파일 다운로드 실패")
-        else:
-            logger.info("[Container] 로컬 재무제표 파일이 최신 상태입니다. 동기화를 건너뜁니다.")
-
-        # 5. 재무제표 데이터를 메모리에 사전 적재 (Eager 로드 웜업)
-        if local_path.exists() and self._financial_repo:
-            try:
-                from evenezer.domain.financials.models import FinancialMetric
-                logger.info("[Container] 재무제표 데이터를 메모리에 사전 적재(Warm-up)합니다...")
-                self._financial_repo.load_all(FinancialMetric.REVENUE)
-                self._financial_repo.load_all(FinancialMetric.OPERATING_PROFIT)
-                self._financial_repo.load_all(FinancialMetric.NET_INCOME)
-                logger.info("[Container] 재무제표 데이터 사전 적재 완료!")
-            except Exception as e:
-                logger.error(f"[Container] 재무제표 데이터 사전 적재 중 오류 발생: {e}")
 
     # ── Property 접근자 (Read-only) ──────────────────────────────────────────
 
@@ -583,6 +404,10 @@ class Container:
     @property
     def financial_service(self) -> FinancialService:
         return self._financial_service
+
+    @property
+    def financial_sync_service(self) -> FinancialSyncService:
+        return self._financial_sync_service
 
     @property
     def weekly_change_service(self) -> WeeklyChangeService:
