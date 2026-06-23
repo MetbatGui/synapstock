@@ -327,20 +327,19 @@ class StatisticsService:
         manifest = self._manifest_repository.load()
 
         # 2. 가상보드 로드 (BoardRepositoryPort 사용)
-        # 로드 실패 시 새 Board 인스턴스 자동 생성
+        # 로드 실패 시 새 Board 인스턴스 자동 생성 (단, FileNotFoundError인 경우만)
         virtual_board = None
         if self._board_repository:
             try:
                 virtual_board = self._board_repository.load("virtual_신규상장주")
             except FileNotFoundError:
-                pass
+                # 파일이 아예 존재하지 않는 경우만 새 보드 생성을 허용합니다.
+                from evenezer.domain.models import Board
+
+                virtual_board = Board(id="virtual_신규상장주", name="신규상장주")
             except Exception as e:
-                logger.error(f"[StatisticsService] 가상보드 로드 실패: {e}")
-
-        if not virtual_board:
-            from evenezer.domain.models import Board
-
-            virtual_board = Board(id="virtual_신규상장주", name="신규상장주")
+                logger.error(f"[StatisticsService] 가상보드 로드 중 치명적 오류 발생 (데이터 유실 방지를 위해 처리를 중단합니다): {e}", exc_info=True)
+                return False
 
         # 3. 마인드맵의 일반 테마 보드들에 기등록된 종목 맵 캐싱
         assigned_stocks_map = {}
