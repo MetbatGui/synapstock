@@ -173,15 +173,19 @@ class BoardFileSyncService:
                                 if not local_exists:
                                     # [상황 1] 로컬에 파일이 전혀 존재하지 않는다면 무조건 다운로드
                                     is_download = True
-                                elif not l_info or not r_info:
-                                    # [상황 2] 자가치유 등으로 매니페스트 정보가 누락된 경우 원격을 기준으로 다운로드 (데이터 보존 우선)
-                                    is_download = True
-                                elif r_modified > l_modified:
-                                    # [상황 3] 원격 드라이브 파일의 수정 시각이 로컬보다 최신인 경우
-                                    is_download = True
-                                elif l_modified > r_modified:
-                                    # [상황 4] 로컬 파일의 수정 시각이 원격보다 최신인 경우
-                                    is_upload = True
+                                else:
+                                    # [상황 2] 로컬과 원격 둘 다 파일이 존재하는 경우
+                                    if l_info and l_modified > 0.0:
+                                        # 로컬에 최신 수정 기록이 명시적으로 존재하는 경우
+                                        if not r_info or l_modified > r_modified:
+                                            # 원격 정보가 없거나 로컬이 더 최신인 경우 업로드
+                                            is_upload = True
+                                        elif r_modified > l_modified:
+                                            # 원격이 더 최신인 경우 다운로드
+                                            is_download = True
+                                    else:
+                                        # 로컬에 수정 기록이 없는 상태(자가치유 등)라면 데이터 보존을 위해 다운로드
+                                        is_download = True
                             else:
                                 if local_exists:
                                     # [상황 5] 원격에는 없으나 로컬에만 존재하는 경우 드라이브로 업로드
