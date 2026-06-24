@@ -29,3 +29,14 @@ docker-logs:
 # 개발 가상환경 및 불필요한 캐시/데이터 폴더를 제외하고 클린 압축 수행
 zip:
     Get-ChildItem -Path . -Exclude ".venv", "data", "scratch", "scripts", "tests", ".coverage", ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache" | Compress-Archive -DestinationPath "..\mindmap_clean.zip" -Force
+
+setup-release:
+    git checkout master
+    git remote add employers-evenezer https://github.com/guruta71/evenezer.git
+
+# Release to employers-evenezer
+# Usage: just release
+release:
+    git checkout -B release main
+    git push -u employers-evenezer release:main
+    git checkout main
