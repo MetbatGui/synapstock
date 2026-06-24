@@ -107,12 +107,14 @@ class BoardFileSyncService:
             # [스마트 자가 치유/부트스트랩]
             # 원격/로컬 매니페스트가 소실되었더라도 구글 드라이브 내에 보드 파일들이 실존한다면
             # 매니페스트에 자동으로 등록(last_modified=0.0)하여 누락 없이 로컬로 다운로드되도록 보장합니다.
+            drive_board_names = set()
             try:
                 drive_files = await drive_adapter.list_files_in_folder("", root_id=theme_folder_id)
                 for df in drive_files:
                     df_name = df.get("name", "")
                     if (df_name.startswith("theme_") or df_name.startswith("virtual_")) and df_name.endswith(".json"):
                         stem = df_name[:-5]
+                        drive_board_names.add(stem)
                         if stem not in merged_manifest.boards:
                             display_name = stem.replace("theme_", "").replace("virtual_", "")
                             merged_manifest.boards[stem] = BoardManifestItem(
@@ -161,9 +163,36 @@ class BoardFileSyncService:
                             l_modified = l_info.last_modified if l_info else 0.0
                             r_modified = r_info.last_modified if r_info else 0.0
                             local_exists = b_id in self._repository.list_boards()
+                            remote_exists = b_id in drive_board_names
 
-                            if not local_exists and r_info:
-                                # [CASE B] 로컬에는 없는데 드라이브에 존재함 👉 다운로드 후 로컬 생성
+                            # 양방향 동기화 판단 조건식 정밀 리팩토링
+                            is_download = False
+                            is_upload = False
+
+                            if remote_exists:
+                                if not local_exists:
+                                    # [상황 1] 로컬에 파일이 전혀 존재하지 않는다면 무조건 다운로드
+                                    is_download = True
+                                else:
+                                    # [상황 2] 로컬과 원격 둘 다 파일이 존재하는 경우
+                                    if l_info and l_modified > 0.0:
+                                        # 로컬에 최신 수정 기록이 명시적으로 존재하는 경우
+                                        if not r_info or l_modified > r_modified:
+                                            # 원격 정보가 없거나 로컬이 더 최신인 경우 업로드
+                                            is_upload = True
+                                        elif r_modified > l_modified:
+                                            # 원격이 더 최신인 경우 다운로드
+                                            is_download = True
+                                    else:
+                                        # 로컬에 수정 기록이 없는 상태(자가치유 등)라면 데이터 보존을 위해 다운로드
+                                        is_download = True
+                            else:
+                                if local_exists:
+                                    # [상황 5] 원격에는 없으나 로컬에만 존재하는 경우 드라이브로 업로드
+                                    is_upload = True
+
+                            if is_download:
+                                # [다운로드 👉 로컬 생성/덮어쓰기]
                                 data = await drive_adapter.get_file(board_filename, root_id=theme_folder_id)
                                 if data:
                                     board_json = json.loads(data.decode("utf-8"))
@@ -171,21 +200,15 @@ class BoardFileSyncService:
                                     board.id = b_id
                                     self._repository.save(board)
                                     success_count += 1
-                                    logger.info(f"[BoardFileSync] 신규 다운로드 성공: {board_filename}")
-
-                            elif local_exists and r_modified > l_modified:
-                                # [CASE C] 원격 버전이 더 최신임 👉 다운로드 후 로컬 덮어쓰기
-                                data = await drive_adapter.get_file(board_filename, root_id=theme_folder_id)
-                                if data:
-                                    board_json = json.loads(data.decode("utf-8"))
-                                    board = self._repository.parse_raw_data(b_id, board_json)
-                                    board.id = b_id
-                                    self._repository.save(board)
-                                    success_count += 1
-                                    logger.info(f"[BoardFileSync] 덮어쓰기 업데이트 성공: {board_filename}")
-
-                            elif local_exists and (not r_info or l_modified > r_modified):
-                                # [CASE D] 로컬 버전이 더 최신이거나 로컬에만 있음 👉 구글 드라이브로 업로드
+                                    logger.info(f"[BoardFileSync] 보드 다운로드 및 덮어쓰기 성공: {board_filename}")
+                                    
+                                    # 다운로드 성공 시 매니페스트 수정 시각 갱신
+                                    if r_modified > 0.0:
+                                        info.last_modified = r_modified
+                                    else:
+                                        info.last_modified = datetime.now(UTC).timestamp()
+                            elif is_upload:
+                                # [로컬 👉 구글 드라이브 업로드]
                                 board = self._repository.load(b_id)
                                 board_bytes = board.model_dump_json(indent=2, exclude={"id"}, exclude_defaults=True).encode("utf-8")
                                 up_success = await drive_adapter.put_file(
@@ -194,7 +217,11 @@ class BoardFileSyncService:
                                 if up_success:
                                     success_count += 1
                                     logger.info(f"[BoardFileSync] 파일 업로드 완료: {board_filename}")
+                                    
+                                    # 업로드 성공 시 매니페스트 수정 시각 갱신
+                                    info.last_modified = datetime.now(UTC).timestamp()
                             else:
+                                # 변경 사항 없음
                                 success_count += 1
                     except Exception as e:
                         logger.error(f"[BoardFileSync] 보드 동기화 실패 ({b_id}): {e}", exc_info=True)

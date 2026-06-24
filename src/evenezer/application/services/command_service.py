@@ -141,8 +141,13 @@ class BoardCommandService:
         return success
 
     def create_board(self, name: str) -> bool:
-        """새로운 빈 보드를 생성합니다."""
+        """새로운 빈 보드를 생성합니다. 이미 존재하는 경우 생성을 거부합니다."""
         try:
+            if name in self._repository.list_boards():
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"[BoardCommandService] 보드 생성 거부: '{name}' 보드가 이미 존재합니다.")
+                return False
             board = Board(id=name, name=name)
             self._repository.save(board)
             self._event_bus.publish(BoardCreated(board_id=name, name=name))
