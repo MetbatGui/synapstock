@@ -95,10 +95,17 @@ class StatisticsService:
 
             prices_map = {}
             for _, row in df_krx.iterrows():
-                ticker = str(row.get("Code", ""))
+                ticker = str(row.get("Code", row.get("ISU_SRT_CD", "")))
                 if ticker.startswith("A"):
                     ticker = ticker[1:]
-                prices_map[ticker] = int(row.get("Close", 0))
+                
+                close_val = row.get("Close", row.get("TDD_CLSPRC", 0))
+                if isinstance(close_val, str):
+                    close_val = close_val.replace(",", "")
+                try:
+                    prices_map[ticker] = int(float(close_val))
+                except (ValueError, TypeError):
+                    prices_map[ticker] = 0
 
             for item in items:
                 if not item.ticker or item.ticker == "none":
