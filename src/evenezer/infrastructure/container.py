@@ -179,6 +179,11 @@ class Container:
         )
         self._sync_service = BoardSyncService(mindmap=self._miro_adapter, ticker_search=self._ticker_search_adapter)
 
+        # 히트맵 및 신규상장주 시세 수집용 KRX 어댑터 (로그인 불필요한 공개 API 기반)
+        # StatisticsService보다 먼저 생성하여 공유 캐시 인스턴스를 주입합니다.
+        from evenezer.infrastructure.adapters.heatmap.krx_repository import KrxRepository as _KrxRepository
+        self._heatmap_krx_repository = CachingKrxRepository(_KrxRepository())
+
         self._statistics_service = StatisticsService(
             storage=self._drive_adapter,
             repository=self._statistics_repo,
@@ -191,7 +196,10 @@ class Container:
             manifest_repository=self._board_sync_manifest_repo,
             board_file_sync_service=self._board_file_sync_service,
             board_repository=self._repo,
-            krx_repo=self._krx_adapter,
+            # NativeKrxAdapter는 KRX 로그인 정보가 없으면 빈 리스트를 반환하므로,
+            # 로그인 없이도 공개 API로 전종목 시세를 수집할 수 있는 KrxRepository 기반 어댑터를 사용합니다.
+            # 히트맵과 동일한 인스턴스(_heatmap_krx_repository)를 공유하여 10분 캐시도 재활용합니다.
+            krx_repo=self._heatmap_krx_repository,
         )
 
         self._financial_service = FinancialService(repository=self._financial_repo)
@@ -219,7 +227,6 @@ class Container:
             drive_adapter=self._drive_adapter,
             folder_id=self.config.heatmap_folder_id,
         )
-        self._heatmap_krx_repository = CachingKrxRepository(KrxRepository())
         self._heatmap_service = HeatmapService(
             loader=self._heatmap_loader,
             krx_repo=self._heatmap_krx_repository,
