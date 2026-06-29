@@ -142,8 +142,16 @@ class StatisticsService:
             logger.error(f"[StatisticsService] 티커 맵 생성 실패: {e}")
             return ticker_map
 
-    def _enrich_tickers(self, items: list, skip_search: bool = False) -> list:
-        """아이템 리스트의 티커 정보를 보강하고, 매니페스트 상의 실제 할당 상태를 매핑합니다."""
+    async def _enrich_tickers(self, items: list, skip_search: bool = False) -> list:
+        """아이템 리스트의 티커 정보를 보강하고, 매니페스트 상의 실제 할당 상태를 매핑합니다.
+
+        티커 탐색 우선순위:
+        1. 마인드맵 보드의 종목명/별칭 → 티커 맵
+        2. 매니페스트 캐시(new_listings)에서 이름 대조
+        3. KRX 전종목 시세에서 종목명으로 탐색 (이름이 변경된 경우 자동 보완)
+        """
+        import asyncio
+
         ticker_map = self._build_local_ticker_map()
 
         # 로컬 매니페스트 로드
@@ -152,12 +160,16 @@ class StatisticsService:
             manifest = self._manifest_repository.load()
         new_listings_meta = manifest.new_listings if manifest else {}
 
+        # 3단계 폴백용 KRX 이름→티커 맵 (티커 없는 항목이 있을 때만 1회 fetch)
+        krx_name_to_ticker: dict[str, str] | None = None
+
         for item in items:
             if hasattr(item, "ticker") and not item.ticker:
                 if item.name in ticker_map:
+                    # 1단계: 마인드맵 보드에서 탐색
                     item.ticker = ticker_map[item.name]
                 else:
-                    # 매니페스트의 new_listings 캐시에서 이름 대조하여 티커 매핑 시도
+                    # 2단계: 매니페스트 캐시에서 이름 대조하여 티커 매핑 시도
                     found_in_manifest = False
                     for ticker, meta in new_listings_meta.items():
                         meta_name = getattr(meta, "name", "") or (
@@ -169,8 +181,19 @@ class StatisticsService:
                             break
 
                     if not found_in_manifest:
-                        # 실시간 외부 API 티커 검색은 네트워크 병목을 유발하므로 수행하지 않고 none으로 설정합니다.
-                        item.ticker = "none"
+                        # 3단계: KRX 전종목 시세에서 종목명으로 티커 탐색
+                        # (이름이 IPO명에서 실제 상장명으로 변경된 경우 자동 보완)
+                        if krx_name_to_ticker is None:
+                            krx_name_to_ticker = await self._build_krx_name_to_ticker_map()
+
+                        if item.name in krx_name_to_ticker:
+                            item.ticker = krx_name_to_ticker[item.name]
+                            logger.info(
+                                f"[StatisticsService] KRX 이름 매핑으로 티커 자동 보완: "
+                                f"{item.name!r} → {item.ticker}"
+                            )
+                        else:
+                            item.ticker = "none"
 
             # 매니페스트 내 상태 데이터 맵핑
             # Pydantic 모델의 경우 status 필드가 있는 경우에만 상태 정보를 바인딩합니다.
@@ -192,6 +215,33 @@ class StatisticsService:
 
         return items
 
+    async def _build_krx_name_to_ticker_map(self) -> dict[str, str]:
+        """KRX 전종목 시세 데이터를 기반으로 종목명 → 티커 역방향 맵을 생성합니다."""
+        import asyncio
+
+        name_to_ticker: dict[str, str] = {}
+        try:
+            raw_krx = await asyncio.to_thread(self.krx_repo.fetch_listing, None)
+            if not raw_krx:
+                return name_to_ticker
+
+            import pandas as pd
+            if isinstance(raw_krx, pd.DataFrame):
+                df_krx = raw_krx
+            else:
+                df_krx = pd.DataFrame(raw_krx)
+
+            for _, row in df_krx.iterrows():
+                name = str(row.get("Name", row.get("ISU_ABBRV", ""))).strip()
+                ticker = str(row.get("Code", row.get("ISU_SRT_CD", ""))).strip()
+                if ticker.startswith("A"):
+                    ticker = ticker[1:]
+                if name and ticker:
+                    name_to_ticker[name] = ticker
+        except Exception as e:
+            logger.warning(f"[StatisticsService] KRX 이름→티커 맵 생성 실패: {e}")
+        return name_to_ticker
+
     async def get_daily_ranking(
         self, date_str: str, market: Any = None, subject: Any = None
     ) -> list[DailyMarketRanking] | DailyMarketRanking | None:
@@ -211,7 +261,7 @@ class StatisticsService:
     async def get_monthly_ranking(self, month: str, market: Any, subject: Any) -> Any:
         result = await self.ranking_svc.get_monthly_ranking(month, market, subject)
         if result and result.items:
-            self._enrich_tickers(result.items, skip_search=True)
+            await self._enrich_tickers(result.items, skip_search=True)
             for item in result.items:
                 if item.ticker == "none":
                     item.ticker = None
@@ -255,7 +305,7 @@ class StatisticsService:
             for y in years:
                 try:
                     items = await self.ipo_svc.get_data(y, force_sync=force_sync)
-                    enriched = self._enrich_tickers(items)
+                    enriched = await self._enrich_tickers(items)
                     await self._enrich_current_prices(enriched)
                     try:
                         self.ipo_svc.repository.save_new_listings(enriched, year=y)
@@ -270,7 +320,7 @@ class StatisticsService:
             return all_items
         else:
             items = await self.ipo_svc.get_data(year, force_sync=force_sync)
-            enriched_items = self._enrich_tickers(items)
+            enriched_items = await self._enrich_tickers(items)
             await self._enrich_current_prices(enriched_items)
             try:
                 self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
@@ -284,7 +334,7 @@ class StatisticsService:
     # --- 동기화 명령 (Sync) ---
     async def sync_new_listing_data(self, year: str = "2026") -> list[NewListing]:
         items = await self.ipo_svc.sync_data(year)
-        enriched_items = self._enrich_tickers(items)
+        enriched_items = await self._enrich_tickers(items)
         await self._enrich_current_prices(enriched_items)
         try:
             self.ipo_svc.repository.save_new_listings(enriched_items, year=year)
@@ -305,7 +355,7 @@ class StatisticsService:
                 # get_data 내부적으로 force_sync=True 이면 sync_data를 호출하고,
                 # sync_data 내부에 추가된 스마트 캐싱 조건에 따라 구글 드라이브 파일과 조건부 다운로드 수행함
                 items = await self.ipo_svc.get_data(year, force_sync=force_sync)
-                enriched = self._enrich_tickers(items)
+                enriched = await self._enrich_tickers(items)
                 await self._enrich_current_prices(enriched)
                 try:
                     self.ipo_svc.repository.save_new_listings(enriched, year=year)
