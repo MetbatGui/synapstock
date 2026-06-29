@@ -37,6 +37,6 @@ setup-release:
 # Release to employers-evenezer
 # Usage: just release
 release:
-    git checkout -B release main
-    git push -u employers-evenezer release:main
-    git checkout main
+    git checkout -B release master
+    git push -u employers-evenezer release:master
+    git checkout master
