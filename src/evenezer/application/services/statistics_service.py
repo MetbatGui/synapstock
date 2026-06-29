@@ -164,7 +164,8 @@ class StatisticsService:
         krx_name_to_ticker: dict[str, str] | None = None
 
         for item in items:
-            if hasattr(item, "ticker") and not item.ticker:
+            needs_ticker = hasattr(item, "ticker") and (not item.ticker or item.ticker == "none")
+            if needs_ticker:
                 if item.name in ticker_map:
                     # 1단계: 마인드맵 보드에서 탐색
                     item.ticker = ticker_map[item.name]
