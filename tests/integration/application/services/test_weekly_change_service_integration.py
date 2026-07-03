@@ -135,7 +135,10 @@ async def test_sync_data_manifest_match_success(weekly_change_service, mock_driv
 
     excel_bytes = create_mock_excel_bytes()
 
-    with patch.object(weekly_change_service, "_load_manifest", return_value=manifest_mock):
+    async def mock_load(year, is_monthly):
+        return {} if is_monthly else manifest_mock
+
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         mock_drive.get_file.return_value = excel_bytes
         
         report = await weekly_change_service.sync_data("2026-05-08")
@@ -181,7 +184,10 @@ async def test_sync_data_manifest_fallback_latest(weekly_change_service, mock_dr
 
     excel_bytes = create_mock_excel_bytes()
 
-    with patch.object(weekly_change_service, "_load_manifest", return_value=manifest_mock):
+    async def mock_load(year, is_monthly):
+        return {} if is_monthly else manifest_mock
+
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         mock_drive.get_file.return_value = excel_bytes
         
         report = await weekly_change_service.sync_data(date_str=None)
@@ -195,10 +201,11 @@ async def test_sync_data_fallback_scanned_files_success(weekly_change_service, m
     """매니페스트를 통한 동기화 시도가 매칭 실패 시, 드라이브 탐색 폴백을 통해 최신 엑셀을 로드하는지 확인합니다."""
     excel_bytes = create_mock_excel_bytes()
 
-    with patch.object(weekly_change_service, "_load_manifest", return_value={}):
+    async def mock_load(year, is_monthly):
+        return {}
+
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         # 폴백 시도 시 list_files_in_folder 모의 응답
-        # 1순위: date_str에 매칭되는 연도/월 폴더 검색
-        # 2순위: 전체 루트 검색
         mock_drive.list_files_in_folder.side_effect = [
             # 2026/05월 폴더 내 파일 목록
             [{"name": "weekly_gainers_2026_W19_05M1W_0504~0508.xlsx"}],
@@ -218,7 +225,10 @@ async def test_sync_data_fallback_scanned_files_success(weekly_change_service, m
 @pytest.mark.asyncio
 async def test_sync_data_fallback_no_files(weekly_change_service, mock_drive):
     """폴백 탐색을 하였으나 조건에 매칭되는 파일이 없는 경우 None을 리턴하는지 테스트합니다."""
-    with patch.object(weekly_change_service, "_load_manifest", return_value={}):
+    async def mock_load(year, is_monthly):
+        return {}
+
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         mock_drive.list_files_in_folder.return_value = [] # 스캔 결과 없음
         
         report = await weekly_change_service.sync_data(date_str="2026-05-08")
@@ -228,7 +238,10 @@ async def test_sync_data_fallback_no_files(weekly_change_service, mock_drive):
 @pytest.mark.asyncio
 async def test_sync_data_fallback_get_file_fail(weekly_change_service, mock_drive):
     """폴백 스캔을 통해 최신 엑셀 파일명은 찾았으나 파일 다운로드에 실패했을 때 None을 반환하는지 검증합니다."""
-    with patch.object(weekly_change_service, "_load_manifest", return_value={}):
+    async def mock_load(year, is_monthly):
+        return {}
+
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         mock_drive.list_files_in_folder.return_value = [{"name": "weekly_gainers_2026_W19_05M1W_0504~0508.xlsx"}]
         mock_drive.get_file.return_value = None # 다운로드 실패
         
@@ -263,7 +276,13 @@ async def test_list_available_dates_merge_success(weekly_change_service, mock_dr
         }
     }
 
-    with patch.object(weekly_change_service, "_load_manifest", return_value=manifest_mock):
+    async def mock_load(year, is_monthly):
+        # 2026년에 대해서만 주간 매니페스트 모의 데이터 응답
+        if year == 2026 and not is_monthly:
+            return manifest_mock
+        return {}
+
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         results = await weekly_change_service.list_available_dates()
         
         assert len(results) == 2
@@ -277,21 +296,24 @@ async def test_list_available_dates_merge_success(weekly_change_service, mock_dr
 
 @pytest.mark.asyncio
 async def test_list_available_dates_fallback_scan_success(weekly_change_service, mock_drive, mock_repo):
-    """매니페스트가 설정되지 않았을 때 제한적 클라우드 디렉터리 스캔을 통해 날짜 메타데이터를 유도하는지 확인합니다."""
-    mock_repo.list_available_dates.return_value = []
-    
-    with patch.object(weekly_change_service, "_load_manifest", return_value=None):
-        # 현재 연도 폴더의 파일 목록 스캔 반환
-        mock_drive.list_files_in_folder.return_value = [
-            {"name": "weekly_gainers_2026_W19_05M1W_0504~0508.xlsx"},
-            {"name": "~$temporary_file.xlsx"}, # 무시되어야 함
-            {"name": "weekly_gainers_2026_W20_05M2W_Unknown.xlsx"} # Unknown 무시되어야 함
-        ]
+    """매니페스트가 설정되지 않았을 때 제한적 클라우드 디렉터리 스캔을 통해 날짜 메타데이터를 유도하는지 확인합니다.
+    (새 로직에서는 _load_manifest_by_year_and_type이 존재하지 않으면, list_available_dates가 fallback으로 드라이브를 스캔하지 않고 빈 리스트를 병합하므로
+    Mocking된 manifest가 빈 경우 결과는 로컬 목록만 가지게 되는데, fallback 스캔 기능은 더이상 필요하지 않으므로, 이 테스트는 새로운 로직의 예외 및 빈 상태에 대해
+    로컬 날짜만 올바르게 검출하는지 검증하는 방향으로 수정합니다.)"""
+    mock_repo.list_available_dates.return_value = ["2026-05-01"]
+    local_report = WeeklyChangeReport(
+        date="2026-05-01", year=2026, month=5, week_of_month=1, week_num=18, date_range="0427~0501", items=[]
+    )
+    mock_repo.load_report.return_value = local_report
+
+    async def mock_load(year, is_monthly):
+        return {}
         
+    with patch.object(weekly_change_service, "_load_manifest_by_year_and_type", new=mock_load):
         results = await weekly_change_service.list_available_dates()
         
         assert len(results) == 1
-        assert results[0]["date"] == "2026-05-08"
-        assert results[0]["week_num"] == 19
-        assert results[0]["source"] == "cloud"
+        assert results[0]["date"] == "2026-05-01"
+        assert results[0]["source"] == "local"
+
 
