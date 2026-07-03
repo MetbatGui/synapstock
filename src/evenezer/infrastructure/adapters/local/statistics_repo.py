@@ -423,13 +423,13 @@ class LocalBondWithWarrantsRepository:
 
 
 class LocalWeeklyChangeRepository:
-    """주간 등락률 리포트 데이터를 로컬 계층형 폴더 구조의 JSON 파일로 관리하는 저장소입니다."""
+    """주간 및 월간 등락률 리포트 데이터를 로컬 계층형 폴더 구조의 JSON 파일로 관리하는 저장소입니다."""
 
     def __init__(self, data_root: str = "data/statistics/weekly_change"):
         """LocalWeeklyChangeRepository를 초기화합니다.
 
         Args:
-            data_root: 주간 등락률 리포트 파일들이 저장되는 루트 디렉터리.
+            data_root: 등락률 리포트 파일들이 저장되는 루트 디렉터리.
         """
         self.root = Path(data_root)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -440,6 +440,7 @@ class LocalWeeklyChangeRepository:
         year: int | None = None,
         month: int | None = None,
         date_range: str | None = None,
+        is_monthly: bool = False,
     ) -> Path:
         """지정된 날짜 및 기간 특성에 대응하는 물리적 리포트 파일 저장 경로를 연월 기반 디렉토리 구조로 보정하여 반환합니다.
 
@@ -447,7 +448,8 @@ class LocalWeeklyChangeRepository:
             date_str: 조회 기준 일자.
             year: 연도 정보.
             month: 월 정보.
-            date_range: 주간 거래 기간 범위 문자열 (예: '0511~0515').
+            date_range: 거래 기간 범위 문자열 (예: '0511~0515' 또는 '0501~0531').
+            is_monthly: 월간 등락률 여부.
 
         Returns:
             연월 구조가 고려된 최종 리포트 Path 객체.
@@ -459,27 +461,30 @@ class LocalWeeklyChangeRepository:
 
         # 파일명 결정: date_range가 있으면 사용, 없으면 date_str 사용
         filename_part = date_range if date_range else date_str
+        prefix = "monthly_change" if is_monthly else "weekly_change"
 
         if year and month:
             folder = self.root / f"{year}년" / f"{month:02d}월"
             folder.mkdir(parents=True, exist_ok=True)
-            return folder / f"weekly_change_{filename_part}.json"
+            return folder / f"{prefix}_{filename_part}.json"
 
-        return self.root / f"weekly_change_{filename_part}.json"
+        return self.root / f"{prefix}_{filename_part}.json"
 
     def save_report(self, report: WeeklyChangeReport):
-        """주간 등락률 리포트를 기간 속성을 고려한 경로에 파일로 저장합니다.
+        """등락률 리포트를 기간 속성을 고려한 경로에 파일로 저장합니다.
 
         Args:
             report: 저장할 WeeklyChangeReport 도메인 인스턴스.
         """
-        path = self._get_report_path(report.date, report.year, report.month, report.date_range)
+        path = self._get_report_path(
+            report.date, report.year, report.month, report.date_range, report.is_monthly
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(report.model_dump_json(indent=2))
 
     def load_report(self, date: str) -> WeeklyChangeReport | None:
-        """지정된 일자가 포함되어 있거나 매칭되는 주간 등락률 리포트를 로드하여 복원합니다.
+        """지정된 일자가 포함되어 있거나 매칭되는 등락률 리포트를 로드하여 복원합니다.
 
         Args:
             date: 조회할 날짜 문자열 ('YYYY-MM-DD').
@@ -487,8 +492,8 @@ class LocalWeeklyChangeRepository:
         Returns:
             복원 완료된 WeeklyChangeReport 인스턴스. 해당 파일이 없거나 불일치 시 None.
         """
-        # 1. 모든 하위 폴더에서 weekly_change_*.json 파일을 찾음
-        files = list(self.root.rglob("weekly_change_*.json"))
+        # 1. 모든 하위 폴더에서 주간/월간 json 파일을 찾음
+        files = list(self.root.rglob("weekly_change_*.json")) + list(self.root.rglob("monthly_change_*.json"))
 
         # 2. 날짜(예: 0515)가 파일명에 포함되어 있거나, 내부 데이터를 로드해서 확인
         target_date_short = date.replace("-", "")[4:] # '2026-05-15' -> '0515'
@@ -504,12 +509,12 @@ class LocalWeeklyChangeRepository:
         return None
 
     def list_available_dates(self) -> list[str]:
-        """로컬 저장소에 저장된 모든 주간 리포트들의 유효 기준일 목록을 중복 제거 및 정렬하여 반환합니다.
+        """로컬 저장소에 저장된 모든 주간/월간 리포트들의 유효 기준일 목록을 중복 제거 및 정렬하여 반환합니다.
 
         Returns:
             정렬된 기준 날짜 목록.
         """
-        files = self.root.rglob("weekly_change_*.json")
+        files = list(self.root.rglob("weekly_change_*.json")) + list(self.root.rglob("monthly_change_*.json"))
         dates = []
         from evenezer.domain.statistics.models import WeeklyChangeReport
         for f in files:
