@@ -16,7 +16,9 @@ class WeeklyChangeParser(BaseExcelParser):
     def extract_metadata_from_filename(self, filename: str) -> dict:
         """파일명에서 메타데이터를 추출합니다.
 
-        예: 'weekly_gainers_2026_W19_05M1W_0504~0508.xlsx'
+        예:
+        - 주간: 'weekly_gainers_2026_W19_05M1W_0504~0508.xlsx'
+        - 월간: 'monthly_gainers_2026_M05_0501~0531.xlsx'
         """
         import re
 
@@ -35,25 +37,35 @@ class WeeklyChangeParser(BaseExcelParser):
             if year_match:
                 metadata["year"] = int(year_match.group(1))
 
-            # 2. 주차 추출 (W + 숫자)
-            week_match = re.search(r"W(\d+)", filename)
-            if week_match:
-                metadata["week_num"] = int(week_match.group(1))
+            is_monthly = "monthly_gainers" in filename.lower()
 
-            # 3. 월 및 월간 주차 (MM + M + 숫자 + W) - 예: 05M1W
-            mw_match = re.search(r"(\d{2})M(\d+)W", filename)
-            if mw_match:
-                metadata["month"] = int(mw_match.group(1))
-                metadata["week_of_month"] = int(mw_match.group(2))
+            if is_monthly:
+                # 2. 월 추출 (M + 숫자2자리) - 예: M05
+                m_match = re.search(r"M(\d{2})", filename)
+                if m_match:
+                    metadata["month"] = int(m_match.group(1))
+                metadata["week_num"] = 0
+                metadata["week_of_month"] = 0
+            else:
+                # 3. 주차 추출 (W + 숫자)
+                week_match = re.search(r"W(\d+)", filename)
+                if week_match:
+                    metadata["week_num"] = int(week_match.group(1))
 
-            # 4. 기간 추출 (0504~0508)
+                # 4. 월 및 월간 주차 (MM + M + 숫자 + W) - 예: 05M1W
+                mw_match = re.search(r"(\d{2})M(\d+)W", filename)
+                if mw_match:
+                    metadata["month"] = int(mw_match.group(1))
+                    metadata["week_of_month"] = int(mw_match.group(2))
+
+            # 5. 기간 추출 (0504~0508 또는 0501~0531)
             range_match = re.search(r"(\d{4}~\d{4})", filename)
             if range_match:
                 metadata["date_range"] = range_match.group(1)
 
-                # 5. 기준일 설정 (종료일 기준, 예: 2026-05-08)
+                # 6. 기준일 설정 (종료일 기준, 예: 2026-05-08 또는 2026-05-31)
                 if metadata["year"]:
-                    end_date_str = range_match.group(1).split("~")[1] # 0508
+                    end_date_str = range_match.group(1).split("~")[1] # 0508 or 0531
                     metadata["date"] = f"{metadata['year']}-{end_date_str[:2]}-{end_date_str[2:]}"
 
         except Exception as e:
@@ -82,21 +94,12 @@ class WeeklyChangeParser(BaseExcelParser):
                     return row[col]
         return default
 
-    def parse(self, content: bytes, **kwargs) -> WeeklyChangeReport:
-        """엑셀 내용을 파싱하여 WeeklyChangeReport를 반환합니다."""
-        filename = kwargs.get("filename", "")
-        metadata = self.extract_metadata_from_filename(filename)
-
-        explicit_date = kwargs.get("date")
-        date = explicit_date if explicit_date and explicit_date != "Unknown" else metadata["date"]
-
-        df = pd.read_excel(io.BytesIO(content))
-
-        # 컬럼 키워드 (사용자 제공 형식 반영)
+    def _parse_df_to_items(self, df: pd.DataFrame) -> list[WeeklyChangeItem]:
+        """주어진 DataFrame을 파싱하여 WeeklyChangeItem 리스트로 변환합니다."""
         name_kws = ["종목명", "Name"]
         curr_kws = ["종가", "현재가"]
-        base_kws = ["기준가", "시가", "전주종가"]
-        rate_kws = ["등락률", "주간등락률"]
+        base_kws = ["기준가", "시가", "전주종가", "시작가"]
+        rate_kws = ["등락률", "주간등락률", "등락율", "주간등락율"]
         ticker_kws = ["종목코드", "코드", "Ticker"]
 
         items = []
@@ -141,6 +144,47 @@ class WeeklyChangeParser(BaseExcelParser):
             except Exception as e:
                 logger.warning(f"[WeeklyChangeParser] 행 파싱 실패: {e}")
                 continue
+        return items
+
+    def parse(self, content: bytes, **kwargs) -> WeeklyChangeReport:
+        """엑셀 내용을 파싱하여 WeeklyChangeReport를 반환합니다."""
+        filename = kwargs.get("filename", "")
+        metadata = self.extract_metadata_from_filename(filename)
+
+        explicit_date = kwargs.get("date")
+        date = explicit_date if explicit_date and explicit_date != "Unknown" else metadata["date"]
+
+        xl = pd.ExcelFile(io.BytesIO(content))
+        sheets = xl.sheet_names
+
+        all_items = []
+        kospi_items = []
+        kosdaq_items = []
+
+        all_sheet = None
+        kospi_sheet = None
+        kosdaq_sheet = None
+
+        for sheet in sheets:
+            sheet_norm = sheet.strip().replace(" ", "").replace("_", "")
+            if "전체" in sheet_norm or sheet_norm == sheets[0].strip().replace(" ", "").replace("_", ""):
+                all_sheet = sheet
+            elif "KOSPI200" in sheet_norm or "코스피200" in sheet_norm:
+                kospi_sheet = sheet
+            elif "KOSDAQ150" in sheet_norm or "코스닥150" in sheet_norm:
+                kosdaq_sheet = sheet
+
+        if len(sheets) > 1:
+            if all_sheet:
+                all_items = self._parse_df_to_items(xl.parse(all_sheet))
+            if kospi_sheet:
+                kospi_items = self._parse_df_to_items(xl.parse(kospi_sheet))
+            if kosdaq_sheet:
+                kosdaq_items = self._parse_df_to_items(xl.parse(kosdaq_sheet))
+        else:
+            all_items = self._parse_df_to_items(xl.parse(sheets[0]))
+
+        is_monthly = "monthly_gainers" in filename.lower()
 
         return WeeklyChangeReport(
             date=date,
@@ -149,5 +193,8 @@ class WeeklyChangeParser(BaseExcelParser):
             week_of_month=metadata["week_of_month"],
             week_num=metadata["week_num"],
             date_range=metadata["date_range"],
-            items=items
+            items=all_items,
+            kospi_200_items=kospi_items,
+            kosdaq_150_items=kosdaq_items,
+            is_monthly=is_monthly
         )
