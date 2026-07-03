@@ -552,7 +552,10 @@ class WeeklyChangeReport(BaseModel):
         week_of_month (int | None): 월간 주차 (예: 1).
         week_num (int | None): 연간 주차 (예: 19).
         date_range (str | None): 기간 (예: 0504~0508).
-        items (list[WeeklyChangeItem]): 등락률 항목 리스트.
+        items (list[WeeklyChangeItem]): 등락률 항목 리스트 (전체_등락종목).
+        kospi_200_items (list[WeeklyChangeItem]): KOSPI 200 등락종목 리스트.
+        kosdaq_150_items (list[WeeklyChangeItem]): KOSDAQ 150 등락종목 리스트.
+        is_monthly (bool): 월간 등락률 여부.
     """
 
     date: str
@@ -562,6 +565,9 @@ class WeeklyChangeReport(BaseModel):
     week_num: int | None = None
     date_range: str | None = None
     items: list[WeeklyChangeItem]
+    kospi_200_items: list[WeeklyChangeItem] = Field(default_factory=list)
+    kosdaq_150_items: list[WeeklyChangeItem] = Field(default_factory=list)
+    is_monthly: bool = False
 
 
 class StockSplit(BaseModel):
