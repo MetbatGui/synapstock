@@ -431,3 +431,31 @@
 .change-badge.change-up { background: rgba(239, 68, 68, 0.15); color: #f87171; }
 .change-badge.change-down { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
 .change-badge.change-none { background: rgba(156, 163, 175, 0.1); color: #9ca3af; }
+
+/* Premium weekly/monthly sub tabs spacing & animations */
+.stats-sub-tab-container {
+    margin: 10px 0;
+    align-self: flex-start;
+}
+
+.stats-toggle.sub-tab {
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stats-toggle.sub-tab:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.stats-toggle.sub-tab.active {
+    background: rgba(0, 210, 255, 0.1) !important;
+    color: var(--accent-blue) !important;
+    border-color: rgba(0, 210, 255, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(0, 210, 255, 0.15);
+}
