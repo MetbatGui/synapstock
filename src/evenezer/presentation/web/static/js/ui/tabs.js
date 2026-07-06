@@ -26,7 +26,7 @@ export function addLogEntry(message, type = 'info') {
     entry.className = `log-entry ${type}`;
 
     const time = new Date().toLocaleTimeString();
-    entry.innerText = `[${time}] ${message}`;
+    entry.textContent = `[${time}] ${message}`;
 
     consoleEl.appendChild(entry);
     consoleEl.scrollTop = consoleEl.scrollHeight;

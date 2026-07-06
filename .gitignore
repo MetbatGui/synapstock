@@ -20,3 +20,6 @@ stock_cache.json
 .coverage
 
 /scratch
+
+# Frontend node_modules
+node_modules/

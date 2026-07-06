@@ -1,0 +1,15 @@
+{
+  "name": "evenezer-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test:frontend": "vitest run",
+    "test:frontend:watch": "vitest"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "jsdom": "^24.1.0",
+    "vitest": "^1.6.0"
+  }
+}
