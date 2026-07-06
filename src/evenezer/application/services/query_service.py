@@ -74,7 +74,10 @@ class BoardQueryService:
         return None
 
     def get_stock_by_ticker(self, ticker: str) -> tuple[Stock, str, list[str]] | None:
-        """모든 보드를 순회하여 일치하는 티커의 종목 정보를 찾습니다."""
+        """모든 보드를 순회하여 일치하는 티커의 종목 정보를 찾습니다.
+
+        보드에 존재하지 않는 경우, 티커 역조회를 통해 임시 종목 정보를 구성해 반환합니다.
+        """
         boards = self.list_boards()
         for b_name in boards:
             board = self.load_board(b_name)
@@ -83,6 +86,13 @@ class BoardQueryService:
                     if s.ticker == ticker:
                         # [보드이름]을 경로의 시작으로 설정하여 대략적인 위치 파악 용이하게 함
                         return s, b_name, [board.name] + node.path_parts
+
+        # 보드에 없을 경우, 티커 검색 기능을 통해 한글명 역조회
+        if self._ticker_search and hasattr(self._ticker_search, "get_name_by_ticker"):
+            resolved_name = self._ticker_search.get_name_by_ticker(ticker)
+            if resolved_name:
+                return Stock(ticker=ticker, name=resolved_name), "temp", []
+
         return None
 
     def get_all_stocks_flat(self) -> list[dict]:

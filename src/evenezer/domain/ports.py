@@ -248,6 +248,17 @@ class TickerSearchPort(ABC):
             검색 결과 종목 정보 리스트. 각 항목은 {'name': str, 'ticker': str} 형식의 딕셔너리.
         """
 
+    @abstractmethod
+    def get_name_by_ticker(self, ticker: str) -> str | None:
+        """티커 코드를 기반으로 한글 종목명을 조회합니다.
+
+        Args:
+            ticker: 조회할 종목 티커 (예: "005930").
+
+        Returns:
+            종목명 문자열 또는 조회 실패 시 None.
+        """
+
 
 class NewsScraperPort(ABC):
     """뉴스 URL에서 메타데이터를 추출하기 위한 추상 포트."""

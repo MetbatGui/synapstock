@@ -118,3 +118,21 @@ class NaverTickerSearchAdapter(TickerSearchPort):
         except Exception as e:
             logger.error(f"[NaverTickerSearch] 검색 실패 (query={query}): {e}")
             return results
+
+    def get_name_by_ticker(self, ticker: str) -> str | None:
+        """티커 코드를 기반으로 한글 종목명을 조회합니다.
+
+        로컬 캐시를 우선 검색하고, 없으면 네이버 API를 통해 실시간으로 검색합니다.
+        """
+        # 1. 로컬 캐시 역조회
+        for info in self._name_map.values():
+            if info.get("ticker") == ticker:
+                return info.get("name")
+
+        # 2. 캐시에 없으면 네이버 API 검색 실행
+        results = self.search(ticker)
+        for r in results:
+            if r.get("ticker") == ticker:
+                return r.get("name")
+
+        return None
