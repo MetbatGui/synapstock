@@ -34,6 +34,11 @@ export function initWebSocket() {
                 statusIndicator.innerText = '● Synchronizing...';
                 statusIndicator.style.color = '#facc15';
             }
+        } else if (data.type === 'news_added') {
+            addLogEntry(`[SYSTEM] 신규 뉴스 추가 감지: ${data.title}`, 'success');
+            if (window._refreshDashboardNews && window._currentDashboardTicker === data.ticker) {
+                window._refreshDashboardNews();
+            }
         }
     };
 

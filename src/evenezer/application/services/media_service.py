@@ -72,9 +72,24 @@ class StockMediaService:
                 stock_name = found_stock.name
 
         # 중앙 뉴스 아카이브(구글 드라이브 포함)에 기록
-        await self._news_service.save_news(
+        item = await self._news_service.save_news(
             title=title, url=url, ticker=ticker, stock_name=stock_name
         )
+        if item:
+            try:
+                import json
+                from evenezer.presentation.web.core.websocket_manager import manager
+                await manager.broadcast(
+                    json.dumps({
+                        "type": "news_added",
+                        "ticker": ticker,
+                        "title": title,
+                        "url": url,
+                        "date": date
+                    }, ensure_ascii=False)
+                )
+            except Exception:
+                pass
         return True
 
     async def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:

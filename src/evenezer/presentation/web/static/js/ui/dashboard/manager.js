@@ -127,4 +127,12 @@ export function loadStockDashboard(ticker, name = null, loadBoardData, globalLoc
             if (info && info.name) fetchFinancials(info.name);
         });
     }
+
+    // 실시간 뉴스 갱신을 위한 전역 상태 및 헬퍼 바인딩
+    window._currentDashboardTicker = ticker;
+    window._refreshDashboardNews = () => {
+        if (window._currentDashboardTicker === ticker) {
+            fetchNews(ticker, fetchStockInfo, loadBoardData, globalLocalReportCounts);
+        }
+    };
 }
