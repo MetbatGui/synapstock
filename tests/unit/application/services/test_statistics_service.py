@@ -61,7 +61,8 @@ class TestStatisticsService:
         ticker_map = service._build_local_ticker_map()
         assert ticker_map == {}
 
-    def test_enrich_tickers(self, service, mock_query_service):
+    @pytest.mark.asyncio
+    async def test_enrich_tickers(self, service, mock_query_service):
         """_enrich_tickers를 통해 아이템 리스트의 티커가 보강되어야 한다."""
         from evenezer.domain.statistics.models import RankingItem
 
@@ -77,7 +78,7 @@ class TestStatisticsService:
         ]
 
         # Act
-        enriched_items = service._enrich_tickers(items)
+        enriched_items = await service._enrich_tickers(items)
 
         # Assert
         assert enriched_items[0].ticker == "079550"

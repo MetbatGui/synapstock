@@ -138,14 +138,14 @@ class NewsService:
             mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
             local_metadata[filename] = mtime.isoformat().replace("+00:00", "Z")
 
-        # 드라이브 정보와 합침 (누락 방지)
-        local_metadata.update(drive_metadata)
+        # 드라이브 정보와 로컬 정보를 합치되, 로컬 정보를 우선 반영 (최신화 및 누락 방지)
+        combined_metadata = {**drive_metadata, **local_metadata}
 
         # Repository를 통해 메타데이터 영속화 (개선 C)
-        self.repository.save_sync_metadata(local_metadata)
+        self.repository.save_sync_metadata(combined_metadata)
 
         if self.drive_adapter:
-            content = json.dumps(local_metadata, indent=2).encode("utf-8")
+            content = json.dumps(combined_metadata, indent=2).encode("utf-8")
             await self.drive_adapter.put_file("news_metadata.json", content, folder="news")
 
     async def add_news_from_url(
@@ -247,6 +247,9 @@ class NewsService:
             )
             if success:
                 logger.info(f"[NewsService] 구글 드라이브 동기화 성공: {filename}")
+                # 로컬 메타데이터 정보를 갱신하고 구글 드라이브에 업로드
+                current_metadata = self.repository.load_sync_metadata()
+                await self._update_local_metadata(current_metadata)
             else:
                 logger.error(f"[NewsService] 구글 드라이브 동기화 실패: {filename}")
         except Exception as e:

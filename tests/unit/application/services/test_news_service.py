@@ -55,8 +55,19 @@ class TestNewsService:
 
         # 로컬 저장 확인
         mock_repo.save_batch.assert_called_once()
-        # 구글 드라이브 동기화 확인
-        mock_drive.put_file.assert_called_once()
+        # 구글 드라이브 동기화 확인 (뉴스 배치 파일 및 메타데이터 파일 업로드)
+        assert mock_drive.put_file.call_count == 2
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        mock_drive.put_file.assert_any_call(
+            path=f"news_{today_str}.json",
+            data=ANY,
+            folder="news"
+        )
+        mock_drive.put_file.assert_any_call(
+            "news_metadata.json",
+            ANY,
+            folder="news"
+        )
 
     @pytest.mark.asyncio
     async def test_save_news_duplicate_ignore(self, news_service, mock_repo, mock_drive):
