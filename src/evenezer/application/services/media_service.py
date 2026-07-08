@@ -93,7 +93,7 @@ class StockMediaService:
         return True
 
     async def remove_stock_news(self, board_name: str, ticker: str, url: str) -> bool:
-        """종목에서 특정 뉴스 링크를 제거합니다. (아카이브 정책에 따라 현재는 보드에서만 제거 시도하나 로직은 미구현)"""
-        # 현재 구조에서는 전역 아카이브에서 삭제하는 기능은 NewsService에 구현이 필요할 수 있음
-        # 여기서는 보드 의존성을 제거하므로 단순히 성공 반환 (추후 아카이브 삭제 필요시 보강)
-        return True
+        """종목에서 특정 뉴스 링크를 제거합니다. (아카이브 정책에 따라 로컬 및 원격 삭제 유도)"""
+        if self._news_service:
+            return await self._news_service.delete_news_item(ticker=ticker, url=url)
+        return False
