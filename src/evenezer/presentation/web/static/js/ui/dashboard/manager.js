@@ -97,7 +97,10 @@ export function loadStockDashboard(ticker, name = null, loadBoardData, globalLoc
                     <div class="news-section card">
                         <h3 style="display:flex; align-items:center; justify-content:space-between; color:#facc15 !important;">
                             <div><span>📰</span> 주요 뉴스</div>
-                            <button class="btn btn-secondary btn-sm" onclick="triggerNewsAdd('${ticker}','${name || ticker}')">추가</button>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-secondary btn-sm" onclick="if(window._refreshDashboardNews) window._refreshDashboardNews()"><i class="fas fa-sync-alt"></i> 새로고침</button>
+                                <button class="btn btn-secondary btn-sm" onclick="triggerNewsAdd('${ticker}','${name || ticker}')">추가</button>
+                            </div>
                         </h3>
                         <div id="news-list" class="news-list">
                             <div class="loading-mini">뉴스 정보를 가져오는 중...</div>
