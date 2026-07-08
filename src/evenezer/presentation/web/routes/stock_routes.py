@@ -15,18 +15,23 @@ router = APIRouter()
 
 
 @router.get("/api/stock/info/{ticker}", response_model=None)
-async def get_stock_info(ticker: str) -> dict | JSONResponse:
+async def get_stock_info(ticker: str, refresh: bool = False) -> dict | JSONResponse:
     """티커 심볼로 종목 기본 정보(이름, 리포트, 뉴스)를 반환합니다.
 
     모든 보드를 순회하여 일치하는 종목을 탐색합니다.
 
     Args:
         ticker: 조회할 종목 티커 심볼 (예: "005930").
+        refresh: 구글 드라이브 동기화 및 메모리 캐시 강제 무효화 여부.
 
     Returns:
         종목 기본 정보를 담은 딕셔너리 또는 500 JSONResponse.
     """
     try:
+        if refresh:
+            await news_service.sync_from_drive()
+            news_service.invalidate_cache()
+
         result = query_service.get_stock_by_ticker(ticker)
 
         if result:

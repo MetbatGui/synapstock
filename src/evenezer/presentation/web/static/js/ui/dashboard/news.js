@@ -15,14 +15,14 @@ let SCRAPED_NEWS_DATA = null;
  * @param {function} loadBoardData 
  * @param {Object} globalLocalReportCounts 
  */
-export async function fetchNews(ticker, fetchStockInfo, loadBoardData, globalLocalReportCounts) {
+export async function fetchNews(ticker, fetchStockInfo, loadBoardData, globalLocalReportCounts, refresh = false) {
     const listEl = document.getElementById('news-list');
     if (!listEl) return;
 
     listEl.innerHTML = '<div style="text-align:center;color:#6b7280;padding:10px;">로딩 중...</div>';
 
     try {
-        const stockData = await fetchStockInfo(ticker);
+        const stockData = await fetchStockInfo(ticker, refresh);
         if (!stockData || !stockData.news || stockData.news.length === 0) {
             listEl.innerHTML = '<div style="text-align:center;color:#6b7280;padding:20px;">등록된 뉴스가 없습니다.</div>';
             return;

@@ -13,9 +13,10 @@ import { fetchFinancials } from './financials.js?v=1.8';
  * @param {string} ticker 
  * @returns {Promise<Object|null>}
  */
-async function fetchStockInfo(ticker) {
+async function fetchStockInfo(ticker, refresh = false) {
     try {
-        const response = await fetch(`/api/stock/info/${ticker}`);
+        const url = refresh ? `/api/stock/info/${ticker}?refresh=true` : `/api/stock/info/${ticker}`;
+        const response = await fetch(url);
         if (response.ok) return await response.json();
     } catch (err) {
         console.error('Failed to fetch stock info:', err);
@@ -135,7 +136,7 @@ export function loadStockDashboard(ticker, name = null, loadBoardData, globalLoc
     window._currentDashboardTicker = ticker;
     window._refreshDashboardNews = () => {
         if (window._currentDashboardTicker === ticker) {
-            fetchNews(ticker, fetchStockInfo, loadBoardData, globalLocalReportCounts);
+            fetchNews(ticker, fetchStockInfo, loadBoardData, globalLocalReportCounts, true);
         }
     };
 }
