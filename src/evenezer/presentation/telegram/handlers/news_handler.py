@@ -224,6 +224,23 @@ async def process_news_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     # 4. 결과 응답
     if success:
+        # 웹 서버에 실시간 추가 통지 전송 (동기화 및 브로드캐스트 유도)
+        try:
+            import httpx
+            async with httpx.AsyncClient() as http_client:
+                await http_client.post(
+                    "http://localhost:8090/api/internal/news-added",
+                    json={
+                        "ticker": target_ticker,
+                        "title": title,
+                        "url": news_url,
+                        "date": doc_date
+                    },
+                    timeout=5.0
+                )
+        except Exception as e:
+            logger.warning(f"웹 서버에 실시간 알림 송신 실패 (웹서버 미기동 상태 가능성): {e}")
+
         await progress_msg.edit_text("✅ 뉴스 메타데이터 추출 및 구글 드라이브 아카이브 완료!")
         if update.message:
             await update.message.reply_text(
