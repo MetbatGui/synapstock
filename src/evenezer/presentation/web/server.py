@@ -33,7 +33,6 @@ from evenezer.presentation.web.routes import (
     report_routes,
     statistics_routes,
     stock_routes,
-    internal_routes,
 )
 
 # 강한 참조 유지를 위한 글로벌 백그라운드 태스크 세트
@@ -116,7 +115,6 @@ app.include_router(report_routes.router)
 app.include_router(statistics_routes.router)
 app.include_router(financial_routes.router)
 app.include_router(heatmap_routes.router)
-app.include_router(internal_routes.router)
 
 
 # ── 페이지 라우트 ────────────────────────────────────────────────────────────
