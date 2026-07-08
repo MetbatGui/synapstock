@@ -468,4 +468,9 @@ class NewsService:
         self._rebuild_index()
         return True
 
+    def invalidate_cache(self) -> None:
+        """메모리 인덱스 캐시를 만료시켜 다음 조회 시 다시 빌드하도록 유도합니다."""
+        self._is_indexed = False
+        logger.info("[NewsService] 메모리 뉴스 캐시가 무효화되었습니다.")
+
 

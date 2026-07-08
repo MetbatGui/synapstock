@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -22,6 +22,10 @@ async def test_internal_news_added_notification_flows(client):
     mock_sync = AsyncMock()
     container.news_service.sync_from_drive = mock_sync
 
+    # 캐시 무효화 모킹
+    mock_invalidate = MagicMock()
+    container.news_service.invalidate_cache = mock_invalidate
+
     # Websocket manager broadcast 모킹
     with patch("evenezer.presentation.web.server.manager.broadcast", new_callable=AsyncMock) as mock_broadcast:
         # 2. API 호출
@@ -40,6 +44,9 @@ async def test_internal_news_added_notification_flows(client):
 
         # 드라이브 동기화가 감지하자마자 1회 비동기로 실행되었는지 검증
         mock_sync.assert_called_once()
+
+        # 캐시 무효화 호출 여부 검증
+        mock_invalidate.assert_called_once()
         
         # WebSocket 브로드캐스트가 지정된 포맷으로 전송되었는지 검증
         mock_broadcast.assert_called_once()

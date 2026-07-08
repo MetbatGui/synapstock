@@ -35,6 +35,12 @@ async def internal_news_added(payload: NewsAddedNotification):
         logger.error(f"[InternalAPI] 뉴스 추가 후 즉각 동기화 중 오류 발생: {e}")
         # 오류가 나도 브로드캐스트는 보낼 수 있도록 계속 진행
 
+    # 로컬 프로세스 기동 대응: 웹서버의 메모리 캐시 강제 무효화
+    try:
+        container.news_service.invalidate_cache()
+    except Exception as e:
+        logger.error(f"[InternalAPI] 뉴스 캐시 만료 처리 실패: {e}")
+
     # 2. 웹소켓 브로드캐스트 전송
     await manager.broadcast(
         json.dumps({
