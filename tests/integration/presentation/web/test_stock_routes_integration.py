@@ -154,8 +154,11 @@ def test_add_and_delete_stock_news(client):
     assert response_del.status_code == 200
     assert response_del.json() == {"status": "success"}
     
-    # 참고: StockMediaService.remove_stock_news()는 현재 아카이브에서 뉴스를 실질적으로 지우지 않고 무조건 True를 반환하므로,
-    # 삭제 API 호출이 무사히 처리되었는지만 체크합니다. (추후 비즈니스 로직 보강 시 하단 검증 활성화 가능)
+    # 4. 실제 뉴스 목록에서 완전히 지워졌는지 최종 검증
+    response_info_after = client.get(f"/api/stock/info/{news_params['ticker']}")
+    assert response_info_after.status_code == 200
+    info_data_after = response_info_after.json()
+    assert not any(n["url"] == news_params["url"] for n in info_data_after["news"])
 
 
 def test_get_stock_info_refresh_trigger(client):
