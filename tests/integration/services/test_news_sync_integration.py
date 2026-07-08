@@ -42,8 +42,8 @@ async def test_integration_sync_merge_success(news_integration_setup):
     service, local_repo, drive_adapter, local_dir, remote_dir = news_integration_setup
 
     date_str = "2026-07-08"
-    item_local = NewsItem(id="hash_local", title="로컬 뉴스", url="http://local.com", collected_at=datetime.now() - timedelta(minutes=10))
-    item_remote = NewsItem(id="hash_remote", title="리모트 뉴스", url="http://remote.com", collected_at=datetime.now() - timedelta(minutes=5))
+    item_local = NewsItem(id="a7df0bd98115664917452d7e35b7194f", title="로컬 뉴스", url="http://local.com", collected_at=datetime.now() - timedelta(minutes=10))
+    item_remote = NewsItem(id="88c6e5e8e899b9cf985e505ab3834b9d", title="리모트 뉴스", url="http://remote.com", collected_at=datetime.now() - timedelta(minutes=5))
 
     # 1. 로컬 상태 설정
     batch_local = NewsBatch(date=date_str, items=[item_local], last_modified=datetime(2026, 7, 8, 10, 0))
@@ -70,7 +70,7 @@ async def test_integration_sync_merge_success(news_integration_setup):
     updated_local_batch = local_repo.load_batch(date_str)
     assert updated_local_batch is not None
     item_ids = {it.id for it in updated_local_batch.items}
-    assert item_ids == {"hash_local", "hash_remote"}
+    assert item_ids == {"a7df0bd98115664917452d7e35b7194f", "88c6e5e8e899b9cf985e505ab3834b9d"}
 
     # 리모트 파일도 병합되어 업로드 완료되었는지 검증
     remote_file_content = await drive_adapter.get_file(f"news_{date_str}.json", folder="news")
@@ -85,8 +85,8 @@ async def test_integration_delete_news_and_tombstone(news_integration_setup):
     service, local_repo, drive_adapter, local_dir, remote_dir = news_integration_setup
 
     date_str = "2026-07-08"
-    item1 = NewsItem(id="hash_to_keep", title="남길 뉴스", url="http://keep.com", collected_at=datetime.now())
-    item2 = NewsItem(id="hash_to_del", title="지울 뉴스", url="http://delete.com", collected_at=datetime.now())
+    item1 = NewsItem(id="455d3e09848ab798990c7493a73c0be8", title="남길 뉴스", url="http://keep.com", collected_at=datetime.now())
+    item2 = NewsItem(id="252b6415627d01eceac37cfe55650838", title="지울 뉴스", url="http://delete.com", collected_at=datetime.now())
 
     # 1. 초기 로컬/리모트 동일 상태 설정
     batch = NewsBatch(date=date_str, items=[item1, item2], last_modified=datetime(2026, 7, 8, 12, 0))
@@ -107,7 +107,7 @@ async def test_integration_delete_news_and_tombstone(news_integration_setup):
     # 3. 로컬 Tombstone 생성 검증
     metadata = local_repo.load_sync_metadata()
     assert "deleted_news" in metadata
-    assert "hash_to_del" in metadata["deleted_news"]
+    assert "252b6415627d01eceac37cfe55650838" in metadata["deleted_news"]
 
     # 4. 동기화 실행 (리모트에도 기사 2번이 삭제되도록 전파되어야 함)
     await service.sync_from_drive()
@@ -116,13 +116,13 @@ async def test_integration_delete_news_and_tombstone(news_integration_setup):
     # 로컬에 남길 뉴스만 있는지 확인
     updated_local_batch = local_repo.load_batch(date_str)
     assert len(updated_local_batch.items) == 1
-    assert updated_local_batch.items[0].id == "hash_to_keep"
+    assert updated_local_batch.items[0].id == "455d3e09848ab798990c7493a73c0be8"
 
     # 리모트 파일에서도 지울 뉴스가 제거되었는지 확인
     remote_file_content = await drive_adapter.get_file(f"news_{date_str}.json", folder="news")
     remote_batch = NewsBatch.model_validate(json.loads(remote_file_content.decode("utf-8")))
     assert len(remote_batch.items) == 1
-    assert remote_batch.items[0].id == "hash_to_keep"
+    assert remote_batch.items[0].id == "455d3e09848ab798990c7493a73c0be8"
 
 
 @pytest.mark.asyncio
@@ -131,7 +131,7 @@ async def test_integration_empty_batch_file_deletion(news_integration_setup):
     service, local_repo, drive_adapter, local_dir, remote_dir = news_integration_setup
 
     date_str = "2026-07-08"
-    item = NewsItem(id="hash_only", title="유일한 뉴스", url="http://only.com", collected_at=datetime.now())
+    item = NewsItem(id="a7140974a131d4fa52adc040d565ddc0", title="유일한 뉴스", url="http://only.com", collected_at=datetime.now())
 
     # 1. 로컬/리모트 상태 설정
     batch = NewsBatch(date=date_str, items=[item], last_modified=datetime(2026, 7, 8, 12, 0))
