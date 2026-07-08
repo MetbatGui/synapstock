@@ -233,6 +233,18 @@ class StoragePort(ABC):
             성공적으로 다운로드되었으면 True, 실패 시 False.
         """
 
+    @abstractmethod
+    async def delete_file(self, path: str, **kwargs) -> bool:
+        """지정된 경로의 파일을 영속 저장소에서 제거합니다.
+
+        Args:
+            path: 제거할 파일 상대 경로.
+            **kwargs: 추가적인 어댑터별 설정 인수.
+
+        Returns:
+            성공적으로 제거되었으면 True, 실패 시 False.
+        """
+
 
 class TickerSearchPort(ABC):
     """주식 종목 티커 검색을 위한 추상 포트."""
@@ -387,6 +399,17 @@ class NewsRepositoryPort(ABC):
             filename: 저장할 파일 이름.
             content: 저장할 바이너리 바이트 데이터.
             mtime: 설정할 최종 수정 시각 (에포크 초). None인 경우 설정하지 않음.
+        """
+
+    @abstractmethod
+    def delete_batch(self, date_str: str) -> bool:
+        """특정 날짜의 뉴스 배치 파일을 영속 저장소에서 물리적으로 제거합니다.
+
+        Args:
+            date_str: 삭제 대상 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            성공적으로 삭제되면 True, 실패하거나 존재하지 않으면 False.
         """
 
     @abstractmethod

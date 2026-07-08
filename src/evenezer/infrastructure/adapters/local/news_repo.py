@@ -111,6 +111,25 @@ class LocalNewsRepository(NewsRepositoryPort):
             if f.name != "news_metadata.json"
         ]
 
+    def delete_batch(self, date_str: str) -> bool:
+        """특정 날짜의 뉴스 배치 파일을 로컬 파일 시스템에서 물리적으로 삭제합니다.
+
+        Args:
+            date_str: 삭제 대상 일자 (YYYY-MM-DD 형식).
+
+        Returns:
+            성공적으로 삭제 완료 시 True, 파일이 존재하지 않거나 실패 시 False.
+        """
+        file_path = self._get_file_path(date_str)
+        if not file_path.exists():
+            return False
+        try:
+            file_path.unlink()
+            return True
+        except Exception as e:
+            logger.error(f"[NewsRepo] 파일 삭제 실패 ({date_str}): {e}")
+            return False
+
     def save_raw_file(self, filename: str, content: bytes, mtime: float | None = None) -> None:
         """임의의 바이너리 데이터를 파일로 저장하고 선택적으로 파일 수정 시각을 설정합니다.
 

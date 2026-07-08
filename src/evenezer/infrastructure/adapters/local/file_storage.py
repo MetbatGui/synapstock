@@ -19,13 +19,14 @@ class LocalFileStorageAdapter(StoragePort):
         """
         self.base_dir = Path(base_dir)
 
-    def _get_abs_path(self, path: str) -> Path:
+    def _get_abs_path(self, path: str, folder: str | None = None) -> Path:
         """상대 경로를 인스턴스 기준의 절대 경로로 변환하고 검증합니다.
 
         경로 순회(Path Traversal) 공격 방지를 위해 base_dir 내에 위치하는지 검증합니다.
 
         Args:
             path: 변환 및 검사할 파일 경로.
+            folder: 서브 디렉토리 폴더 (선택 사항).
 
         Returns:
             검증 완료된 절대 경로 Path 객체.
@@ -33,7 +34,11 @@ class LocalFileStorageAdapter(StoragePort):
         Raises:
             ValueError: 경로 traversal이 감지된 경우.
         """
-        p = Path(path)
+        if folder:
+            p = Path(folder) / path
+        else:
+            p = Path(path)
+            
         base_resolved = self.base_dir.resolve()
 
         if p.is_absolute():
@@ -55,7 +60,7 @@ class LocalFileStorageAdapter(StoragePort):
         Returns:
             존재할 경우 True, 그렇지 않으면 False.
         """
-        return await asyncio.to_thread(self._get_abs_path(path).exists)
+        return await asyncio.to_thread(self._get_abs_path(path, kwargs.get("folder")).exists)
 
     async def ensure_directory(self, path: str, **kwargs) -> bool:
         """디렉토리가 없으면 상위 계층을 포함하여 생성합니다.
@@ -68,7 +73,7 @@ class LocalFileStorageAdapter(StoragePort):
         """
         def _ensure():
             try:
-                self._get_abs_path(path).mkdir(parents=True, exist_ok=True)
+                self._get_abs_path(path, kwargs.get("folder")).mkdir(parents=True, exist_ok=True)
                 return True
             except Exception as e:
                 logger.error(f"Failed to create directory {path}: {e}")
@@ -84,7 +89,7 @@ class LocalFileStorageAdapter(StoragePort):
         Returns:
             파일 바이너리 데이터, 대상이 파일이 아니거나 로드 실패 시 None.
         """
-        abs_path = self._get_abs_path(path)
+        abs_path = self._get_abs_path(path, kwargs.get("folder"))
         if not await asyncio.to_thread(abs_path.is_file):
             return None
         try:
@@ -106,7 +111,7 @@ class LocalFileStorageAdapter(StoragePort):
         Returns:
             파일 작성 성공 시 True, 실패 시 False.
         """
-        abs_path = self._get_abs_path(path)
+        abs_path = self._get_abs_path(path, kwargs.get("folder"))
         def _put():
             import os
             import tempfile
@@ -139,7 +144,7 @@ class LocalFileStorageAdapter(StoragePort):
         Returns:
             각 파일의 id 및 name 정보를 담은 딕셔너리 목록.
         """
-        abs_path = self._get_abs_path(folder_path)
+        abs_path = self._get_abs_path(folder_path, kwargs.get("folder"))
         if not await asyncio.to_thread(abs_path.is_dir):
             return []
 
@@ -163,7 +168,7 @@ class LocalFileStorageAdapter(StoragePort):
         Returns:
             복사 성공 시 True, 실패 시 False.
         """
-        src = self._get_abs_path(filename)
+        src = self._get_abs_path(filename, kwargs.get("folder"))
         dest = Path(local_path)
 
         if not await asyncio.to_thread(src.exists):
@@ -178,3 +183,25 @@ class LocalFileStorageAdapter(StoragePort):
                 logger.error(f"Failed to download(copy) file {filename} to {local_path}: {e}")
                 return False
         return await asyncio.to_thread(_copy)
+
+    async def delete_file(self, path: str, **kwargs) -> bool:
+        """지정된 경로의 파일을 로컬 파일 시스템에서 물리적으로 제거합니다.
+
+        Args:
+            path: 제거할 파일 상대 경로.
+
+        Returns:
+            성공적으로 제거되었으면 True, 실패 시 False.
+        """
+        abs_path = self._get_abs_path(path, kwargs.get("folder"))
+        def _delete():
+            try:
+                if abs_path.is_file():
+                    abs_path.unlink()
+                    return True
+                return False
+            except Exception as e:
+                logger.error(f"Failed to delete file {path}: {e}")
+                return False
+        return await asyncio.to_thread(_delete)
+

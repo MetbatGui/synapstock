@@ -144,3 +144,81 @@ class TestNewsService:
         mock_repo.save_sync_metadata.assert_called_once()
         # 드라이브 메타데이터 업로드 확인
         mock_drive.put_file.assert_called_with("news_metadata.json", ANY, folder="news")
+
+    @pytest.mark.asyncio
+    async def test_merge_batches_basic(self, news_service):
+        """두 뉴스 배치를 중복 없이 올바르게 병합해야 한다."""
+        item1 = NewsItem(id="hash1", title="뉴스 1", url="http://test.com/1", collected_at=datetime.now())
+        item2 = NewsItem(id="hash2", title="뉴스 2", url="http://test.com/2", collected_at=datetime.now())
+        item3 = NewsItem(id="hash3", title="뉴스 3", url="http://test.com/3", collected_at=datetime.now())
+
+        batch_local = NewsBatch(date="2026-07-08", items=[item1, item2], last_modified=datetime(2026, 7, 8, 10, 0))
+        batch_drive = NewsBatch(date="2026-07-08", items=[item2, item3], last_modified=datetime(2026, 7, 8, 11, 0))
+
+        merged = news_service.merge_batches(batch_local, batch_drive, tombstone=set())
+
+        assert merged is not None
+        assert len(merged.items) == 3
+        # 중복인 item2는 하나만 존재해야 하며, 1, 2, 3 모두 존재해야 함
+        item_ids = {it.id for it in merged.items}
+        assert item_ids == {"hash1", "hash2", "hash3"}
+        assert merged.last_modified > batch_drive.last_modified
+
+    @pytest.mark.asyncio
+    async def test_merge_batches_with_tombstone(self, news_service):
+        """Tombstone에 등록된 뉴스 ID는 병합 결과에서 제외되어야 한다."""
+        item1 = NewsItem(id="hash1", title="뉴스 1", url="http://test.com/1", collected_at=datetime.now())
+        item2 = NewsItem(id="hash2", title="뉴스 2", url="http://test.com/2", collected_at=datetime.now())
+        item3 = NewsItem(id="hash3", title="뉴스 3", url="http://test.com/3", collected_at=datetime.now())
+
+        batch_local = NewsBatch(date="2026-07-08", items=[item1, item2], last_modified=datetime(2026, 7, 8, 10, 0))
+        batch_drive = NewsBatch(date="2026-07-08", items=[item2, item3], last_modified=datetime(2026, 7, 8, 11, 0))
+
+        # 'hash2'가 Tombstone에 등록되어 삭제 처리된 이력으로 존재함
+        tombstone = {"hash2"}
+        merged = news_service.merge_batches(batch_local, batch_drive, tombstone=tombstone)
+
+        assert merged is not None
+        assert len(merged.items) == 2
+        item_ids = {it.id for it in merged.items}
+        assert item_ids == {"hash1", "hash3"} # hash2는 제외됨
+
+
+    @pytest.mark.asyncio
+    async def test_merge_batches_basic(self, news_service):
+        """두 뉴스 배치를 중복 없이 올바르게 병합해야 한다."""
+        item1 = NewsItem(id="hash1", title="뉴스 1", url="http://test.com/1", collected_at=datetime.now())
+        item2 = NewsItem(id="hash2", title="뉴스 2", url="http://test.com/2", collected_at=datetime.now())
+        item3 = NewsItem(id="hash3", title="뉴스 3", url="http://test.com/3", collected_at=datetime.now())
+
+        batch_local = NewsBatch(date="2026-07-08", items=[item1, item2], last_modified=datetime(2026, 7, 8, 10, 0))
+        batch_drive = NewsBatch(date="2026-07-08", items=[item2, item3], last_modified=datetime(2026, 7, 8, 11, 0))
+
+        merged = news_service.merge_batches(batch_local, batch_drive, tombstone=set())
+
+        assert merged is not None
+        assert len(merged.items) == 3
+        # 중복인 item2는 하나만 존재해야 하며, 1, 2, 3 모두 존재해야 함
+        item_ids = {it.id for it in merged.items}
+        assert item_ids == {"hash1", "hash2", "hash3"}
+        assert merged.last_modified > batch_drive.last_modified
+
+    @pytest.mark.asyncio
+    async def test_merge_batches_with_tombstone(self, news_service):
+        """Tombstone에 등록된 뉴스 ID는 병합 결과에서 제외되어야 한다."""
+        item1 = NewsItem(id="hash1", title="뉴스 1", url="http://test.com/1", collected_at=datetime.now())
+        item2 = NewsItem(id="hash2", title="뉴스 2", url="http://test.com/2", collected_at=datetime.now())
+        item3 = NewsItem(id="hash3", title="뉴스 3", url="http://test.com/3", collected_at=datetime.now())
+
+        batch_local = NewsBatch(date="2026-07-08", items=[item1, item2], last_modified=datetime(2026, 7, 8, 10, 0))
+        batch_drive = NewsBatch(date="2026-07-08", items=[item2, item3], last_modified=datetime(2026, 7, 8, 11, 0))
+
+        # 'hash2'가 Tombstone에 등록되어 삭제 처리된 이력으로 존재함
+        tombstone = {"hash2"}
+        merged = news_service.merge_batches(batch_local, batch_drive, tombstone=tombstone)
+
+        assert merged is not None
+        assert len(merged.items) == 2
+        item_ids = {it.id for it in merged.items}
+        assert item_ids == {"hash1", "hash3"} # hash2는 제외됨
+

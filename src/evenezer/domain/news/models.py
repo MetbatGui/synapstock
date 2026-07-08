@@ -20,6 +20,7 @@ class NewsBatch(BaseModel):
 
     date: str = Field(..., description="저장 날짜 (YYYY-MM-DD)")
     items: list[NewsItem] = Field(default_factory=list)
+    last_modified: datetime = Field(default_factory=datetime.now, description="배치 데이터 최종 변경 시각")
 
     @property
     def count(self) -> int:

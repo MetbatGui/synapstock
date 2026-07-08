@@ -156,3 +156,18 @@ def test_add_and_delete_stock_news(client):
     
     # 참고: StockMediaService.remove_stock_news()는 현재 아카이브에서 뉴스를 실질적으로 지우지 않고 무조건 True를 반환하므로,
     # 삭제 API 호출이 무사히 처리되었는지만 체크합니다. (추후 비즈니스 로직 보강 시 하단 검증 활성화 가능)
+
+
+def test_get_stock_info_refresh_trigger(client):
+    """GET /api/stock/info/{ticker}?refresh=true - 강제 드라이브 동기화 및 캐시 만료 유도 검증."""
+    from evenezer.presentation.web.core.dependencies import news_service
+    
+    with patch.object(news_service, "sync_from_drive", new_callable=AsyncMock) as mock_sync, \
+         patch.object(news_service, "invalidate_cache") as mock_invalidate:
+         
+        response = client.get("/api/stock/info/035420?refresh=true")
+        assert response.status_code == 200
+        
+        # refresh=true 일 때 동기화 및 캐시 무효화가 작동해야 함
+        mock_sync.assert_called_once()
+        mock_invalidate.assert_called_once()
