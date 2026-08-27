@@ -388,7 +388,11 @@ class GoogleDriveAdapter(StoragePort):
                 def _do_list():
                     results = (
                         self.service.files()
-                        .list(q=query, fields="files(id, name, mimeType, size, createdTime, modifiedTime)", pageSize=1000)
+                        .list(
+                            q=query,
+                            fields="files(id, name, mimeType, size, createdTime, modifiedTime, md5Checksum)",
+                            pageSize=1000,
+                        )
                         .execute()
                     )
                     return results.get("files", [])
@@ -447,7 +451,9 @@ class GoogleDriveAdapter(StoragePort):
         def _get():
             try:
                 with self._lock:
-                    file_meta = self.service.files().get(fileId=file_id, fields="id, name, modifiedTime, size, mimeType").execute()
+                    file_meta = self.service.files().get(
+                        fileId=file_id, fields="id, name, modifiedTime, size, mimeType, md5Checksum"
+                    ).execute()
                 return file_meta
             except Exception as e:
                 logger.error(f"[GoogleDrive] 파일 ID({file_id}) 메타데이터 조회 실패: {e}")

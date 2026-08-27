@@ -399,6 +399,11 @@ async def test_list_files_in_folder_success(temp_token_file, mock_drive_service)
         result = await adapter.list_files_in_folder("my_folder")
         assert len(result) == 2
         assert result == mock_files
+        mock_drive_service.files()._list_mock.assert_called_with(
+            q="'folder_id_123' in parents and trashed = false",
+            fields="files(id, name, mimeType, size, createdTime, modifiedTime, md5Checksum)",
+            pageSize=1000,
+        )
 
 
 @pytest.mark.asyncio
@@ -472,6 +477,9 @@ async def test_get_file_metadata_and_delete_file(temp_token_file, mock_drive_ser
     mock_drive_service.files()._get_res.execute.return_value = {"id": "f123", "name": "test"}
     meta = await adapter.get_file_metadata("f123")
     assert meta == {"id": "f123", "name": "test"}
+    mock_drive_service.files()._get_mock.assert_called_with(
+        fileId="f123", fields="id, name, modifiedTime, size, mimeType, md5Checksum"
+    )
 
     mock_drive_service.files()._get_res.execute.side_effect = Exception("Meta API error")
     assert await adapter.get_file_metadata("f123") is None
