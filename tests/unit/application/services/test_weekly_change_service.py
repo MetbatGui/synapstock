@@ -274,3 +274,21 @@ async def test_list_available_dates_merges_local_and_cloud_without_duplicates(se
     assert dates == ["2026-07-03", "2026-06-26"]
     assert results[0]["source"] == "cloud"
     assert results[1]["source"] == "local"
+
+
+@pytest.mark.asyncio
+async def test_list_available_dates_keeps_monthly_when_date_collides_with_weekly(service, mock_repo, db_sync_stub):
+    """월간 이벤트의 last_trading_day가 주간 이벤트와 우연히 같아도 둘 다 살아남아야 한다.
+
+    실데이터에서 월말 마지막 거래일이 그 주의 금요일 마감일과 같은 날짜인 경우가 흔하다
+    (예: 2026-07-31이 7월의 마지막 거래일이면서 동시에 어느 주의 금요일 마감일).
+    """
+    db_sync_stub.register(CURRENT_YEAR, False, [weekly_event("2026-W31", 31, 7, 5, "2026-07-31")], [])
+    db_sync_stub.register(CURRENT_YEAR, True, [monthly_event("2026-M07", 7, "2026-07-31")], [])
+
+    results = await service.list_available_dates()
+
+    weekly_entry = next(r for r in results if not r["is_monthly"])
+    monthly_entry = next(r for r in results if r["is_monthly"])
+    assert weekly_entry["date"] == "2026-07-31"
+    assert monthly_entry["date"] == "2026-07-31"

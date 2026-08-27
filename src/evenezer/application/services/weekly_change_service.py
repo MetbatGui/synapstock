@@ -92,12 +92,12 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
             return await self._sync_for_year(self._parse_year(date_str), date_str)
         return await self._sync_latest()
 
-    def _local_dates(self) -> dict[str, dict]:
+    def _local_dates(self) -> dict[tuple[str, bool], dict]:
         results = {}
         for d in self.repository.list_available_dates():
             report = self.repository.load_report(d)
             if report:
-                results[report.date] = {
+                results[(report.date, report.is_monthly)] = {
                     "date": report.date,
                     "year": report.year,
                     "month": report.month,
@@ -109,7 +109,12 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                 }
         return results
 
-    async def _cloud_dates(self, known_dates: set[str]) -> dict[str, dict]:
+    async def _cloud_dates(self, known_keys: set[tuple[str, bool]]) -> dict[tuple[str, bool], dict]:
+        """weekly/monthly는 별도 축이므로 (날짜, is_monthly) 조합으로 구분한다.
+
+        월말 마지막 거래일이 그 주의 금요일 마감일과 같은 날짜인 경우가 흔해,
+        날짜만으로 중복 판정하면 한쪽이 다른 쪽을 가려버린다.
+        """
         results = {}
         current_year = datetime.now().year
         for year in (current_year, current_year - 1, current_year - 2):
@@ -121,9 +126,10 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                     if event["status"] not in _FINAL_STATUSES:
                         continue
                     date_str = event["last_trading_day"]
-                    if date_str in known_dates or date_str in results:
+                    key = (date_str, is_monthly)
+                    if key in known_keys or key in results:
                         continue
-                    results[date_str] = {
+                    results[key] = {
                         "date": date_str,
                         "year": event["year"],
                         "month": event["month"],
