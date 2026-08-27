@@ -470,12 +470,38 @@ class LocalWeeklyChangeRepository:
 
         return self.root / f"{prefix}_{filename_part}.json"
 
+    @staticmethod
+    def _period_key(report: WeeklyChangeReport) -> tuple:
+        """같은 주/월을 가리키는 리포트인지 판별하는 키. 연도+기간 단위(주차 또는 월)+주간/월간 구분으로 식별한다."""
+        if report.is_monthly:
+            return (report.year, report.month, True)
+        return (report.year, report.week_num, False)
+
+    def _remove_stale_snapshots(self, report: WeeklyChangeReport) -> None:
+        """같은 주/월인데 날짜만 다른 과거 스냅샷 파일을 제거한다.
+
+        진행 중인 주/월을 여러 날에 걸쳐 재동기화하면 last_trading_day가 갱신되는데,
+        파일명이 날짜 기반이라 그대로 두면 과거 스냅샷이 누적되어 목록에 중복 표시된다.
+        """
+        prefix = "monthly_change" if report.is_monthly else "weekly_change"
+        key = self._period_key(report)
+        for path in self.root.rglob(f"{prefix}_*.json"):
+            try:
+                existing = WeeklyChangeReport.model_validate_json(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if self._period_key(existing) == key and existing.date != report.date:
+                path.unlink(missing_ok=True)
+
     def save_report(self, report: WeeklyChangeReport):
         """등락률 리포트를 기간 속성을 고려한 경로에 파일로 저장합니다.
+
+        같은 주/월의 과거(다른 날짜) 스냅샷이 있으면 먼저 제거한 뒤 저장합니다.
 
         Args:
             report: 저장할 WeeklyChangeReport 도메인 인스턴스.
         """
+        self._remove_stale_snapshots(report)
         path = self._get_report_path(
             report.date, report.year, report.month, report.date_range, report.is_monthly
         )
