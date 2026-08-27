@@ -64,6 +64,7 @@ async def test_first_sync_downloads_and_saves_manifest(data_root, mock_drive):
 
     result = await sync.ensure_year_db(2026, is_monthly=False)
 
+    assert result is not None
     assert result == sync._local_path(is_monthly=False, year=2026)
     assert result.exists()
     mock_drive.get_file_by_id.assert_called_once_with("drive_id_1")

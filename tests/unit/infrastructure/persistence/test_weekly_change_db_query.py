@@ -118,6 +118,7 @@ def test_fetch_event_by_date_not_found(db_path):
 def test_fetch_latest_event_skips_non_final(db_path):
     """RUNNING 상태는 제외하고, 완료된 이벤트 중 가장 최신을 반환한다."""
     event = fetch_latest_event(db_path)
+    assert event is not None
     assert event["id"] == "2026-W27"
 
 
@@ -128,9 +129,15 @@ def test_fetch_events_ordered_desc(db_path):
     assert len(events) == 3
 
 
-def test_build_report_splits_items_by_index_flag(db_path):
+@pytest.fixture
+def event_0703(db_path):
     event = fetch_event_by_date(db_path, "2026-07-03")
-    report = build_report(db_path, event, is_monthly=False)
+    assert event is not None
+    return event
+
+
+def test_build_report_event_fields(db_path, event_0703):
+    report = build_report(db_path, event_0703, is_monthly=False)
 
     assert report.date == "2026-07-03"
     assert report.year == 2026
@@ -138,14 +145,13 @@ def test_build_report_splits_items_by_index_flag(db_path):
     assert report.week_num == 27
     assert report.week_of_month == 1
     assert report.is_monthly is False
+
+
+def test_build_report_all_items(db_path, event_0703):
+    report = build_report(db_path, event_0703, is_monthly=False)
+
     assert len(report.items) == 3
     assert {i.name for i in report.items} == {"삼성전자", "SK하이닉스", "코스닥종목"}
-
-    assert len(report.kospi_200_items) == 2
-    assert {i.name for i in report.kospi_200_items} == {"삼성전자", "SK하이닉스"}
-
-    assert len(report.kosdaq_150_items) == 2
-    assert {i.name for i in report.kosdaq_150_items} == {"SK하이닉스", "코스닥종목"}
 
     samsung = next(i for i in report.items if i.name == "삼성전자")
     assert samsung.ticker == "005930"
@@ -154,8 +160,23 @@ def test_build_report_splits_items_by_index_flag(db_path):
     assert samsung.change_rate == 2.94
 
 
+def test_build_report_kospi200_items(db_path, event_0703):
+    report = build_report(db_path, event_0703, is_monthly=False)
+
+    assert len(report.kospi_200_items) == 2
+    assert {i.name for i in report.kospi_200_items} == {"삼성전자", "SK하이닉스"}
+
+
+def test_build_report_kosdaq150_items(db_path, event_0703):
+    report = build_report(db_path, event_0703, is_monthly=False)
+
+    assert len(report.kosdaq_150_items) == 2
+    assert {i.name for i in report.kosdaq_150_items} == {"SK하이닉스", "코스닥종목"}
+
+
 def test_build_report_date_range_from_items(db_path):
     event = fetch_event_by_date(db_path, "2026-07-03")
+    assert event is not None
     report = build_report(db_path, event, is_monthly=False)
     assert report.date_range == "0629~0703"
 
@@ -171,6 +192,7 @@ def test_build_report_empty_items_has_none_date_range(db_path):
     conn.close()
 
     event = fetch_event_by_date(db_path, "2026-07-17")
+    assert event is not None
     report = build_report(db_path, event, is_monthly=False)
     assert report.items == []
     assert report.date_range is None

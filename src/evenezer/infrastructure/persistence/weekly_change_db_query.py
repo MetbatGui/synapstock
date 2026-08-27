@@ -39,7 +39,7 @@ def fetch_latest_event(db_path: Path) -> sqlite3.Row | None:
     return next((e for e in fetch_events(db_path) if e["status"] in _FINAL_STATUSES), None)
 
 
-def _event_date_range(event_row: sqlite3.Row) -> str | None:
+def event_date_range(event_row: sqlite3.Row) -> str | None:
     start, end = event_row["range_start"], event_row["range_end"]
     if not start or not end:
         return None
@@ -79,7 +79,7 @@ def build_report(db_path: Path, event_row: sqlite3.Row, is_monthly: bool) -> Wee
         month=event_row["month"],
         week_of_month=event_row["week_of_month"],
         week_num=event_row["week"],
-        date_range=_event_date_range(event_row),
+        date_range=event_date_range(event_row),
         items=all_items,
         kospi_200_items=kospi_items,
         kosdaq_150_items=kosdaq_items,
