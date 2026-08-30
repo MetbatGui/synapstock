@@ -34,9 +34,11 @@ class YearlyDbSync:
         folder_name: str,
         filename_for_year: Callable[[int], str],
         required_tables: set[str],
+        subfolder: str = "",
     ):
         self.drive_adapter = drive_adapter
         self.folder_name = folder_name
+        self.subfolder = subfolder
         self.filename_for_year = filename_for_year
         self.required_tables = required_tables
         self.root = Path(data_root)
@@ -126,7 +128,15 @@ class YearlyDbSync:
         return datetime.now(UTC) - checked < _METADATA_TTL
 
     async def _find_remote_file(self, year: int) -> dict | None:
-        remote_files = await self.drive_adapter.list_files_in_folder("", folder=self.folder_name)
+        list_kwargs = {"folder": self.folder_name}
+        if self.subfolder:
+            root_files = await self.drive_adapter.list_files_in_folder("", folder=self.folder_name)
+            sub_folder = next((f for f in (root_files or []) if f.get("name") == self.subfolder), None)
+            if not sub_folder:
+                return None
+            list_kwargs = {"root_id": sub_folder["id"], "folder": self.folder_name}
+
+        remote_files = await self.drive_adapter.list_files_in_folder("", **list_kwargs)
         filename = self.filename_for_year(year)
         return next((f for f in (remote_files or []) if f.get("name") == filename), None)
 
