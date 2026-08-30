@@ -182,6 +182,72 @@ async def test_force_bypasses_ttl(data_root, mock_drive):
     mock_drive.get_file_metadata.assert_called_once()
 
 
+# ---------------------------------------------------------------------------
+# 중첩 서브폴더 지원 (예: ceiling의 "db/{year}.db" - "ceiling" 루트 안에 "db"
+# 서브폴더가 하나 더 있고 그 안에 연도별 파일이 있음)
+# ---------------------------------------------------------------------------
+
+def make_sync_with_subfolder(drive, data_root) -> YearlyDbSync:
+    return YearlyDbSync(
+        drive_adapter=drive,
+        data_root=str(data_root),
+        folder_name="ceiling",
+        subfolder="db",
+        filename_for_year=lambda year: f"{year}.db",
+        required_tables={"cohort_stocks", "price_history"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_subfolder_resolves_nested_folder_before_listing_files(data_root, mock_drive):
+    sync = make_sync_with_subfolder(mock_drive, data_root)
+    remote_db_path = data_root / "_remote_source" / "2026.db"
+    remote_db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(remote_db_path)
+    conn.execute("CREATE TABLE cohort_stocks (x TEXT)")
+    conn.execute("CREATE TABLE price_history (x TEXT)")
+    conn.commit()
+    conn.close()
+    content = remote_db_path.read_bytes()
+
+    # 1단계: "ceiling" 루트에서 "db" 서브폴더를 찾는다.
+    # 2단계: 그 서브폴더 id로 다시 목록 조회해 "2026.db"를 찾는다.
+    mock_drive.list_files_in_folder.side_effect = [
+        [{"id": "db_folder_id", "name": "db"}],
+        [{"id": "drive_id_1", "name": "2026.db"}],
+    ]
+    mock_drive.get_file_metadata.return_value = remote_meta()
+    mock_drive.get_file_by_id.return_value = content
+
+    result = await sync.ensure_db(2026)
+
+    assert result == sync._local_path(2026)
+    assert result.read_bytes() == content
+    first_call = mock_drive.list_files_in_folder.call_args_list[0]
+    assert first_call.kwargs.get("folder") == "ceiling"
+    second_call = mock_drive.list_files_in_folder.call_args_list[1]
+    assert second_call.kwargs.get("root_id") == "db_folder_id"
+
+
+@pytest.mark.asyncio
+async def test_subfolder_not_found_falls_back_to_valid_local(data_root, mock_drive):
+    sync = make_sync_with_subfolder(mock_drive, data_root)
+    local_path = sync._local_path(2026)
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(local_path)
+    conn.execute("CREATE TABLE cohort_stocks (x TEXT)")
+    conn.execute("CREATE TABLE price_history (x TEXT)")
+    conn.commit()
+    conn.close()
+
+    mock_drive.list_files_in_folder.return_value = []  # "db" 서브폴더 자체가 없음
+
+    result = await sync.ensure_db(2026)
+
+    assert result == local_path
+    mock_drive.get_file_metadata.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_ttl_expired_rechecks_and_touches_last_checked(data_root, mock_drive):
     sync = make_sync(mock_drive, data_root)
