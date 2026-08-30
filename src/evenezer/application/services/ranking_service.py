@@ -1,7 +1,5 @@
-import io
 import logging
-
-import pandas as pd
+from datetime import datetime
 
 from evenezer.application.services.base_statistics_service import BaseStatisticsService
 from evenezer.domain.statistics.models import (
@@ -10,21 +8,39 @@ from evenezer.domain.statistics.models import (
     DailyMarketRankingAnalysis,
     MarketType,
     MonthlyMarketStats,
+    RankingItem,
     SupplySubject,
 )
-from evenezer.infrastructure.adapters.local.cache_manager import LocalCacheManager
-from evenezer.infrastructure.parsers.excel import SupplyDemandParser
+from evenezer.infrastructure.persistence import netbuy_db_query
+from evenezer.infrastructure.persistence.yearly_db_sync import YearlyDbSync
 
 logger = logging.getLogger(__name__)
 
-class RankingService(BaseStatisticsService[DailyMarketRanking]):
-    """거래일/월간 수급 순위 및 분석 전문 서비스."""
+_COMBOS = [
+    (MarketType.KOSPI, SupplySubject.FOREIGN),
+    (MarketType.KOSPI, SupplySubject.INSTITUTION),
+    (MarketType.KOSDAQ, SupplySubject.FOREIGN),
+    (MarketType.KOSDAQ, SupplySubject.INSTITUTION),
+]
 
-    def __init__(self, drive_adapter, folder_id, local_repository):
+
+class RankingService(BaseStatisticsService[DailyMarketRanking]):
+    """거래일/월간 수급 순위 및 분석 전문 서비스.
+
+    krx-auto-crawling이 발행하는 SQLite SSOT DB(market_data_{year}.db)를 로컬로
+    구독해 조회한다 (docs/db_ssot_consumer_sync.md 참고).
+    """
+
+    def __init__(self, drive_adapter, folder_id, local_repository, db_sync: YearlyDbSync | None = None):
         super().__init__(drive_adapter, folder_id)
         self.repository = local_repository
-        self.parser = SupplyDemandParser()
-        self.cache_manager = LocalCacheManager()
+        self.db_sync = db_sync or YearlyDbSync(
+            drive_adapter=drive_adapter,
+            data_root="data/statistics/netbuy/db",
+            folder_name="sd",
+            filename_for_year=lambda year: f"market_data_{year}.db",
+            required_tables={"netbuy", "price_info"},
+        )
         self._daily_cache = {}
         self._monthly_cache = {}
 
@@ -98,129 +114,58 @@ class RankingService(BaseStatisticsService[DailyMarketRanking]):
         return res
 
     async def sync_data(self, date_str: str | None = None) -> list[DailyMarketRanking]:
-        """지정된 폴더 구조에서 특정 엑셀 파일을 찾아 누락된 날짜(시트)를 모두 동기화합니다."""
+        """SSOT DB를 최신 상태로 동기화하고, 아직 로컬에 없는 날짜만 순위표로 조립합니다.
+
+        date_str가 주어지면 그 연도의 DB를, 없으면 올해 DB를 대상으로 한다.
+        """
         try:
             if not self.drive_adapter:
                 return []
 
-            # 1. 고정된 폴더 구조 탐색 (현재 연도 기준)
-            from datetime import datetime
-            now = datetime.now()
-            current_year = now.year
+            target_year = int(date_str[:4]) if date_str else datetime.now().year
 
-            # 1.1 대상 엑셀 파일 탐색
-            target_file = await self._find_target_excel_file(current_year)
-            if not target_file:
-                return []
-
-            # 1.2 파일 수정 날짜 체크 (자동 동기화 판단)
-            modified_time = target_file.get("modifiedTime", "")
-            needs_sync = self.cache_manager.needs_update("ranking", target_file["name"], modified_time)
-
-            if not needs_sync:
-                # 수정 날짜가 동일하면 더 이상 진행할 필요 없음
+            db_path = await self.db_sync.ensure_db(target_year)
+            if not db_path:
                 return self._get_fallback_rankings(date_str)
 
-            logger.info(f"[{self.get_service_name()}] 파일 업데이트 감지 ({modified_time}). 신규 데이터 확인을 시작합니다.")
-
-            # 2. 파일 다운로드 및 시트 목록 확인
-            logger.info(f"[{self.get_service_name()}] 대상 파일 다운로드 중: {target_file['name']}")
-            content = await self.drive_adapter.get_file_by_id(target_file["id"])
-            if not content:
-                return []
-
-            # 3. 동기화할 날짜 결정
-            # 로컬에 이미 존재하는 날짜는 건너뜀 (과거 시트는 변경될 이유가 거의 없으므로 신규 추가만 수행)
+            # 로컬에 이미 존재하는 날짜는 건너뜀 (과거 데이터는 변경될 이유가 거의 없으므로
+            # 신규 추가만 수행) - KOSPI/FOREIGN 조합을 대표값으로 삼는다(4개 조합은 항상
+            # 함께 동기화되므로 하나만 확인해도 충분).
             existing_dates = set(self.repository.list_available_dates(MarketType.KOSPI, SupplySubject.FOREIGN))
-            all_rankings = self._sync_new_sheets(content, current_year, existing_dates)
+            remote_dates = [d for d in netbuy_db_query.list_dates(db_path) if d not in existing_dates]
 
-            return self._post_sync_process(all_rankings, target_file, modified_time, needs_sync, date_str)
+            all_rankings: list[DailyMarketRanking] = []
+            for d in remote_dates:
+                for market, subject in _COMBOS:
+                    rows = netbuy_db_query.fetch_ranking_rows(db_path, market.value, subject.value, d)
+                    if not rows:
+                        continue
+                    items = [
+                        RankingItem(
+                            rank=r["rank"],
+                            name=r["stock_name"],
+                            amount=r["net_buy_amount"],
+                            ticker=r["stock_code"],
+                            high_price_type=r["high_price_type"],
+                        )
+                        for r in rows
+                    ]
+                    ranking = DailyMarketRanking(date=d, market=market, subject=subject, items=items)
+                    self.repository.save_daily_ranking(ranking)
+                    all_rankings.append(ranking)
+
+            if all_rankings:
+                newly_synced_count = len(set(r.date for r in all_rankings))
+                logger.info(f"[{self.get_service_name()}] 총 {newly_synced_count}일치 데이터가 새로 추가되었습니다.")
+                if date_str:
+                    return self.repository.get_rankings(date_str)
+                return all_rankings
+
+            return self._get_fallback_rankings(date_str)
 
         except Exception as e:
             logger.error(f"[{self.get_service_name()}] 순위 동기화 실패: {e}", exc_info=True)
             return []
-
-    def _post_sync_process(
-        self,
-        all_rankings: list[DailyMarketRanking],
-        target_file: dict,
-        modified_time: str,
-        needs_sync: bool,
-        date_str: str | None
-    ) -> list[DailyMarketRanking]:
-        """동기화 성공 이후의 후처리 작업 및 캐시 갱신을 수행하고 랭킹 목록을 반환합니다."""
-        if len(all_rankings) > 0 or needs_sync:
-            if len(all_rankings) > 0:
-                newly_synced_count = len(set(r.date for r in all_rankings))
-                logger.info(f"[{self.get_service_name()}] 총 {newly_synced_count}일치 데이터가 새로 추가되었습니다.")
-
-            # 캐시 매니저 업데이트 (수정 날짜 기록)
-            self.cache_manager.update_cache_info(
-                "ranking", target_file["name"], modified_time, {"file_id": target_file["id"]}
-            )
-
-            if not all_rankings and date_str:
-                return self.repository.get_rankings(date_str)
-            return all_rankings
-
-        # 새로 동기화된 게 없으면 가장 최근 데이터 반환
-        return self._get_fallback_rankings(date_str)
-
-    async def _find_target_excel_file(self, current_year: int) -> dict | None:
-        """현재 연도 기준에 따라 수급 엑셀 파일 정보를 탐색하여 반환합니다."""
-        target_year = f"{current_year}년"
-        target_subfolder = "일별수급정리표"
-        target_filename = f"{current_year}일별수급순위정리표.xlsx"
-
-        # 1. 연도 폴더 찾기
-        root_files = await self.drive_adapter.list_files_in_folder("", folder="sd")
-        year_folder = next((f for f in root_files if target_year in f["name"]), None)
-        if not year_folder:
-            logger.warning(f"[{self.get_service_name()}] '{target_year}' 폴더를 찾을 수 없습니다.")
-            return None
-
-        # 2. 서브 폴더 찾기
-        year_items = await self.drive_adapter.list_files_in_folder("", root_id=year_folder["id"], folder="sd")
-        sub_folder = next((f for f in year_items if target_subfolder in f["name"]), None)
-        if not sub_folder:
-            logger.warning(f"[{self.get_service_name()}] '{target_subfolder}' 폴더를 찾을 수 없습니다.")
-            return None
-
-        # 3. 대상 파일 찾기
-        sub_items = await self.drive_adapter.list_files_in_folder("", root_id=sub_folder["id"], folder="sd")
-        target_file = next((f for f in sub_items if target_filename in f["name"]), None)
-        if not target_file:
-            logger.warning(f"[{self.get_service_name()}] '{target_filename}' 파일을 찾을 수 없습니다.")
-            return None
-
-        return target_file
-
-    def _sync_new_sheets(self, excel_content: bytes, current_year: int, existing_dates: set[str]) -> list[DailyMarketRanking]:
-        """엑셀 바이너리에서 누락된 MMDD 시트들을 파싱하여 영속화하고 전체 순위 리스트를 반환합니다."""
-        xl = pd.ExcelFile(io.BytesIO(excel_content))
-        sheet_names = xl.sheet_names
-        all_rankings = []
-
-        for sheet_name in sheet_names:
-            # 시트 이름은 오직 MMDD 형식만 허용 (예: 0102)
-            sheet_name = sheet_name.strip()
-            if len(sheet_name) == 4 and sheet_name.isdigit():
-                date_norm = f"{current_year}-{sheet_name[:2]}-{sheet_name[2:]}"
-            else:
-                continue
-
-            if date_norm not in existing_dates:
-                logger.info(f"[{self.get_service_name()}] 신규 날짜 발견, 동기화 시작: {date_norm} (시트: {sheet_name})")
-                try:
-                    rankings = self.parser.parse_summary_table(excel_content, sheet_name, date_norm)
-                    if rankings:
-                        for r in rankings:
-                            self.repository.save_daily_ranking(r)
-                        all_rankings.extend(rankings)
-                except Exception as e:
-                    logger.error(f"[{self.get_service_name()}] 시트 {sheet_name} 파싱 실패: {e}")
-
-        return all_rankings
 
     def _get_fallback_rankings(self, date_str: str | None) -> list[DailyMarketRanking]:
         """새로 동기화된 내용이 없는 상황에서, 최선의 로컬 순위 데이터를 조회하여 반환합니다."""
