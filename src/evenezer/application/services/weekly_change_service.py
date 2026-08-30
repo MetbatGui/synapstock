@@ -33,13 +33,18 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         return "WeeklyChangeService"
 
     async def get_weekly_change(self, date: str, force_sync: bool = False) -> WeeklyChangeReport | None:
-        """특정 날짜의 주간 등락률 데이터를 가져옵니다."""
+        """특정 날짜의 주간 등락률 데이터를 가져옵니다.
+
+        force_sync=True면 mindmap 자체 리포트 캐시를 건너뛸 뿐 아니라, DB 동기화의
+        TTL(§10.3)도 무시하고 원격과 실제로 대조한다 - 사용자가 명시적으로 새로고침을
+        누른 경우까지 20분 TTL에 막혀 낡은 로컬을 보여주면 안 되기 때문이다.
+        """
         if not force_sync:
             report = self.repository.load_report(date)
             if report:
                 return report
 
-        return await self.sync_data(date)
+        return await self.sync_data(date, force=force_sync)
 
     @staticmethod
     def _parse_year(date_str: str) -> int:
@@ -48,10 +53,10 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         except (ValueError, TypeError):
             return datetime.now().year
 
-    async def _sync_for_year(self, year: int, date_str: str) -> WeeklyChangeReport | None:
+    async def _sync_for_year(self, year: int, date_str: str, force: bool = False) -> WeeklyChangeReport | None:
         """지정 연도의 weekly/monthly DB에서 date_str에 해당하는 이벤트를 찾아 리포트를 조립합니다."""
         for is_monthly in (False, True):
-            db_path = await self.db_sync.ensure_year_db(year, is_monthly)
+            db_path = await self.db_sync.ensure_year_db(year, is_monthly, force=force)
             if not db_path:
                 continue
             event = fetch_event_by_date(db_path, date_str)
@@ -61,13 +66,13 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
                 return report
         return None
 
-    async def _sync_latest(self) -> WeeklyChangeReport | None:
+    async def _sync_latest(self, force: bool = False) -> WeeklyChangeReport | None:
         """올해/작년 weekly/monthly DB를 모두 훑어 가장 최근 완료 이벤트를 찾습니다."""
         current_year = datetime.now().year
         candidates = []
         for year in (current_year, current_year - 1):
             for is_monthly in (False, True):
-                db_path = await self.db_sync.ensure_year_db(year, is_monthly)
+                db_path = await self.db_sync.ensure_year_db(year, is_monthly, force=force)
                 if not db_path:
                     continue
                 event = fetch_latest_event(db_path)
@@ -83,14 +88,17 @@ class WeeklyChangeService(BaseStatisticsService[WeeklyChangeReport]):
         self.repository.save_report(report)
         return report
 
-    async def sync_data(self, date_str: str | None = None) -> WeeklyChangeReport | None:
-        """SSOT DB를 최신 상태로 동기화하고, 대상 이벤트를 리포트로 조립해 로컬 캐시에 저장합니다."""
+    async def sync_data(self, date_str: str | None = None, force: bool = False) -> WeeklyChangeReport | None:
+        """SSOT DB를 최신 상태로 동기화하고, 대상 이벤트를 리포트로 조립해 로컬 캐시에 저장합니다.
+
+        force=True면 db_sync의 TTL을 무시하고 항상 원격과 실제로 대조한다(수동 새로고침용).
+        """
         if not self.drive_adapter:
             return None
 
         if date_str:
-            return await self._sync_for_year(self._parse_year(date_str), date_str)
-        return await self._sync_latest()
+            return await self._sync_for_year(self._parse_year(date_str), date_str, force=force)
+        return await self._sync_latest(force=force)
 
     def _local_dates(self) -> dict[tuple[str, bool], dict]:
         results = {}

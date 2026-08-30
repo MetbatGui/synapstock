@@ -171,7 +171,7 @@ class WeeklyChangeDbSync:
             return True
         return False
 
-    async def ensure_year_db(self, year: int, is_monthly: bool) -> Path | None:
+    async def ensure_year_db(self, year: int, is_monthly: bool, force: bool = False) -> Path | None:
         """해당 연도의 weekly/monthly DB를 최신 상태로 보장하고 로컬 경로를 반환한다.
 
         원격 확인 실패나 다운로드 실패 시에도, 이전에 검증된 로컬 DB가 있으면
@@ -180,7 +180,10 @@ class WeeklyChangeDbSync:
 
         원격 메타데이터 확인은 짧은 TTL(20분) 안에서는 생략한다 - 목록 조회
         화면 하나가 열릴 때마다 연도x주기 조합별로 Drive API를 다회 호출하는
-        걸 막기 위함 (db_ssot_guide.md §10.3).
+        걸 막기 위함 (db_ssot_guide.md §10.3). force=True면 이 TTL 생략을
+        건너뛰고 항상 원격과 대조한다 - 사용자가 명시적으로 동기화를 요청한
+        경우(수동 새로고침)까지 TTL에 막히면 안 되기 때문
+        (docs/db_ssot_consumer_sync.md "동기화 알고리즘" §1).
         """
         if not self.drive_adapter:
             return None
@@ -189,7 +192,7 @@ class WeeklyChangeDbSync:
         local_path = self._local_path(is_monthly, year)
         local_valid = self._validate(local_path)
 
-        if local_valid:
+        if local_valid and not force:
             entry = self._load_manifest().get(key)
             if entry and self._within_ttl(entry):
                 return local_path

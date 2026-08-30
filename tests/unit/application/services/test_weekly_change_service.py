@@ -87,7 +87,7 @@ def db_sync_stub(tmp_path):
         make_db(p, events, items or [])
         paths[(year, is_monthly)] = p
 
-    async def ensure_year_db(year, is_monthly):
+    async def ensure_year_db(year, is_monthly, force=False):
         return paths.get((year, is_monthly))
 
     stub = MagicMock()
@@ -130,7 +130,7 @@ async def test_get_weekly_change_cache_miss_calls_sync_data(service, mock_repo, 
     mock_repo.load_report.return_value = None
     called = {}
 
-    async def fake_sync(date_str):
+    async def fake_sync(date_str, force=False):
         called["date"] = date_str
         return "sentinel"
 
@@ -157,6 +157,20 @@ async def test_get_weekly_change_force_sync_ignores_cache(service, mock_repo, db
     assert result is not None
     assert result.items[0].name == "삼성전자"
     mock_repo.save_report.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_weekly_change_force_sync_bypasses_db_sync_ttl(service, mock_repo, db_sync_stub):
+    """force_sync=True는 db_sync.ensure_year_db에도 force=True로 전달돼야 한다 -
+    안 그러면 §10.3 TTL에 막혀 사용자가 명시적으로 새로고침을 눌러도 낡은 로컬
+    DB를 그대로 보여주게 된다."""
+    db_sync_stub.register(
+        CURRENT_YEAR, False, [weekly_event("2026-W27", 27, 7, 1, "2026-07-03")], [],
+    )
+
+    await service.get_weekly_change(date="2026-07-03", force_sync=True)
+
+    db_sync_stub.ensure_year_db.assert_any_call(CURRENT_YEAR, False, force=True)
 
 
 @pytest.mark.asyncio
