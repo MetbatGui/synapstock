@@ -324,3 +324,76 @@ async def test_monthly_uses_separate_manifest_key_and_path(data_root, mock_drive
     assert result != sync._local_path(is_monthly=False, year=2026)
     manifest = json.loads(sync.manifest_path.read_text(encoding="utf-8"))
     assert "monthly/2026.db" in manifest
+
+
+# ---------------------------------------------------------------------------
+# TTL (db_ssot_guide.md §10.3): 원격 메타데이터 확인은 짧은 TTL 안에서는 생략
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_within_ttl_skips_remote_calls_entirely(data_root, mock_drive):
+    """매니페스트의 last_checked_at이 TTL 이내면 Drive API를 아예 호출하지 않는다."""
+    from datetime import UTC, datetime
+
+    sync = WeeklyChangeDbSync(drive_adapter=mock_drive, data_root=str(data_root))
+    local_path = sync._local_path(is_monthly=False, year=2026)
+    make_valid_db(local_path, last_trading_day="2026-06-26")
+    sync._save_manifest(
+        {
+            "weekly/2026.db": {
+                "drive_file_id": "drive_id_1",
+                "remote_modified_time": "t",
+                "remote_md5_checksum": "m",
+                "remote_size_bytes": "1",
+                "local_md5": "x",
+                "local_size_bytes": local_path.stat().st_size,
+                "data_max_date": "2026-06-26",
+                "downloaded_at": "2026-01-01T00:00:00+00:00",
+                "last_checked_at": datetime.now(UTC).isoformat(),
+            }
+        }
+    )
+
+    result = await sync.ensure_year_db(2026, is_monthly=False)
+
+    assert result == local_path
+    mock_drive.list_files_in_folder.assert_not_called()
+    mock_drive.get_file_metadata.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ttl_expired_rechecks_remote(data_root, mock_drive):
+    """TTL이 지났으면 다시 원격과 대조하고, 변경 없으면 last_checked_at을 갱신한다."""
+    from datetime import UTC, datetime, timedelta
+
+    sync = WeeklyChangeDbSync(drive_adapter=mock_drive, data_root=str(data_root))
+    local_path = sync._local_path(is_monthly=False, year=2026)
+    make_valid_db(local_path, last_trading_day="2026-06-26")
+    stale_checked_at = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
+    sync._save_manifest(
+        {
+            "weekly/2026.db": {
+                "drive_file_id": "drive_id_1",
+                "remote_modified_time": "t",
+                "remote_md5_checksum": "m",
+                "remote_size_bytes": "1",
+                "local_md5": "x",
+                "local_size_bytes": local_path.stat().st_size,
+                "data_max_date": "2026-06-26",
+                "downloaded_at": stale_checked_at,
+                "last_checked_at": stale_checked_at,
+            }
+        }
+    )
+    mock_drive.list_files_in_folder.return_value = [{"id": "drive_id_1", "name": "2026.db"}]
+    mock_drive.get_file_metadata.return_value = remote_meta(
+        file_id="drive_id_1", mtime="t", md5="m"
+    )
+
+    result = await sync.ensure_year_db(2026, is_monthly=False)
+
+    assert result == local_path
+    mock_drive.get_file_metadata.assert_called_once()
+    mock_drive.get_file_by_id.assert_not_called()  # 변경 없음 - 재다운로드는 안 함
+    manifest = json.loads(sync.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["weekly/2026.db"]["last_checked_at"] != stale_checked_at

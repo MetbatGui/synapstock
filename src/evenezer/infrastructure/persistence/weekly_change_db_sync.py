@@ -8,12 +8,18 @@ import hashlib
 import json
 import logging
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 REQUIRED_TABLES = {"events", "items"}
+
+# 원격 메타데이터 확인은 가볍지만 요청마다 실행할 필요는 없다 - 짧은 TTL이 지난
+# 첫 요청에서만 재확인한다 (db_ssot_guide.md §10.3, docs/db_ssot_consumer_sync.md
+# "동기화 알고리즘" §1). 페이지 하나가 열릴 때마다 연도x주기 조합별로 Drive API를
+# 다회 호출하는 걸 막는 게 목적.
+_METADATA_TTL = timedelta(minutes=20)
 
 
 class WeeklyChangeDbSync:
@@ -81,6 +87,7 @@ class WeeklyChangeDbSync:
             conn.close()
 
     def _write_manifest_entry(self, manifest: dict, key: str, remote_meta: dict, local_path: Path) -> None:
+        now = datetime.now(UTC).isoformat()
         manifest[key] = {
             "drive_file_id": remote_meta.get("id"),
             "remote_modified_time": remote_meta.get("modifiedTime"),
@@ -89,9 +96,17 @@ class WeeklyChangeDbSync:
             "local_md5": self._md5(local_path),
             "local_size_bytes": local_path.stat().st_size,
             "data_max_date": self._max_last_trading_day(local_path),
-            "downloaded_at": datetime.now(UTC).isoformat(),
+            "downloaded_at": now,
+            "last_checked_at": now,
         }
         self._save_manifest(manifest)
+
+    def _touch_last_checked(self, key: str) -> None:
+        """원격과 대조했는데 변경이 없었을 때 TTL 판단용 시각만 갱신한다."""
+        manifest = self._load_manifest()
+        if key in manifest:
+            manifest[key]["last_checked_at"] = datetime.now(UTC).isoformat()
+            self._save_manifest(manifest)
 
     @staticmethod
     def _is_unchanged(entry: dict, remote_meta: dict) -> bool:
@@ -100,6 +115,21 @@ class WeeklyChangeDbSync:
             and entry.get("remote_md5_checksum") == remote_meta.get("md5Checksum")
             and entry.get("remote_modified_time") == remote_meta.get("modifiedTime")
         )
+
+    @staticmethod
+    def _within_ttl(entry: dict) -> bool:
+        """매니페스트 항목이 마지막으로 원격과 대조된 지 TTL 이내인지 확인한다."""
+        checked_at = entry.get("last_checked_at") or entry.get("downloaded_at")
+        if not checked_at:
+            return False
+        try:
+            checked = datetime.fromisoformat(checked_at)
+        except ValueError:
+            return False
+        if checked.tzinfo is None:
+            # 과거(타임존 정보 없이 저장된) 매니페스트 항목 호환 - UTC로 가정한다.
+            checked = checked.replace(tzinfo=UTC)
+        return datetime.now(UTC) - checked < _METADATA_TTL
 
     async def _find_remote_file(self, year: int, is_monthly: bool) -> dict | None:
         subfolder = "db/monthly" if is_monthly else "db/weekly"
@@ -130,7 +160,10 @@ class WeeklyChangeDbSync:
         """검증된 로컬 DB가 원격과 이미 일치하면 True. 매니페스트가 없던 경우 새로 생성한다."""
         entry = self._load_manifest().get(key)
         if entry:
-            return self._is_unchanged(entry, remote_meta)
+            unchanged = self._is_unchanged(entry, remote_meta)
+            if unchanged:
+                self._touch_last_checked(key)
+            return unchanged
 
         if self._md5(local_path) == remote_meta.get("md5Checksum"):
             manifest = self._load_manifest()
@@ -144,6 +177,10 @@ class WeeklyChangeDbSync:
         원격 확인 실패나 다운로드 실패 시에도, 이전에 검증된 로컬 DB가 있으면
         stale 상태로 재사용한다. 검증된 로컬 DB조차 없으면 None을 반환해
         동기화 실패를 데이터 없음처럼 위장하지 않는다.
+
+        원격 메타데이터 확인은 짧은 TTL(20분) 안에서는 생략한다 - 목록 조회
+        화면 하나가 열릴 때마다 연도x주기 조합별로 Drive API를 다회 호출하는
+        걸 막기 위함 (db_ssot_guide.md §10.3).
         """
         if not self.drive_adapter:
             return None
@@ -151,6 +188,11 @@ class WeeklyChangeDbSync:
         key = self._manifest_key(is_monthly, year)
         local_path = self._local_path(is_monthly, year)
         local_valid = self._validate(local_path)
+
+        if local_valid:
+            entry = self._load_manifest().get(key)
+            if entry and self._within_ttl(entry):
+                return local_path
 
         remote = await self._find_remote_file(year, is_monthly)
         if not remote:
