@@ -74,17 +74,31 @@
 유지)는 `db_ssot_consumer_sync.md`를 그대로 따르면 된다 — 도메인마다
 새로 설계할 필요 없음.
 
-### [알려진 결함] 원격 메타데이터 확인에 TTL이 없다 — 다음 마이그레이션에서 고칠 것
+### 원격 메타데이터 확인 TTL — 2026-08-31 수정 완료, 다음 마이그레이션은 처음부터 넣을 것
 
 `db_ssot_consumer_sync.md`는 원격 메타데이터 확인을 "서버 시작 시 1회 /
 명시적 동기화 시 / 짧은 TTL(10~30분) 경과 후 첫 요청"으로 제한하라고
-명시했지만, `WeeklyChangeDbSync.ensure_year_db`는 이 권고를 구현하지
-않고 호출될 때마다 무조건 Drive에 `list_files_in_folder` +
-`get_file_metadata`를 날린다. `list_available_dates()`가 연도 3개 ×
-주기 2종을 순회하므로, 날짜 드롭다운을 열 때마다 Drive API가 12회
-호출된다 — 트래픽이 적을 땐 문제없지만 다음 도메인(특히 `ceiling`처럼
-DB가 크거나 호출이 잦은 화면)을 옮길 땐 매니페스트에 `last_checked_at`을
-같이 기록해 TTL 이내면 원격 호출을 건너뛰는 로직을 처음부터 넣는다.
+명시했는데, `WeeklyChangeDbSync.ensure_year_db`는 처음엔 이 권고를
+구현하지 않고 호출될 때마다 무조건 Drive에 `list_files_in_folder` +
+`get_file_metadata`를 날렸다. `list_available_dates()`가 연도 3개 ×
+주기 2종을 순회해서, 날짜 드롭다운을 열 때마다 Drive API가 12회
+호출되는 게 실사용 중 발견돼 20분 TTL로 고쳤다(매니페스트에
+`last_checked_at` 추가, `_within_ttl()`로 판단).
+
+**이 수정 자체가 새 버그를 만들 뻔했다 — 교훈으로 남긴다.** TTL을
+`ensure_year_db` 레벨에만 넣었더니, UI의 수동 새로고침
+(`force_sync=True` → `/api/statistics/weekly-change?force_sync=true`)을
+눌러도 TTL 이내면 그냥 낡은 로컬 DB를 반환해버리는 회귀가 바로
+생겼다. `get_weekly_change(force_sync)` → `sync_data()` →
+`_sync_for_year`/`_sync_latest` → `ensure_year_db()`까지 호출 체인이
+길었는데, 중간 계층들이 `force`를 그냥 삼키고 있었던 것이다.
+**TTL을 도입하면 "명시적 동기화 요청은 TTL을 무시해야 한다"는 요구사항이
+반드시 함께 따라온다(§ "동기화 알고리즘" 1항이 이미 이렇게 명시하고
+있었다) — TTL 캐시를 만드는 순간, 그 캐시를 우회하는 경로가 호출
+체인 끝까지 실제로 뚫려 있는지 매 계층에서 확인할 것.** 다음
+도메인(`ceiling` 등)을 옮길 때는 TTL과 force 우회를 같은 커밋에서
+설계하고, "force_sync=True면 TTL 캐시가 실제로 원격을 재확인하는지"를
+회귀 테스트로 반드시 남긴다.
 
 ### "날짜 기반 캐시 키"는 진행 중인 기간에서 반드시 버그를 만든다
 
