@@ -69,7 +69,8 @@ from evenezer.infrastructure.adapters.scraper.naver_ticker_adapter import (
     NaverTickerSearchAdapter,
 )
 from evenezer.infrastructure.config import AppConfig
-from evenezer.infrastructure.persistence.excel_financial_repository import ExcelFinancialRepository
+from evenezer.infrastructure.persistence.db_financial_repository import DbFinancialRepository
+from evenezer.infrastructure.persistence.yearly_db_sync import YearlyDbSync
 
 
 class Container:
@@ -111,13 +112,25 @@ class Container:
         from evenezer.infrastructure.adapters.local.news_repo import LocalNewsRepository
 
         self._news_repo = LocalNewsRepository(self.config.news_dir)
-        self._financial_repo = ExcelFinancialRepository(
-            str(self.config.data_dir / "financial_statements" / "재무제표.xlsx")
+        self._financial_repo = DbFinancialRepository(
+            str(self.config.financial_dir / "db" / "financial_statements.db")
         )
 
         # 4. 조건부 어댑터 (Google Drive)
         self._drive_adapter = None
         self._init_google_drive()
+
+        # dart-fss-extractor가 발행하는 SQLite SSOT(db/financial_statements.db) 구독 -
+        # ExcelFinancialDataAdapter(보드 위젯용, 재무제표.xlsx)는 별도 경로로 계속
+        # Excel을 구독한다(FinancialSyncService) - 이번 전환 범위 밖.
+        self._financial_db_sync = YearlyDbSync(
+            drive_adapter=self._drive_adapter,
+            data_root=str(self.config.financial_dir / "db"),
+            folder_name="financial_statements",
+            subfolder="db",
+            filename_for_year=lambda _: "financial_statements.db",
+            required_tables={"companies", "financials"},
+        )
 
         # 5. 도메인 서비스 싱글톤
         self._board_file_sync_service = BoardFileSyncService(
@@ -239,6 +252,7 @@ class Container:
         """재무제표, 테마 보드, 주식 분할, 히트맵 등의 백그라운드 동기화 스레드 및 아웃박스 워커를 기동합니다."""
         logger.info("[Container] 백그라운드 서비스 기동 시작...")
         self.sync_financial_statements_from_drive()
+        self.sync_financial_db_from_drive()
         self.sync_boards_from_drive_in_background()
         self.sync_stock_splits_from_drive_in_background()
         self.sync_heatmap_from_drive_in_background()
@@ -278,6 +292,7 @@ class Container:
                 "weekly_change": self.config.weekly_change_folder_id,
                 "stock_split": self.config.stock_split_folder_id,
                 "heatmap": self.config.heatmap_folder_id,
+                "financial_statements": self.config.financial_statements_id,
             }
 
             # None이 아닌 폴더 ID만 포함하여 dict[str, str] 보장
@@ -323,6 +338,19 @@ class Container:
     def sync_financial_statements_from_drive(self):
         """Google Drive에 업로드된 최신 재무제표 엑셀 파일을 로컬에 동기화하기 위한 백그라운드 데몬 스레드를 실행합니다."""
         self._run_in_background_thread(self._financial_sync_service.sync, "FinancialSyncThread")
+
+    async def _sync_financial_db(self) -> None:
+        await self._financial_db_sync.ensure_db(0)
+
+    def sync_financial_db_from_drive(self):
+        """dart-fss-extractor가 발행한 db/financial_statements.db를 로컬에 동기화하기
+        위한 백그라운드 데몬 스레드를 실행합니다."""
+        if not self._drive_adapter or not self.config.financial_statements_id:
+            logger.info(
+                "[Container] 재무제표 구글 드라이브 ID가 없거나 어댑터가 활성화되지 않아 DB 동기화를 건너뜁니다."
+            )
+            return
+        self._run_in_background_thread(self._sync_financial_db, "FinancialDbSyncThread")
 
     def sync_boards_from_drive_in_background(self):
         """로컬 가상/테마 보드 데이터와 Google Drive 내 파일을 양방향 동기화하는 백그라운드 데몬 스레드를 실행합니다."""
