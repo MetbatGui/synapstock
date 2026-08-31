@@ -182,6 +182,9 @@ class YearlyDbSync:
 
         원격 메타데이터 확인은 짧은 TTL(20분) 안에서는 생략한다(§10.3).
         force=True면 TTL을 무시하고 항상 원격과 대조한다(수동 새로고침용).
+
+        원격에 아예 없는 연도(예: 아직 발행 전인 미래 연도)도 "없음" 결과를 TTL로
+        캐시한다 - 안 그러면 존재하지 않는 연도를 매 요청마다 Drive에 확인하게 된다.
         """
         if not self.drive_adapter:
             return None
@@ -190,13 +193,19 @@ class YearlyDbSync:
         local_path = self._local_path(year)
         local_valid = self._validate(local_path)
 
-        if local_valid and not force:
+        if not force:
             entry = self._load_manifest().get(key)
-            if entry and self._within_ttl(entry):
+            if local_valid and entry and self._within_ttl(entry):
                 return local_path
+            if not local_valid and entry and entry.get("not_found") and self._within_ttl(entry):
+                return None
 
         remote = await self._find_remote_file(year)
         if not remote:
+            if not local_valid:
+                manifest = self._load_manifest()
+                manifest[key] = {"not_found": True, "last_checked_at": datetime.now(UTC).isoformat()}
+                self._save_manifest(manifest)
             return local_path if local_valid else None
 
         remote_meta = await self.drive_adapter.get_file_metadata(remote["id"])
