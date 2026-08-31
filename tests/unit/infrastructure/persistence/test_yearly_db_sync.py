@@ -98,6 +98,32 @@ async def test_remote_file_not_found_and_no_local_returns_none(data_root, mock_d
 
 
 @pytest.mark.asyncio
+async def test_repeated_calls_for_permanently_missing_year_are_ttl_cached(data_root, mock_drive):
+    """존재하지 않는 연도(예: 아직 발행 전 미래 연도)를 매 요청마다 확인하면 Drive를
+    영원히 두들기게 된다 - "없음" 결과도 TTL로 캐시해야 한다."""
+    sync = make_sync(mock_drive, data_root)
+    mock_drive.list_files_in_folder.return_value = []
+
+    result1 = await sync.ensure_db(2099)
+    result2 = await sync.ensure_db(2099)
+
+    assert result1 is None
+    assert result2 is None
+    assert mock_drive.list_files_in_folder.call_count == 1  # 두 번째 호출은 TTL에 막혀 생략
+
+
+@pytest.mark.asyncio
+async def test_force_bypasses_ttl_even_for_missing_year(data_root, mock_drive):
+    sync = make_sync(mock_drive, data_root)
+    mock_drive.list_files_in_folder.return_value = []
+
+    await sync.ensure_db(2099)
+    await sync.ensure_db(2099, force=True)
+
+    assert mock_drive.list_files_in_folder.call_count == 2
+
+
+@pytest.mark.asyncio
 async def test_corrupt_local_triggers_redownload_even_without_manifest(data_root, mock_drive):
     sync = make_sync(mock_drive, data_root)
     local_path = sync._local_path(2026)
